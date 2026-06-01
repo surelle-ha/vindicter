@@ -50,7 +50,10 @@
       "Bash(node -e \"const {marked}=require\\('./node_modules/marked/src/marked.cjs'\\); console.log\\(typeof marked\\('# hello'\\)\\)\")",
       "Bash(node -e \"import\\('d:/Workspace/vindicta/apps/desktop/node_modules/marked/lib/marked.esm.js'\\).then\\(m=>{console.log\\(typeof m.marked\\('# hello'\\), m.marked\\('# hello'\\).slice\\(0,30\\)\\)}\\)\")",
       "Bash(pnpm remove *)",
-      "Bash(node --input-type=module)"
+      "Bash(node --input-type=module)",
+      "Bash(pnpm --filter @vindicta/desktop build)",
+      "Bash(Get-ChildItem -Path \"D:\\\\workspace\\\\vindicta\\\\apps\\\\desktop\" -Recurse -Force)",
+      "Bash(Select-Object -First 50)"
     ]
   }
 }

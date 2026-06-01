@@ -125,6 +125,7 @@ export interface SecurityScanFinding {
   evidence: string
   recommendation: string
   selected: boolean
+  whitelisted?: boolean
 }
 
 export interface SecurityScan {
@@ -150,11 +151,20 @@ export interface SecuritySettings {
   aiFindingLimit: number
 }
 
+export interface WhitelistedFinding {
+  id: string
+  title: string
+  category: string
+  area: string
+  addedAt: string
+}
+
 export interface SecurityData {
   findingCounter: number
   findings: SecurityFinding[]
   scans: SecurityScan[]
   settings: SecuritySettings
+  whitelist: WhitelistedFinding[]
 }
 
 export interface ProjectMeta {
@@ -218,4 +228,5 @@ export const DEFAULT_SECURITY_DATA: SecurityData = {
   findings: [],
   scans: [],
   settings: DEFAULT_SECURITY_SETTINGS,
+  whitelist: [],
 }

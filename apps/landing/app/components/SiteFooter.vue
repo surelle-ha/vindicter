@@ -17,8 +17,9 @@ defineProps<{
       </div>
 
       <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-        <NuxtLink to="/beta" class="transition-colors hover:text-white/60">Open Beta</NuxtLink>
+        <NuxtLink to="/standard-beta" class="transition-colors hover:text-white/60">Open Beta</NuxtLink>
         <NuxtLink to="/docs" class="transition-colors hover:text-white/60">Docs</NuxtLink>
+        <NuxtLink to="/faq" class="transition-colors hover:text-white/60">FAQ</NuxtLink>
         <NuxtLink to="/support" class="transition-colors hover:text-white/60">Support</NuxtLink>
         <NuxtLink to="/privacy" class="transition-colors hover:text-white/60">Privacy</NuxtLink>
         <NuxtLink to="/terms" class="transition-colors hover:text-white/60">Terms</NuxtLink>

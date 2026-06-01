@@ -94,6 +94,39 @@
         { "name": "npm-install-codex", "cmd": "npm", "args": ["install", "-g", "@openai/codex@latest"], "sidecar": false },
         { "name": "npm-cmd-install-codex", "cmd": "npm.cmd", "args": ["install", "-g", "@openai/codex@latest"], "sidecar": false },
         {
+          "name": "npm-audit",
+          "cmd": "npm",
+          "args": ["audit", "--json", "--prefix", { "validator": "[^\\u0000-\\u001f\\u007f]+" }],
+          "sidecar": false
+        },
+        {
+          "name": "npm-cmd-audit",
+          "cmd": "npm.cmd",
+          "args": ["audit", "--json", "--prefix", { "validator": "[^\\u0000-\\u001f\\u007f]+" }],
+          "sidecar": false
+        },
+        { "name": "cargo-version", "cmd": "cargo", "args": ["--version"], "sidecar": false },
+        {
+          "name": "cargo-audit-scan",
+          "cmd": "cargo",
+          "args": ["audit", "--json", "--file", { "validator": "[^\\u0000-\\u001f\\u007f]+" }],
+          "sidecar": false
+        },
+        { "name": "trivy-version", "cmd": "trivy", "args": ["--version"], "sidecar": false },
+        {
+          "name": "trivy-fs-scan",
+          "cmd": "trivy",
+          "args": ["fs", "--format", "json", "--quiet", "--no-progress", { "validator": "[^\\u0000-\\u001f\\u007f]+" }],
+          "sidecar": false
+        },
+        { "name": "semgrep-version", "cmd": "semgrep", "args": ["--version"], "sidecar": false },
+        {
+          "name": "semgrep-scan",
+          "cmd": "semgrep",
+          "args": ["--config=auto", "--json", "--quiet", { "validator": "[^\\u0000-\\u001f\\u007f]+" }],
+          "sidecar": false
+        },
+        {
           "name": "wsl-exec",
           "cmd": "wsl",
           "args": ["bash", "-c", { "validator": "(?s).*" }],

@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "identifier": "com.vindicta.app",
   "productName": "Vindicta",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "build": {
     "beforeDevCommand": "pnpm --filter @vindicta/desktop dev",
     "beforeBuildCommand": "pnpm --filter @vindicta/desktop generate",
@@ -45,8 +45,8 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQwMEVCNzYwN0FDNDNGODgKUldTSVA4UjZZTGNPUUxQZTE5MUdiVUV2bTZUK0pIOHZUYWkrOTVIMTFEZmlIWE9UaStRTGY2WnoK",
-      "endpoints": ["https://REPLACE_WITH_R2_DOMAIN/releases/latest/update.json"],
-      "dialog": true
+      "endpoints": ["https://pub-1dcbd264e42f475e9f95858cc16ab6b7.r2.dev/releases/latest/update.json"],
+      "dialog": false
     },
     "shell": {
       "open": true

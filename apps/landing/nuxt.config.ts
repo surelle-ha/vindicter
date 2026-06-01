@@ -5,6 +5,12 @@ export default defineNuxtConfig({
   ssr: true,
   nitro: { preset: 'static' },
   modules: [],
+  runtimeConfig: {
+    public: {
+      supabaseUrl:     process.env.SUPABASE_URL      ?? '',
+      supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? '',
+    },
+  },
   css: ['~/assets/css/main.css'],
   app: {
     head: {

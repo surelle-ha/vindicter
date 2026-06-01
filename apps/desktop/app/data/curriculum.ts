@@ -12,6 +12,7 @@ export interface Lesson {
   content: string
   labHint?: string
   agentNotes?: string
+  prerequisiteId?: string | null
 }
 
 export interface CustomLesson extends Lesson {

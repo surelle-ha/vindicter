@@ -17,13 +17,33 @@ const projects = useProjectsStore()
 const app = useAppStore()
 const security = useSecurityStore()
 const wizard = useWizardStore()
+const feed = useNotificationFeedStore()
 const { createProject } = useVindictaJson()
 const { notify } = useNotifications()
+
+const RSS_NOTIF_KEY = 'vindicta:rss:last-notified-ids'
+
+function notifyNewRssItems(freshItems: NewsItem[]) {
+  try {
+    const lastIds: string[] = JSON.parse(localStorage.getItem(RSS_NOTIF_KEY) ?? '[]')
+    const newItems = freshItems.filter(item => !lastIds.includes(item.id))
+    if (newItems.length > 0) {
+      feed.push({
+        category: 'rss_article',
+        title: `${newItems.length} new security article${newItems.length === 1 ? '' : 's'}`,
+        body: newItems.slice(0, 3).map(i => i.title).join(' • '),
+        link: '/',
+      })
+    }
+    localStorage.setItem(RSS_NOTIF_KEY, JSON.stringify(freshItems.map(i => i.id)))
+  }
+  catch { /* ignore */ }
+}
 
 onMounted(async () => {
   await projects.loadProjects()
   await loadActiveSecurity()
-  await loadSecurityNews()
+  await loadSecurityNews()   // serves cache instantly if fresh; fetches in background if stale
 })
 
 const activeProject = computed(() => projects.activeProject)
@@ -91,55 +111,99 @@ async function fetchRssXml(url: string) {
   }
 }
 
-async function loadSecurityNews() {
-  if (!enabledRssSources.value.length) {
-    newsItems.value = []
+// ── RSS cache helpers ─────────────────────────────────────────────────────────
+const RSS_CACHE_KEY = 'vindicta:rss:cache'
+const RSS_CACHE_TTL = 30 * 60 * 1000  // 30 minutes
+
+interface RssCache { items: NewsItem[]; fetchedAt: number; sourceIds: string[] }
+
+function getRssCache(): RssCache | null {
+  try {
+    if (typeof localStorage === 'undefined') return null
+    const raw = localStorage.getItem(RSS_CACHE_KEY)
+    return raw ? JSON.parse(raw) as RssCache : null
+  } catch { return null }
+}
+
+function setRssCache(items: NewsItem[]) {
+  try {
+    const data: RssCache = {
+      items,
+      fetchedAt: Date.now(),
+      sourceIds: enabledRssSources.value.map(s => s.id),
+    }
+    localStorage.setItem(RSS_CACHE_KEY, JSON.stringify(data))
+  } catch { /* storage may be full */ }
+}
+
+async function fetchAndParseNews(): Promise<NewsItem[]> {
+  const batches = await Promise.allSettled(enabledRssSources.value.map(async (source) => {
+    const xml = await fetchRssXml(source.url)
+    const doc = new DOMParser().parseFromString(xml, 'application/xml')
+    if (doc.querySelector('parsererror')) throw new Error(`${source.label} returned invalid XML`)
+    const nodes = [
+      ...Array.from(doc.querySelectorAll('item')),
+      ...Array.from(doc.querySelectorAll('entry')),
+    ]
+    return nodes.slice(0, 6).map((item, index) => {
+      const title = childText(item, ['title']) || 'Untitled security story'
+      const link = itemLink(item, source.url)
+      const pubDate = childText(item, ['pubDate', 'published', 'updated', 'dc:date'])
+      const summary = childText(item, ['description', 'summary', 'content:encoded', 'content'])
+      const timestamp = pubDate ? new Date(pubDate).getTime() : Date.now() - index
+      return {
+        id: `${source.id}-${index}-${title}`,
+        title, link, sourceLabel: source.label,
+        publishedLabel: formatNewsDate(pubDate),
+        summary: cleanSummary(summary),
+        timestamp: Number.isNaN(timestamp) ? Date.now() - index : timestamp,
+      } satisfies NewsItem
+    })
+  }))
+
+  const items = batches
+    .flatMap(r => r.status === 'fulfilled' ? r.value : [])
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, 8)
+
+  const rejected = batches.filter(r => r.status === 'rejected') as PromiseRejectedResult[]
+  if (!items.length && rejected.length) {
+    throw new Error(rejected[0]?.reason?.message ?? 'No stories returned from the configured feeds.')
+  }
+  return items
+}
+
+async function loadSecurityNews(forceRefresh = false) {
+  if (!enabledRssSources.value.length) { newsItems.value = []; return }
+
+  // Serve cached articles immediately if fresh enough
+  const cache = getRssCache()
+  const cacheValid = cache
+    && Date.now() - cache.fetchedAt < RSS_CACHE_TTL
+    && JSON.stringify(cache.sourceIds) === JSON.stringify(enabledRssSources.value.map(s => s.id))
+
+  if (!forceRefresh && cacheValid) {
+    newsItems.value = cache.items
+    // Silently refresh in background after a short delay
+    setTimeout(() => void loadSecurityNews(true), 5_000)
     return
   }
 
   newsLoading.value = true
   newsError.value = ''
   try {
-    const batches = await Promise.allSettled(enabledRssSources.value.map(async (source) => {
-      const xml = await fetchRssXml(source.url)
-      const document = new DOMParser().parseFromString(xml, 'application/xml')
-      const parserError = document.querySelector('parsererror')
-      if (parserError) throw new Error(`${source.label} returned invalid RSS XML`)
-      const nodes = [
-        ...Array.from(document.querySelectorAll('item')),
-        ...Array.from(document.querySelectorAll('entry')),
-      ]
-
-      return nodes.slice(0, 6).map((item, index) => {
-        const title = childText(item, ['title']) || 'Untitled security story'
-        const link = itemLink(item, source.url)
-        const pubDate = childText(item, ['pubDate', 'published', 'updated', 'dc:date'])
-        const summary = childText(item, ['description', 'summary', 'content:encoded', 'content'])
-        const timestamp = pubDate ? new Date(pubDate).getTime() : Date.now() - index
-        return {
-          id: `${source.id}-${index}-${title}`,
-          title,
-          link,
-          sourceLabel: source.label,
-          publishedLabel: formatNewsDate(pubDate),
-          summary: cleanSummary(summary),
-          timestamp: Number.isNaN(timestamp) ? Date.now() - index : timestamp,
-        } satisfies NewsItem
-      })
-    }))
-
-    const rejected = batches.filter(result => result.status === 'rejected') as PromiseRejectedResult[]
-    newsItems.value = batches
-      .flatMap(result => result.status === 'fulfilled' ? result.value : [])
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, 8)
-
-    if (!newsItems.value.length) {
-      newsError.value = rejected[0]?.reason?.message ?? 'No stories were returned from the enabled feeds.'
-    }
+    const items = await fetchAndParseNews()
+    newsItems.value = items
+    setRssCache(items)
+    notifyNewRssItems(items)
   }
   catch (e: any) {
-    newsError.value = e?.message ?? 'Could not load security news.'
+    // On background refresh failure, keep showing cached articles
+    if (forceRefresh && cache?.items.length) {
+      newsItems.value = cache.items
+    } else {
+      newsError.value = e?.message ?? 'Could not load security news.'
+    }
   }
   finally {
     newsLoading.value = false

@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { Bell } from 'lucide-vue-next'
+
 const { forceClose, hideWindow, minimize, toggleMaximize } = useTauriWindow()
 const aiActivity = useAIActivityStore()
 const app = useAppStore()
+const feed = useNotificationFeedStore()
 
 const showCloseModal = ref(false)
 const version = ref('')
@@ -79,28 +82,43 @@ async function sendToTray() {
       v{{ version }}
     </span>
 
-    <div class="controls relative z-10 ml-auto flex items-center gap-1.5">
+    <div class="controls relative z-10 ml-auto flex items-center gap-2">
+      <!-- Notification bell -->
       <button
-        class="group flex size-3.5 items-center justify-center rounded-[2px] border border-amber-300/30 bg-amber-400/75 transition-[filter] hover:brightness-125"
-        title="Minimize"
-        @click.stop="minimize()"
+        class="relative flex size-5 items-center justify-center rounded-full text-[var(--text-faint)] transition-colors hover:text-[var(--text-muted)]"
+        title="Notifications"
+        @click.stop="feed.openDrawer()"
       >
-        <span class="text-[8px] font-black leading-none text-amber-950 opacity-0 group-hover:opacity-100">-</span>
+        <Bell class="size-3.5" />
+        <span
+          v-if="feed.unreadCount > 0"
+          class="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-0.5 font-mono text-[8px] font-bold leading-none text-white"
+        >{{ feed.unreadCount > 99 ? '99+' : feed.unreadCount }}</span>
       </button>
-      <button
-        class="group flex size-3.5 items-center justify-center rounded-[2px] border border-cyan-300/30 bg-cyan-400/70 transition-[filter] hover:brightness-125"
-        title="Maximize"
-        @click.stop="toggleMaximize()"
-      >
-        <span class="text-[7px] font-black leading-none text-cyan-950 opacity-0 group-hover:opacity-100">+</span>
-      </button>
-      <button
-        class="group flex size-3.5 items-center justify-center rounded-[2px] border border-red-400/30 bg-red-500/70 transition-[filter] hover:brightness-125"
-        title="Close"
-        @click.stop="openCloseModal"
-      >
-        <span class="text-[7px] font-black leading-none text-red-950 opacity-0 group-hover:opacity-100">x</span>
-      </button>
+
+      <div class="flex items-center gap-1.5">
+        <button
+          class="group flex size-3.5 items-center justify-center rounded-full border border-amber-300/30 bg-amber-400/75 transition-[filter] hover:brightness-125"
+          title="Minimize"
+          @click.stop="minimize()"
+        >
+          <span class="text-[8px] font-black leading-none text-amber-950 opacity-0 group-hover:opacity-100">-</span>
+        </button>
+        <button
+          class="group flex size-3.5 items-center justify-center rounded-full border border-cyan-300/30 bg-cyan-400/70 transition-[filter] hover:brightness-125"
+          title="Maximize"
+          @click.stop="toggleMaximize()"
+        >
+          <span class="text-[7px] font-black leading-none text-cyan-950 opacity-0 group-hover:opacity-100">+</span>
+        </button>
+        <button
+          class="group flex size-3.5 items-center justify-center rounded-full border border-red-400/30 bg-red-500/70 transition-[filter] hover:brightness-125"
+          title="Close"
+          @click.stop="openCloseModal"
+        >
+          <span class="text-[7px] font-black leading-none text-red-950 opacity-0 group-hover:opacity-100">x</span>
+        </button>
+      </div>
     </div>
 
     <span

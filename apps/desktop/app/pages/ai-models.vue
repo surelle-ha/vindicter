@@ -524,7 +524,7 @@ onMounted(() => {
             </span>
           </div>
           <p class="text-xs leading-relaxed text-[var(--text-muted)]">
-            Run open-source LLMs locally via Ollama. Powers the Academy professor and AI security scans without sending data to external APIs. Requires Ollama running on your machine.
+            Run LLMs locally via Ollama. Powers the Academy professor and AI security scans without sending data to external APIs. Requires Ollama running on your machine.
           </p>
 
           <div class="grid gap-3 sm:grid-cols-2">
@@ -569,17 +569,17 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Core AI -->
+    <!-- DefendCore -->
     <div class="space-y-3">
       <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">Vindicta AI</p>
       <div class="rounded-xl border border-rose-500/15 bg-[var(--bg-card)] p-5 opacity-60">
         <div class="flex items-start gap-4">
           <div class="grid size-10 shrink-0 place-items-center rounded-xl border border-rose-500/20 bg-rose-500/10">
-            <span class="text-sm font-bold text-rose-300">C</span>
+            <span class="text-sm font-bold text-rose-300">DC</span>
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-center gap-2">
-              <p class="text-sm font-semibold text-[var(--text)]">Core AI</p>
+              <p class="text-sm font-semibold text-[var(--text)]">DefendCore</p>
               <span class="rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[9px] font-semibold text-rose-300">Soon</span>
               <span class="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-semibold text-[var(--text-faint)]">In Training</span>
             </div>
@@ -587,7 +587,7 @@ onMounted(() => {
               Vindicta's native AI model — purpose-built for security education and analysis. Currently in development and training. Will be available as a first-party option across the Academy, scanner, and all AI features.
             </p>
             <div class="mt-3 rounded-lg border border-rose-500/15 bg-rose-500/[0.05] px-3 py-2.5">
-              <p class="text-[11px] text-rose-300/80">No setup required — Core AI will be available automatically when released.</p>
+              <p class="text-[11px] text-rose-300/80">No setup required — DefendCore will be available automatically when released.</p>
             </div>
           </div>
         </div>

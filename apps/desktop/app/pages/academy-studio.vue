@@ -2,7 +2,7 @@
 import {
   AudioLines, AlertTriangle, BookOpen, CheckCircle2, ChevronLeft, Download, Eraser,
   FileText, GripVertical, Info, LayoutList, Loader2, Mic, Music, NotebookPen,
-  Package, Pencil, Plus, Save, Settings, Trash2, Upload, Volume2, X,
+  Package, Pause, Pencil, Play, Plus, Save, Settings, Trash2, Upload, Volume2, X,
 } from 'lucide-vue-next'
 import type { CustomLesson } from '~/data/curriculum'
 import type { TTSScriptModel } from '~/composables/useAcademyTTS'
@@ -31,13 +31,15 @@ const loading       = ref(true)
 const saving        = ref(false)
 const saveError     = ref('')
 const editingLesson = ref<CustomLesson | null>(null)
-const isNew         = ref(false)
-const activeTab     = ref<'metadata' | 'content' | 'notes' | 'audio'>('metadata')
+const isNew                   = ref(false)
+const editingOriginalFilename = ref('')
+const savedSnapshot           = ref('')
+const activeTab               = ref<'metadata' | 'content' | 'notes' | 'audio'>('metadata')
 const confirmDelete   = ref<CustomLesson | null>(null)
 const showDeleteModal = ref(false)
 const showSaveModal   = ref(false)
 const saveTarget      = ref<'appdata' | 'bundled' | 'both'>('appdata')
-type PendingAction = { type: 'save-lesson' } | { type: 'rename-section'; oldName: string; newName: string }
+type PendingAction = { type: 'save-lesson' } | { type: 'rename-section'; oldName: string; newName: string } | { type: 'delete-lesson'; lesson: CustomLesson }
 const pendingAction   = ref<PendingAction>({ type: 'save-lesson' })
 const showSettings    = ref(false)
 const showClearModal  = ref(false)
@@ -47,7 +49,37 @@ const settingsError   = ref('')
 const audioLoading   = ref(false)
 const audioError     = ref('')
 const ttsModel       = ref<TTSScriptModel>('claude')
-const audioObjUrl    = ref<string | null>(null)
+const audioObjUrl      = ref<string | null>(null)
+const studioPlayerRef  = ref<HTMLAudioElement | null>(null)
+const studioPlaying    = ref(false)
+const studioCurrentTime = ref(0)
+const studioDuration   = ref(0)
+const studioProgressEl = ref<HTMLElement | null>(null)
+
+const studioProgressPct = computed(() =>
+  studioDuration.value > 0 ? (studioCurrentTime.value / studioDuration.value) * 100 : 0,
+)
+
+function studioFormatTime(secs: number) {
+  if (!isFinite(secs) || isNaN(secs) || secs <= 0) return '0:00'
+  const m = Math.floor(secs / 60)
+  const s = Math.floor(secs % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function studioToggle() {
+  const a = studioPlayerRef.value
+  if (!a) return
+  if (studioPlaying.value) a.pause(); else void a.play()
+}
+
+function studioSeek(e: MouseEvent) {
+  const bar = studioProgressEl.value
+  const a   = studioPlayerRef.value
+  if (!bar || !a || !studioDuration.value) return
+  const rect = bar.getBoundingClientRect()
+  a.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * studioDuration.value
+}
 const bundledFilenames = ref<Set<string>>(new Set())
 const sectionFilter   = ref<string | null>(null)
 const draggingSection = ref<string | null>(null)
@@ -77,6 +109,9 @@ watch(editingLesson, async (lesson) => {
     URL.revokeObjectURL(audioObjUrl.value)
     audioObjUrl.value = null
   }
+  studioPlaying.value     = false
+  studioCurrentTime.value = 0
+  studioDuration.value    = 0
   if (!lesson) return
   if (lesson.embeddedAudio?.data) {
     await studio.loadEmbeddedAudio(lesson.id, lesson.embeddedAudio.data)
@@ -117,7 +152,10 @@ function openNew() {
 }
 
 function openEdit(lesson: CustomLesson) {
-  editingLesson.value = { ...lesson, objectives: [...lesson.objectives] }
+  const copy = { ...lesson, objectives: [...lesson.objectives] }
+  editingLesson.value = copy
+  editingOriginalFilename.value = lesson.vaFilename
+  savedSnapshot.value = snapshotLesson(copy)
   isNew.value = false
   activeTab.value = 'metadata'
 }
@@ -149,14 +187,20 @@ async function confirmSave() {
       let filename = lesson.vaFilename || `${lesson.id}.va`
       if (saveTarget.value === 'appdata' || saveTarget.value === 'both') {
         filename = await studio.saveLessonToCourseBin(lesson, lesson.vaFilename || undefined)
+        // If filename was changed, remove the old file
+        if (editingOriginalFilename.value && editingOriginalFilename.value !== filename) {
+          await studio.deleteFromCourseBin(editingOriginalFilename.value).catch(() => {})
+          editingOriginalFilename.value = filename
+        }
       }
       if (saveTarget.value === 'bundled' || saveTarget.value === 'both') {
         filename = await studio.saveLessonToBundledCourseBin(lesson, filename)
         bundledFilenames.value = await studio.getBundledFilenames()
       }
       lesson.vaFilename = filename
+      savedSnapshot.value = snapshotLesson(lesson)
       isNew.value = false
-    } else {
+    } else if (action.type === 'rename-section') {
       const { oldName, newName } = action
       if (saveTarget.value === 'appdata' || saveTarget.value === 'both') {
         await studio.renameSection(oldName, newName, lessons.value)
@@ -167,6 +211,9 @@ async function confirmSave() {
       }
       if (editingLesson.value?.section === oldName) editingLesson.value.section = newName
       if (sectionFilter.value === oldName) sectionFilter.value = newName
+    } else if (action.type === 'delete-lesson') {
+      await executeDelete(action.lesson, saveTarget.value)
+      return  // lessons already reloaded inside executeDelete
     }
     lessons.value = await studio.loadCourseBin()
   } catch (err) {
@@ -185,15 +232,37 @@ async function exportLesson(lesson: CustomLesson) {
 }
 
 async function doDelete(lesson: CustomLesson) {
+  showDeleteModal.value = false
+  confirmDelete.value = null
+  // If this lesson exists in the bundle, ask where to delete from
+  if (bundledFilenames.value.has(lesson.vaFilename)) {
+    pendingAction.value = { type: 'delete-lesson', lesson }
+    saveTarget.value = 'both'
+    showSaveModal.value = true
+    return
+  }
+  // AppData-only lesson: delete directly
+  await executeDelete(lesson, 'appdata')
+}
+
+async function executeDelete(lesson: CustomLesson, target: 'appdata' | 'bundled' | 'both') {
   try {
-    await studio.deleteFromCourseBin(lesson.vaFilename)
+    if (target === 'appdata' || target === 'both') {
+      await studio.deleteFromCourseBin(lesson.vaFilename)
+    }
+    if (target === 'bundled' || target === 'both') {
+      const { resourceDir } = await import('@tauri-apps/api/path')
+      const { remove, exists } = await import('@tauri-apps/plugin-fs')
+      const resDir = await resourceDir()
+      const sep = resDir.includes('\\') ? '\\' : '/'
+      const bundledPath = `${resDir}${sep}course-bin${sep}${lesson.vaFilename}`
+      if (await exists(bundledPath)) await remove(bundledPath)
+      bundledFilenames.value = await studio.getBundledFilenames()
+    }
     if (editingLesson.value?.id === lesson.id) editingLesson.value = null
     lessons.value = await studio.loadCourseBin()
   } catch (err) {
     saveError.value = (err as Error).message
-  } finally {
-    showDeleteModal.value = false
-    confirmDelete.value = null
   }
 }
 
@@ -405,6 +474,23 @@ const uniqueSections = computed(() => {
   return [...seen]
 })
 
+const otherLessons = computed(() =>
+  lessons.value.filter(l => l.id !== editingLesson.value?.id),
+)
+
+function snapshotLesson(lesson: CustomLesson): string {
+  const { title, subtitle, content, agentNotes, section, sectionOrder, duration, objectives, labHint, prerequisiteId, vaFilename } = lesson
+  // Track audio by voice+generatedAt so newly generated audio marks the lesson dirty
+  const audioKey = lesson.embeddedAudio ? `${lesson.embeddedAudio.voice}:${lesson.embeddedAudio.generatedAt}` : null
+  return JSON.stringify({ title, subtitle, content, agentNotes, section, sectionOrder, duration, objectives: [...objectives], labHint, prerequisiteId, vaFilename, audioKey })
+}
+
+const hasUnsavedChanges = computed(() => {
+  if (!editingLesson.value) return false
+  if (isNew.value) return !!(editingLesson.value.title || editingLesson.value.content?.trim().length > 40)
+  return snapshotLesson(editingLesson.value) !== savedSnapshot.value
+})
+
 const groupedLessons = computed(() => {
   const filtered = sectionFilter.value
     ? lessons.value.filter(l => l.section === sectionFilter.value)
@@ -449,8 +535,7 @@ const groupedLessons = computed(() => {
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-1.5 mb-0.5">
-              <h1 class="text-sm font-semibold text-[var(--text)]">Academy Studio</h1>
-              <span class="rounded-full text-[8px] font-bold uppercase tracking-widest bg-fuchsia-500/15 text-fuchsia-300/70 border border-fuchsia-500/20 px-1.5 py-px">Secret</span>
+              <h1 class="text-sm font-semibold text-[var(--text)]">Academy Builder</h1>
             </div>
             <p class="text-[9px] text-[var(--text-faint)]">
               {{ lessons.length }} lesson{{ lessons.length !== 1 ? 's' : '' }} · course-bin
@@ -614,9 +699,17 @@ const groupedLessons = computed(() => {
                 <div class="flex-1 min-w-0 px-2.5 py-2.5">
                   <div class="flex items-start gap-1.5">
                     <div class="flex-1 min-w-0">
-                      <p class="text-[11px] font-medium text-[var(--text)] truncate leading-tight">
-                        {{ lesson.title || '(Untitled)' }}
-                      </p>
+                      <div class="flex items-center gap-1.5">
+                        <p class="text-[11px] font-medium text-[var(--text)] truncate leading-tight flex-1">
+                          {{ lesson.title || '(Untitled)' }}
+                        </p>
+                        <!-- Unsaved changes dot -->
+                        <span
+                          v-if="editingLesson?.id === lesson.id && hasUnsavedChanges"
+                          class="size-1.5 rounded-full bg-amber-400 shrink-0 animate-pulse"
+                          title="Unsaved changes"
+                        />
+                      </div>
                       <p v-if="lesson.subtitle" class="text-[10px] text-[var(--text-faint)] truncate mt-0.5 leading-tight">
                         {{ lesson.subtitle }}
                       </p>
@@ -700,6 +793,14 @@ const groupedLessons = computed(() => {
                   <span class="text-[9px] text-[var(--text-faint)]/30">·</span>
                   <span class="text-[9px] font-semibold" :class="getSectionColor(editingLesson.section).color">{{ editingLesson.section }}</span>
                 </template>
+                <!-- Unsaved changes indicator -->
+                <template v-if="hasUnsavedChanges">
+                  <span class="text-[9px] text-[var(--text-faint)]/30">·</span>
+                  <span class="flex items-center gap-1 text-[9px] text-amber-400/80">
+                    <span class="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    Unsaved
+                  </span>
+                </template>
               </div>
               <p class="text-sm font-semibold text-[var(--text)] truncate">
                 {{ editingLesson.title || '(Untitled lesson)' }}
@@ -708,12 +809,15 @@ const groupedLessons = computed(() => {
             <div class="flex items-center gap-1.5 shrink-0">
               <button
                 :disabled="saving"
-                class="flex items-center gap-1.5 rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/10 px-3 py-1.5 text-[11px] font-medium text-fuchsia-300 hover:bg-fuchsia-500/[0.18] transition-colors disabled:opacity-50"
+                class="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-all disabled:opacity-50"
+                :class="hasUnsavedChanges
+                  ? 'border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 shadow-[0_0_12px_rgba(245,158,11,0.15)]'
+                  : 'border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300 hover:bg-fuchsia-500/[0.18]'"
                 @click="save"
               >
                 <Loader2 v-if="saving" class="size-3.5 animate-spin" />
                 <Save v-else class="size-3.5" />
-                Save
+                {{ hasUnsavedChanges ? 'Save changes' : 'Save' }}
               </button>
               <button
                 v-if="!isNew"
@@ -825,6 +929,36 @@ const groupedLessons = computed(() => {
               />
             </div>
 
+            <!-- Prerequisite lesson -->
+            <div>
+              <label class="block text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                Prerequisite lesson <span class="normal-case tracking-normal font-normal text-[var(--text-faint)]">— must be completed before this one unlocks</span>
+              </label>
+              <select
+                v-model="editingLesson.prerequisiteId"
+                class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3.5 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/20 transition-colors appearance-none"
+              >
+                <option :value="null">None — no prerequisite</option>
+                <optgroup
+                  v-for="group in groupedLessons"
+                  :key="group.name"
+                  :label="group.name"
+                >
+                  <option
+                    v-for="lesson in group.items.filter(l => l.id !== editingLesson.id)"
+                    :key="lesson.id"
+                    :value="lesson.id"
+                  >{{ lesson.title || '(Untitled)' }}</option>
+                </optgroup>
+                <!-- Also show lessons not in the current filter -->
+                <optgroup v-if="otherLessons.length && !groupedLessons.length" label="All lessons">
+                  <option v-for="lesson in otherLessons" :key="lesson.id" :value="lesson.id">
+                    {{ lesson.section ? `[${lesson.section}] ` : '' }}{{ lesson.title || '(Untitled)' }}
+                  </option>
+                </optgroup>
+              </select>
+            </div>
+
             <!-- Objectives -->
             <div>
               <div class="flex items-center justify-between mb-1.5">
@@ -859,6 +993,22 @@ const groupedLessons = computed(() => {
                 class="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3.5 py-2.5 text-sm text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/20 transition-colors leading-relaxed"
               />
             </div>
+
+            <!-- VA Filename -->
+            <div v-if="!isNew">
+              <label class="block text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                File Name <span class="normal-case tracking-normal font-normal text-[var(--text-faint)]">— rename the .va file in course-bin</span>
+              </label>
+              <div class="flex items-center gap-2">
+                <input
+                  v-model="editingLesson.vaFilename"
+                  type="text"
+                  placeholder="lesson-id.va"
+                  class="flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3.5 py-2.5 text-sm text-[var(--text)] font-mono placeholder-[var(--text-faint)] focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/20 transition-colors"
+                />
+              </div>
+              <p class="text-[9px] text-[var(--text-faint)] mt-1">Renaming takes effect when you save. The old file will be removed and replaced with the new name.</p>
+            </div>
           </div>
 
           <!-- ── Content ── -->
@@ -891,15 +1041,60 @@ const groupedLessons = computed(() => {
           <!-- ── Audio ── -->
           <div v-else-if="activeTab === 'audio'" class="max-w-lg space-y-4">
 
-            <!-- Existing audio player -->
-            <div v-if="audioObjUrl" class="rounded-xl border border-teal-500/20 bg-teal-500/[0.06] p-4">
-              <div class="flex items-center gap-2 mb-3">
-                <Music class="size-3.5 text-teal-400" />
-                <span class="text-[11px] font-medium text-teal-300">Audio narration</span>
-                <span class="text-[9px] text-teal-400/50 ml-auto">{{ editingLesson.embeddedAudio?.voice ?? '' }}</span>
+            <!-- Custom audio player -->
+            <div v-if="audioObjUrl" class="rounded-xl border border-teal-500/20 bg-teal-500/[0.05] p-4 space-y-3">
+              <!-- Hidden audio element -->
+              <audio
+                ref="studioPlayerRef"
+                :src="audioObjUrl"
+                preload="metadata"
+                @play="studioPlaying = true"
+                @pause="studioPlaying = false"
+                @ended="studioPlaying = false; studioCurrentTime = 0"
+                @timeupdate="studioCurrentTime = studioPlayerRef?.currentTime ?? 0"
+                @loadedmetadata="studioDuration = studioPlayerRef?.duration ?? 0"
+              />
+
+              <!-- Title row -->
+              <div class="flex items-center gap-2">
+                <div class="size-7 shrink-0 grid place-items-center rounded-lg border border-teal-500/20 bg-teal-500/10">
+                  <Music class="size-3.5 text-teal-400" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[11px] font-semibold text-teal-300">Audio narration</p>
+                  <p class="text-[9px] text-teal-400/50">{{ editingLesson.embeddedAudio?.voice ?? 'embedded' }}</p>
+                </div>
               </div>
-              <audio :src="audioObjUrl" controls class="w-full h-8 rounded" />
-              <button class="mt-2 text-[10px] text-red-400/60 hover:text-red-400 transition-colors" @click="clearAudio">
+
+              <!-- Controls -->
+              <div class="flex items-center gap-3">
+                <button
+                  class="size-9 shrink-0 grid place-items-center rounded-full border border-teal-500/30 bg-teal-500/15 hover:bg-teal-500/25 active:scale-95 transition-all"
+                  :title="studioPlaying ? 'Pause' : 'Play'"
+                  @click="studioToggle"
+                >
+                  <Pause v-if="studioPlaying" class="size-4 text-teal-300" />
+                  <Play  v-else               class="size-4 translate-x-px text-teal-300" />
+                </button>
+                <div class="flex-1 space-y-1.5">
+                  <div
+                    ref="studioProgressEl"
+                    class="h-1.5 w-full cursor-pointer overflow-hidden rounded-full bg-white/[0.08] hover:bg-white/[0.12] transition-colors group"
+                    @click="studioSeek"
+                  >
+                    <div
+                      class="h-full rounded-full bg-gradient-to-r from-teal-500 to-teal-400 transition-none"
+                      :style="{ width: studioProgressPct + '%' }"
+                    />
+                  </div>
+                  <div class="flex justify-between text-[9px] text-teal-400/50 tabular-nums">
+                    <span>{{ studioFormatTime(studioCurrentTime) }}</span>
+                    <span>{{ studioFormatTime(studioDuration) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <button class="text-[10px] text-red-400/50 hover:text-red-400 transition-colors" @click="clearAudio">
                 Remove audio
               </button>
             </div>
@@ -938,11 +1133,11 @@ const groupedLessons = computed(() => {
 
               <div>
                 <label class="block text-[10px] text-[var(--text-muted)] mb-1.5">Script model</label>
-                <div class="flex flex-wrap gap-1.5">
+                <div class="grid grid-cols-2 gap-1.5">
                   <button
                     v-for="opt in ttsModelOptions"
                     :key="opt.value"
-                    class="rounded-lg border px-2.5 py-1 text-[10px] transition-colors"
+                    class="rounded-lg border px-2.5 py-1.5 text-[10px] text-left transition-colors"
                     :class="ttsModel === opt.value
                       ? 'border-teal-500/30 bg-teal-500/10 text-teal-300'
                       : 'border-[var(--border)] text-[var(--text-faint)] hover:text-[var(--text-muted)]'"
@@ -1019,12 +1214,15 @@ const groupedLessons = computed(() => {
             >Cancel</button>
             <button
               :disabled="saving"
-              class="flex items-center gap-1.5 rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/10 px-3 py-1.5 text-[11px] font-medium text-fuchsia-300 hover:bg-fuchsia-500/[0.18] transition-colors disabled:opacity-50"
+              class="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-all disabled:opacity-50"
+              :class="hasUnsavedChanges
+                ? 'border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 shadow-[0_0_12px_rgba(245,158,11,0.15)]'
+                : 'border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300 hover:bg-fuchsia-500/[0.18]'"
               @click="save"
             >
               <Loader2 v-if="saving" class="size-3.5 animate-spin" />
               <Save v-else class="size-3.5" />
-              Save
+              {{ hasUnsavedChanges ? 'Save changes' : 'Save' }}
             </button>
           </div>
         </div>
@@ -1043,9 +1241,9 @@ const groupedLessons = computed(() => {
     </GlassModal>
 
     <!-- ── Save / rename modal ────────────────────────────────────────────────── -->
-    <GlassModal v-model="showSaveModal" :title="pendingAction.type === 'save-lesson' ? 'Save Lesson' : 'Rename Section'">
+    <GlassModal v-model="showSaveModal" :title="pendingAction.type === 'save-lesson' ? 'Save Lesson' : pendingAction.type === 'delete-lesson' ? 'Delete Lesson' : 'Rename Section'">
       <p class="text-xs text-[var(--text-muted)] mb-4">
-        {{ pendingAction.type === 'save-lesson' ? 'Where should this lesson be saved?' : 'Where should this rename be applied?' }}
+        {{ pendingAction.type === 'save-lesson' ? 'Where should this lesson be saved?' : pendingAction.type === 'delete-lesson' ? 'Where should this lesson be deleted from?' : 'Where should this rename be applied?' }}
       </p>
 
       <div class="space-y-2 mb-5">
@@ -1085,8 +1283,16 @@ const groupedLessons = computed(() => {
 
       <div class="flex justify-end gap-2">
         <button class="rounded-lg border border-[var(--border)] px-3 py-1.5 text-[11px] text-[var(--text-muted)] hover:bg-[var(--bg-card)] transition-colors" @click="showSaveModal = false">Cancel</button>
-        <button class="flex items-center gap-1.5 rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/10 px-3 py-1.5 text-[11px] text-fuchsia-300 hover:bg-fuchsia-500/[0.18] transition-colors" @click="confirmSave">
-          <Save class="size-3.5" /> Save
+        <button
+          class="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] transition-colors"
+          :class="pendingAction.type === 'delete-lesson'
+            ? 'border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20'
+            : 'border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300 hover:bg-fuchsia-500/[0.18]'"
+          @click="confirmSave"
+        >
+          <Trash2 v-if="pendingAction.type === 'delete-lesson'" class="size-3.5" />
+          <Save v-else class="size-3.5" />
+          {{ pendingAction.type === 'delete-lesson' ? 'Delete' : 'Save' }}
         </button>
       </div>
     </GlassModal>

@@ -11,12 +11,12 @@ const { notify } = useNotifications()
 type SettingsTab = 'general' | 'news' | 'wsl' | 'updates' | 'diagnostics' | 'data'
 const activeSettingsTab = ref<SettingsTab>('general')
 const settingsTabs: { id: SettingsTab; label: string; description: string }[] = [
-  { id: 'general', label: 'General', description: 'Theme, startup, navigation, and notifications' },
-  { id: 'news', label: 'News', description: 'Security RSS sources for Home' },
-  { id: 'wsl', label: 'WSL', description: 'Backend profiles and cleanup' },
-  { id: 'updates', label: 'Updates', description: 'Version, releases, and app information' },
-  { id: 'diagnostics', label: 'Doctor', description: 'Local tooling health checks' },
-  { id: 'data', label: 'Data', description: 'Raw data and reset actions' },
+  { id: 'general',     label: 'General',     description: 'Theme, startup, navigation, and notifications' },
+  { id: 'news',        label: 'News',        description: 'Security RSS sources for Home' },
+  { id: 'wsl',         label: 'WSL',         description: 'Backend profiles and cleanup' },
+  { id: 'diagnostics', label: 'Doctor',      description: 'Local tooling health checks' },
+  { id: 'data',        label: 'Data',        description: 'Raw data and reset actions' },
+  { id: 'updates',     label: 'Updates',     description: 'Version, releases, and app information' },
 ]
 
 // Notifications

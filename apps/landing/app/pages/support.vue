@@ -1,82 +1,251 @@
 <script setup lang="ts">
+import { BookOpen, CheckCircle2, HelpCircle, LifeBuoy, Loader2, Mail, Send } from 'lucide-vue-next'
+
 useLandingSeo({
-  title: 'Developer Support — Vindicta',
-  description: 'Get help with Vindicta through email support and the documentation portal.',
+  title: 'Support - Vindicta',
+  description: 'Get help with Vindicta after checking the documentation and frequently asked questions.',
   path: '/support',
 })
+
+type SupportStep = 'check' | 'form' | 'done'
+type SupportCategory = 'setup' | 'scan' | 'billing' | 'bug' | 'other'
+
+const step = ref<SupportStep>('check')
+const loading = ref(false)
+const apiError = ref('')
+const successEmail = ref('')
+
+const form = reactive({
+  name: '',
+  email: '',
+  category: 'setup' as SupportCategory,
+  subject: '',
+  message: '',
+  documentationChecked: false,
+  faqChecked: false,
+})
+
+const errors = reactive({
+  name: '',
+  email: '',
+  subject: '',
+  message: '',
+  checks: '',
+})
+
+const categories: Array<{ value: SupportCategory; label: string }> = [
+  { value: 'setup', label: 'Setup or install' },
+  { value: 'scan', label: 'Scanning or findings' },
+  { value: 'billing', label: 'Beta or account' },
+  { value: 'bug', label: 'Bug report' },
+  { value: 'other', label: 'Something else' },
+]
+
+function showSupportForm() {
+  form.documentationChecked = true
+  form.faqChecked = true
+  step.value = 'form'
+}
+
+function validate() {
+  errors.name = form.name.trim() ? '' : 'Name is required.'
+  errors.email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) ? '' : 'Enter a valid email address.'
+  errors.subject = form.subject.trim() ? '' : 'Subject is required.'
+  errors.message = form.message.trim().length >= 20 ? '' : 'Please share at least 20 characters so we have context.'
+  errors.checks = form.documentationChecked && form.faqChecked ? '' : 'Please confirm that you checked the docs and FAQ first.'
+
+  return !Object.values(errors).some(Boolean)
+}
+
+async function submitSupport() {
+  apiError.value = ''
+  if (!validate()) return
+
+  loading.value = true
+  try {
+    const supabase = useSupabase()
+    const { error } = await supabase
+      .from('support_tickets')
+      .insert({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        category: form.category,
+        subject: form.subject.trim(),
+        message: form.message.trim(),
+        documentation_checked: form.documentationChecked,
+        faq_checked: form.faqChecked,
+        source_url: import.meta.client ? window.location.href : null,
+      })
+
+    if (error) throw error
+    successEmail.value = form.email.trim()
+    step.value = 'done'
+  } catch {
+    apiError.value = 'Something went wrong. Please try again or email support@vindicta.surelle.xyz.'
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <template>
   <div class="flex flex-1 flex-col">
-    <main class="flex-1 flex items-center justify-center px-6 py-24">
-      <div class="flex flex-col items-center text-center max-w-lg">
-
-        <!-- Icon -->
-        <div class="mb-8 flex h-20 w-20 items-center justify-center rounded-3xl border border-warn/25 bg-warn/8">
-          <svg class="h-10 w-10 text-warn" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
-          </svg>
+    <main class="flex-1 px-6 py-28">
+      <div class="mx-auto max-w-4xl">
+        <div class="mb-10 text-center">
+          <div class="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-accent/25 bg-accent/10">
+            <LifeBuoy class="h-8 w-8 text-accent" />
+          </div>
+          <h1 class="font-display text-[44px] font-black uppercase leading-none tracking-wide sm:text-[60px]">
+            Developer Support
+          </h1>
+          <p class="mx-auto mt-5 max-w-xl text-[14px] leading-relaxed text-white/48">
+            Start with the docs and FAQ. If your question is still open, send the support request and the admin team can review it from the new dashboard.
+          </p>
         </div>
 
-        <!-- Badge -->
-        <div class="mb-6 inline-flex items-center gap-2 rounded-full border border-warn/20 bg-warn/8 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-warn/80">
-          <span class="h-1.5 w-1.5 rounded-full bg-warn animate-pulse" />
-          Under Maintenance
-        </div>
-
-        <!-- Title -->
-        <h1 class="font-display text-[44px] sm:text-[56px] font-black uppercase leading-none tracking-wide mb-5">
-          Developer<br/>Support
-        </h1>
-
-        <p class="text-[14px] leading-relaxed text-white/45 mb-8 max-w-sm">
-          The developer support portal is currently being set up. In the meantime, reach out directly by email.
-        </p>
-
-        <!-- Interim options -->
-        <div class="w-full space-y-3 mb-10">
-          <p class="text-[10px] font-semibold uppercase tracking-[0.25em] text-white/25 mb-4">In the meantime, you can</p>
-
-          <a
-            href="mailto:support@vindicta.surelle.xyz"
-            class="flex items-center gap-4 rounded-xl border border-white/8 bg-surface/60 px-5 py-4 text-left transition-all hover:border-accent/30 hover:bg-surface group"
-          >
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 border border-accent/20 group-hover:bg-accent/20 transition-colors">
-              <svg class="h-4 w-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-              </svg>
+        <section v-if="step === 'check'" class="rounded-2xl border border-white/8 bg-surface/60 p-6 sm:p-8">
+          <div class="mb-6 flex items-start gap-4">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-warn/20 bg-warn/8">
+              <HelpCircle class="h-5 w-5 text-warn" />
             </div>
             <div>
-              <p class="text-[13px] font-semibold text-white">Email Support</p>
-              <p class="text-[11px] text-white/40">support@vindicta.surelle.xyz</p>
+              <h2 class="text-[16px] font-bold text-white">Has this already been answered?</h2>
+              <p class="mt-1 text-[13px] leading-relaxed text-white/45">
+                Many setup, scanning, beta, and local-first questions are covered in the documentation or FAQ.
+              </p>
             </div>
-            <svg class="ml-auto h-4 w-4 text-white/20 group-hover:text-white/50 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-            </svg>
-          </a>
+          </div>
 
-          <NuxtLink
-            to="/docs"
-            class="flex items-center gap-4 rounded-xl border border-white/8 bg-surface/60 px-5 py-4 text-left transition-all hover:border-white/15 hover:bg-surface group"
-          >
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/5 border border-white/10 group-hover:bg-white/10 transition-colors">
-              <svg class="h-4 w-4 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-              </svg>
-            </div>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <NuxtLink
+              to="/docs"
+              class="flex items-center gap-4 rounded-xl border border-white/8 bg-white/[0.03] px-5 py-4 transition hover:border-accent/30 hover:bg-white/[0.05]"
+            >
+              <BookOpen class="h-5 w-5 shrink-0 text-accent" />
+              <div>
+                <p class="text-[13px] font-bold text-white">Documentation</p>
+                <p class="text-[11px] text-white/35">Install, configure, scan, and triage.</p>
+              </div>
+            </NuxtLink>
+
+            <NuxtLink
+              to="/faq"
+              class="flex items-center gap-4 rounded-xl border border-white/8 bg-white/[0.03] px-5 py-4 transition hover:border-accent/30 hover:bg-white/[0.05]"
+            >
+              <HelpCircle class="h-5 w-5 shrink-0 text-accent" />
+              <div>
+                <p class="text-[13px] font-bold text-white">FAQ</p>
+                <p class="text-[11px] text-white/35">Common beta and product questions.</p>
+              </div>
+            </NuxtLink>
+          </div>
+
+          <div class="mt-8 grid gap-3 sm:grid-cols-2">
+            <NuxtLink
+              to="/"
+              class="inline-flex items-center justify-center gap-2 rounded-xl border border-ok/20 bg-ok/8 px-5 py-4 text-[13px] font-bold text-ok transition hover:bg-ok/12"
+            >
+              <CheckCircle2 class="h-4 w-4" />
+              Yes, I found my answer
+            </NuxtLink>
+            <button
+              class="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-4 text-[13px] font-bold text-white transition hover:bg-accent/90"
+              @click="showSupportForm"
+            >
+              <Mail class="h-4 w-4" />
+              No, I still need help
+            </button>
+          </div>
+        </section>
+
+        <section v-else-if="step === 'form'" class="rounded-2xl border border-white/8 bg-surface/60 p-6 sm:p-8">
+          <div class="mb-6">
+            <p class="text-[13px] font-bold text-white">Support request</p>
+            <p class="mt-1 text-[12px] text-white/35">This creates a read-only support item for admins to review.</p>
+          </div>
+
+          <div class="grid gap-5 sm:grid-cols-2">
             <div>
-              <p class="text-[13px] font-semibold text-white">Documentation</p>
-              <p class="text-[11px] text-white/40">Setup guides, configuration, and usage</p>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/40 mb-2">Name</label>
+              <input v-model="form.name" :disabled="loading" class="w-full rounded-xl border border-white/8 bg-white/[0.04] px-4 py-3 text-[13px] text-white placeholder-white/20 outline-none transition-colors focus:border-accent/40 disabled:opacity-50" placeholder="Jane Smith" />
+              <p v-if="errors.name" class="mt-1 text-[11px] text-err/80">{{ errors.name }}</p>
             </div>
-            <svg class="ml-auto h-4 w-4 text-white/20 group-hover:text-white/50 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-            </svg>
+
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/40 mb-2">Email</label>
+              <input v-model="form.email" type="email" :disabled="loading" class="w-full rounded-xl border border-white/8 bg-white/[0.04] px-4 py-3 text-[13px] text-white placeholder-white/20 outline-none transition-colors focus:border-accent/40 disabled:opacity-50" placeholder="you@example.com" />
+              <p v-if="errors.email" class="mt-1 text-[11px] text-err/80">{{ errors.email }}</p>
+            </div>
+          </div>
+
+          <div class="mt-5 grid gap-5 sm:grid-cols-[220px_1fr]">
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/40 mb-2">Category</label>
+              <select v-model="form.category" :disabled="loading" class="w-full rounded-xl border border-white/8 bg-[#1e1f22] px-4 py-3 text-[13px] text-white outline-none transition-colors focus:border-accent/40 disabled:opacity-50">
+                <option v-for="category in categories" :key="category.value" :value="category.value">{{ category.label }}</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/40 mb-2">Subject</label>
+              <input v-model="form.subject" :disabled="loading" class="w-full rounded-xl border border-white/8 bg-white/[0.04] px-4 py-3 text-[13px] text-white placeholder-white/20 outline-none transition-colors focus:border-accent/40 disabled:opacity-50" placeholder="Short summary" />
+              <p v-if="errors.subject" class="mt-1 text-[11px] text-err/80">{{ errors.subject }}</p>
+            </div>
+          </div>
+
+          <div class="mt-5">
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/40 mb-2">Message</label>
+            <textarea v-model="form.message" rows="7" :disabled="loading" class="w-full resize-y rounded-xl border border-white/8 bg-white/[0.04] px-4 py-3 text-[13px] leading-relaxed text-white placeholder-white/20 outline-none transition-colors focus:border-accent/40 disabled:opacity-50" placeholder="What happened? What did you expect? Which version or platform are you using?" />
+            <p v-if="errors.message" class="mt-1 text-[11px] text-err/80">{{ errors.message }}</p>
+          </div>
+
+          <div class="mt-5 space-y-3 rounded-xl border border-white/8 bg-white/[0.03] p-4">
+            <label class="flex items-start gap-3 text-[12px] leading-relaxed text-white/50">
+              <input v-model="form.documentationChecked" type="checkbox" class="mt-1 accent-[#8b5cf6]" />
+              I checked the documentation and it did not answer this question.
+            </label>
+            <label class="flex items-start gap-3 text-[12px] leading-relaxed text-white/50">
+              <input v-model="form.faqChecked" type="checkbox" class="mt-1 accent-[#8b5cf6]" />
+              I checked the FAQ and still need support.
+            </label>
+            <p v-if="errors.checks" class="text-[11px] text-err/80">{{ errors.checks }}</p>
+          </div>
+
+          <p v-if="apiError" class="mt-5 text-[12px] text-err/80">{{ apiError }}</p>
+
+          <div class="mt-6 flex flex-col gap-3 sm:flex-row">
+            <button
+              class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-5 py-4 text-[13px] font-bold text-white transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="loading"
+              @click="submitSupport"
+            >
+              <Loader2 v-if="loading" class="h-4 w-4 animate-spin" />
+              <Send v-else class="h-4 w-4" />
+              {{ loading ? 'Sending...' : 'Send support request' }}
+            </button>
+            <button
+              class="inline-flex items-center justify-center rounded-xl border border-white/10 px-5 py-4 text-[13px] font-semibold text-white/45 transition hover:bg-white/5 hover:text-white/70"
+              :disabled="loading"
+              @click="step = 'check'"
+            >
+              Back
+            </button>
+          </div>
+        </section>
+
+        <section v-else class="rounded-2xl border border-ok/20 bg-ok/5 p-8 text-center">
+          <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-ok/25 bg-ok/10">
+            <CheckCircle2 class="h-8 w-8 text-ok" />
+          </div>
+          <h2 class="font-display text-[30px] font-black uppercase">Request received</h2>
+          <p class="mx-auto mt-3 max-w-md text-[14px] leading-relaxed text-white/50">
+            Thanks. Your support request was saved and the team can review it in the admin dashboard. Replies will go to {{ successEmail }}.
+          </p>
+          <NuxtLink to="/" class="mt-7 inline-flex text-[12px] text-white/35 transition hover:text-white/65">
+            Back to home
           </NuxtLink>
-        </div>
-
-        <NuxtLink to="/" class="text-[12px] text-white/30 hover:text-white/60 transition-colors">
-          ← Back to home
-        </NuxtLink>
+        </section>
       </div>
     </main>
   </div>

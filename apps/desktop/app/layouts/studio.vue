@@ -1,6 +1,10 @@
 <script setup lang="ts">
 const aiActivity = useAIActivityStore()
-onMounted(() => { void aiActivity.load() })
+const feed = useNotificationFeedStore()
+onMounted(() => {
+  void aiActivity.load()
+  feed.load()
+})
 </script>
 
 <template>
@@ -14,7 +18,9 @@ onMounted(() => { void aiActivity.load() })
       </main>
     </div>
     <NotificationToast />
+    <NotificationDrawer />
     <FloatingAIActivity />
     <FeaturesModal />
+    <AppUpdateBanner />
   </div>
 </template>

@@ -21,6 +21,7 @@ function cloneDefaultSecurity(): SecurityData {
     findings: [],
     scans: [],
     settings: { ...DEFAULT_SECURITY_DATA.settings },
+    whitelist: [],
   }
 }
 
@@ -76,6 +77,7 @@ function normalizeScanFinding(value: any, index: number): SecurityScanFinding {
     evidence: Array.isArray(value?.evidence) ? value.evidence.map(String).join('\n') : stringValue(value?.evidence),
     recommendation: stringValue(value?.recommendation, 'Review the referenced code path and define remediation.'),
     selected: Boolean(value?.selected ?? true),
+    whitelisted: Boolean(value?.whitelisted ?? false),
   }
 }
 
@@ -121,6 +123,7 @@ function normalizeScan(value: any): SecurityScan {
 function normalizeSecurityData(value: unknown): SecurityData {
   const raw = value as any
   const findings = Array.isArray(raw?.findings) ? raw.findings.map(normalizeFinding) : []
+  const whitelist = Array.isArray(raw?.whitelist) ? raw.whitelist : []
   return {
     findingCounter: Number.isFinite(raw?.findingCounter)
       ? Number(raw.findingCounter)
@@ -135,6 +138,7 @@ function normalizeSecurityData(value: unknown): SecurityData {
       autoScanEnabled: Boolean(raw?.settings?.autoScanEnabled ?? true),
       aiFindingLimit: normalizeFindingLimit(raw?.settings?.aiFindingLimit),
     },
+    whitelist,
   }
 }
 
@@ -152,6 +156,9 @@ function mergeSecurityData(projectData: SecurityData, backupData: SecurityData |
   const mergedScans = [...scans.values()]
     .sort((a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime())
     .slice(0, 30)
+  const whitelist = new Map<string, SecurityData['whitelist'][number]>()
+  for (const item of projectData.whitelist ?? []) whitelist.set(`${item.title}||${item.category}`, item)
+  for (const item of backupData.whitelist ?? []) whitelist.set(`${item.title}||${item.category}`, item)
 
   return {
     findingCounter: Math.max(
@@ -169,6 +176,7 @@ function mergeSecurityData(projectData: SecurityData, backupData: SecurityData |
       autoScanEnabled: Boolean(backupData.settings.autoScanEnabled),
       aiFindingLimit: normalizeFindingLimit(backupData.settings.aiFindingLimit),
     },
+    whitelist: [...whitelist.values()],
   }
 }
 
@@ -192,6 +200,7 @@ export const useSecurityStore = defineStore('security', {
     highRiskFindings: state => state.data.findings.filter(finding => finding.severity === 'critical' || finding.severity === 'high').length,
     dependencyFindings: state => state.data.findings.filter(finding => finding.source === 'dependency'),
     secretFindings: state => state.data.findings.filter(finding => finding.source === 'secret'),
+    whitelist: state => state.data.whitelist ?? [],
   },
 
   actions: {
@@ -421,6 +430,44 @@ export const useSecurityStore = defineStore('security', {
 
     async clearAllFindings() {
       this.data.findings = []
+      await this.persist()
+    },
+
+    async addToWhitelist(finding: { id: string; title: string; category: string; area: string }) {
+      if (!this.data.whitelist) this.data.whitelist = []
+      const existing = this.data.whitelist.find(w => w.title === finding.title && w.category === finding.category)
+      if (!existing) {
+        this.data.whitelist.push({
+          id: `wl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          title: finding.title,
+          category: finding.category,
+          area: finding.area,
+          addedAt: new Date().toISOString(),
+        })
+      }
+      for (const scan of this.data.scans) {
+        scan.findings = scan.findings.map(f =>
+          f.title === finding.title && f.category === finding.category
+            ? { ...f, whitelisted: true }
+            : f,
+        )
+      }
+      await this.persist()
+    },
+
+    async removeFromWhitelist(id: string) {
+      if (!this.data.whitelist) return
+      const removed = this.data.whitelist.find(w => w.id === id)
+      this.data.whitelist = this.data.whitelist.filter(w => w.id !== id)
+      if (removed) {
+        for (const scan of this.data.scans) {
+          scan.findings = scan.findings.map(f =>
+            f.title === removed.title && f.category === removed.category
+              ? { ...f, whitelisted: false }
+              : f,
+          )
+        }
+      }
       await this.persist()
     },
   },

@@ -14,7 +14,7 @@ Vindicta is a **local-first AI-powered security platform** built as a Nuxt 4 + T
 
 There are also two secondary apps:
 - `apps/landing`: Nuxt landing page
-- `apps/api`: NestJS API prototype (not actively developed)
+- `apps/web-admin`: Nuxt admin dashboard for beta, newsletter, and support operations
 
 ## Commands
 
@@ -25,6 +25,7 @@ pnpm desktop:dev                              # Nuxt dev server (browser)
 pnpm --filter @vindicta/desktop tauri:dev     # Full Tauri native window
 pnpm --filter @vindicta/desktop build         # Build check (fastest verification)
 pnpm landing:dev                              # Landing page dev
+pnpm admin:dev                                # Admin dashboard dev
 ```
 
 ## Architecture

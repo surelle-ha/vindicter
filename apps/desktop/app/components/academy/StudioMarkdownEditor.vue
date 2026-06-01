@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { marked } from 'marked'
+import { renderMarkdown } from '~/utils/markdown'
 
 const props = defineProps<{
   modelValue: string
@@ -14,7 +14,7 @@ const showPreview = ref(true)
 
 const rendered = computed(() => {
   if (!props.modelValue) return '<p class="text-[var(--text-faint)] italic">Nothing to preview yet.</p>'
-  return marked.parse(props.modelValue) as string
+  return renderMarkdown(props.modelValue) as string
 })
 </script>
 

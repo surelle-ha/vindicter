@@ -22,6 +22,7 @@ export interface VAFile {
     duration: string
     objectives: string[]
     labHint?: string
+    prerequisiteId?: string | null
     exportedAt: string
     exportedBy: 'vindicta-desktop'
   }
@@ -71,6 +72,7 @@ function vaFileToCustomLesson(va: VAFile, vaFilename: string): CustomLesson {
     week: va.manifest.week,
     title: va.manifest.title,
     subtitle: va.manifest.subtitle || '',
+    prerequisiteId: va.manifest.prerequisiteId ?? null,
     duration: va.manifest.duration,
     objectives: va.manifest.objectives,
     content: va.content,
@@ -227,6 +229,7 @@ function lessonToVAFile(lesson: CustomLesson): VAFile {
       id: lesson.id,
       title: lesson.title,
       subtitle: lesson.subtitle || '',
+      prerequisiteId: lesson.prerequisiteId ?? null,
       week: lesson.week,
       day: lesson.day,
       section: lesson.section,
@@ -252,6 +255,7 @@ function createBlankLesson(existingCount: number, section = ''): CustomLesson {
     week: 99,
     title: '',
     subtitle: '',
+    prerequisiteId: null,
     duration: '30 min',
     objectives: [''],
     content: '# Lesson Title\n\nWrite your lesson content here.',
@@ -265,6 +269,25 @@ function createBlankLesson(existingCount: number, section = ''): CustomLesson {
 }
 
 // ── Seed course-bin from bundled resources on first launch ───────────────────
+
+async function clearLessonTtsAudio(lessonId: string): Promise<void> {
+  try {
+    if (typeof caches !== 'undefined') {
+      const cache = await caches.open(AUDIO_CACHE)
+      await cache.delete(`lesson-audio-${lessonId}`)
+    }
+  } catch { /* ignore */ }
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem('vindicta:academy:tts:cache')
+      if (raw) {
+        const meta = JSON.parse(raw) as Record<string, unknown>
+        delete meta[lessonId]
+        localStorage.setItem('vindicta:academy:tts:cache', JSON.stringify(meta))
+      }
+    }
+  } catch { /* ignore */ }
+}
 
 async function seedCourseBin(): Promise<void> {
   try {
@@ -282,10 +305,35 @@ async function seedCourseBin(): Promise<void> {
     const bundledEntries = await readDir(bundledDir)
     for (const entry of bundledEntries as any[]) {
       if (!entry.name?.endsWith('.va')) continue
-      const dest = `${userDir}${sep}${entry.name}`
-      if (await exists(dest)) continue  // never overwrite user edits
-      const bytes = await readFile(`${bundledDir}${sep}${entry.name}`)
-      await writeFile(dest, bytes)
+      const bundledPath = `${bundledDir}${sep}${entry.name}`
+      const destPath    = `${userDir}${sep}${entry.name}`
+
+      const bundledBytes = new Uint8Array(await readFile(bundledPath))
+
+      if (!(await exists(destPath))) {
+        // New file — just copy
+        await writeFile(destPath, bundledBytes)
+        continue
+      }
+
+      // File exists — compare exportedAt to decide whether to overwrite
+      try {
+        const installedBytes = new Uint8Array(await readFile(destPath))
+        const bundledVa   = await parseVAFile(bundledBytes)
+        const installedVa = await parseVAFile(installedBytes)
+
+        const bundledTime   = new Date(bundledVa.manifest.exportedAt).getTime()
+        const installedTime = new Date(installedVa.manifest.exportedAt).getTime()
+
+        if (bundledTime > installedTime) {
+          // Bundled version is newer: overwrite AppData file and wipe user-generated audio
+          await writeFile(destPath, bundledBytes)
+          await clearLessonTtsAudio(installedVa.manifest.id)
+        }
+        // else: keep existing (user may have customised it, or it's already up to date)
+      } catch {
+        // Can't parse one or both files — skip to preserve whatever is on disk
+      }
     }
   } catch {
     // best-effort; app works fine without bundled resources

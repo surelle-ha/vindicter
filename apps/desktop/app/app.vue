@@ -3,6 +3,7 @@ const app = useAppStore()
 const user = useUserStore()
 const projects = useProjectsStore()
 const auth = useAuthStore()
+const updater = useAppUpdater()
 const router = useRouter()
 
 // Init persisted settings and apply theme before first render
@@ -16,30 +17,20 @@ useHead({
   },
 })
 
-// Disable native right-click context menu
-// Secret hotkey: Ctrl+Shift+Alt+S opens Academy Studio
-function handleStudioHotkey(e: KeyboardEvent) {
-  if (e.ctrlKey && e.shiftKey && e.altKey && (e.code === 'KeyS' || e.key.toLowerCase() === 's')) {
-    e.preventDefault()
-    void router.push('/academy-studio')
-  }
-}
-
 onMounted(() => {
   document.addEventListener('contextmenu', (e) => e.preventDefault())
-  window.addEventListener('keydown', handleStudioHotkey)
   if (app.wslAutoStart) {
     void startConfiguredWslBackends()
   }
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleStudioHotkey)
+  // Check for updates silently in the background 30s after launch
+  setTimeout(() => { void updater.checkAndDownload() }, 30_000)
 })
 
 async function onLaunched() {
   if (!user.complete) {
     await router.push('/onboarding')
+  } else {
+    await router.push('/')
   }
 }
 

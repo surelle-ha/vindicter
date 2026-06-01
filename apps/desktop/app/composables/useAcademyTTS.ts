@@ -250,7 +250,7 @@ async function generateScript(lesson: Lesson, model: TTSScriptModel): Promise<st
         messages: [{ role: 'user', content: prompt }],
       })
     case 'core':
-      throw new Error('Core AI is not yet available.')
+      throw new Error('DefendCore is not yet available.')
     default:            throw new Error(`Unknown script model: ${model as string}`)
   }
 }

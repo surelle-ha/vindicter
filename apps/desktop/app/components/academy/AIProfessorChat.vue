@@ -32,6 +32,7 @@ interface ChatMessage {
   createdAt?: string
   model?: Exclude<AcademyAIModel, null>
   mermaidCode?: string
+  isContinuation?: boolean
 }
 
 type ParsedQuiz = AcademyChatQuiz
@@ -86,7 +87,7 @@ const modelOptions: { id: AcademyAIModel; label: string; sublabel: string; note?
   },
   {
     id: 'core',
-    label: 'Core AI',
+    label: 'DefendCore',
     sublabel: 'Vindicta\'s native AI model — currently in training',
     color: 'text-rose-300',
     bg: 'bg-rose-500/10',
@@ -134,6 +135,7 @@ function restoreSession() {
       createdAt: message.createdAt,
       model: message.model,
       mermaidCode,
+      isContinuation: message.isContinuation,
     }
   })
   nextId = Math.max(0, ...messages.value.map(message => message.id)) + 1
@@ -153,6 +155,7 @@ function serializableMessages(): AcademyChatMessage[] {
       createdAt: message.createdAt ?? new Date().toISOString(),
       model: message.model ?? activeModel(),
       quiz: message.quiz ?? null,
+      isContinuation: message.isContinuation,
     }))
 }
 
@@ -214,6 +217,8 @@ function stripLeakedAnswer(text: string): string {
 
 function streamingProfessorText(text: string): string {
   let visible = stripLeakedAnswer(text.replace(/\r\n/g, '\n'))
+  // Collapse --- dividers into a subtle inline separator while streaming
+  visible = visible.replace(/\n[ \t]*---[ \t]*(?=\n|$)/gm, '\n\n· · ·\n\n')
   // Hide incomplete mermaid blocks while streaming
   visible = visible.replace(/```mermaid[\s\S]*?```/gm, '⏳ Generating diagram…')
   visible = visible.replace(/```mermaid[\s\S]*$/m, '⏳ Generating diagram…')
@@ -223,28 +228,60 @@ function streamingProfessorText(text: string): string {
   return intro ? `${intro}\n\nPreparing a question...` : 'Preparing a question...'
 }
 
+function splitByDividers(raw: string): string[] {
+  return raw
+    .split(/\n[ \t]*---[ \t]*(?:\n|$)/)
+    .map(s => s.trim())
+    .filter(s => s.length > 0)
+}
+
 async function finalizeProfessorMessage(profMsg: ChatMessage, rawText: string) {
-  const { cleanText, quiz, readyForNext, labSpawn, labCmd } = parseQuiz(rawText)
-  profMsg.text = cleanText
-  profMsg.quiz = quiz
-  profMsg.streaming = false
+  const segments = splitByDividers(rawText)
+  const now = new Date().toISOString()
+
+  // Build a finalized ChatMessage from each segment
+  const finalized: ChatMessage[] = segments.map((seg, i) => {
+    const { cleanText, quiz, readyForNext, labSpawn, labCmd } = parseQuiz(seg)
+    const mermaidMatch = cleanText.match(/```mermaid\n?([\s\S]*?)```/m)
+    return {
+      id: i === 0 ? profMsg.id : nextId++,
+      role: 'professor' as const,
+      text: cleanText,
+      quiz,
+      streaming: false,
+      createdAt: now,
+      model: profMsg.model,
+      mermaidCode: mermaidMatch?.[1]?.trim(),
+      isContinuation: i > 0,
+      _readyForNext: readyForNext,
+      _labSpawn: labSpawn,
+      _labCmd: labCmd,
+    } as ChatMessage & { _readyForNext: boolean; _labSpawn: boolean; _labCmd: string | null }
+  })
+
+  // Replace the single streaming placeholder with all finalized segments
+  const idx = messages.value.indexOf(profMsg)
+  if (idx !== -1) {
+    messages.value.splice(idx, 1, ...finalized)
+  }
+
   isStreaming.value = false
   await persistMessages()
 
-  // Detect mermaid diagram and store per-message + emit to parent for whiteboard
-  const mermaidMatch = cleanText.match(/```mermaid\n?([\s\S]*?)```/m)
-  if (mermaidMatch?.[1]?.trim()) {
-    profMsg.mermaidCode = mermaidMatch[1].trim()
-    emit('mermaid-diagram', mermaidMatch[1].trim())
+  // Side-effects: mermaid diagrams, completion signal, lab terminal
+  for (const msg of finalized) {
+    if (msg.mermaidCode) {
+      emit('mermaid-diagram', msg.mermaidCode)
+    }
+    const meta = msg as any
+    if (meta._readyForNext && !props.lessonCompleted) {
+      emit('markComplete')
+    }
+    if (meta._labSpawn) {
+      emit('open-terminal', meta._labCmd ?? '')
+    }
   }
 
-  if (readyForNext && !props.lessonCompleted) {
-    emit('markComplete')
-  }
-  // Spawn the WSL practice terminal if the professor requested it
-  if (labSpawn) {
-    emit('open-terminal', labCmd ?? '')
-  }
   await nextTick()
   scrollToBottom()
 }
@@ -269,6 +306,7 @@ Your teaching approach:
 - Explain concepts step by step. Check understanding before moving on.
 - Ask comprehension questions using the QUIZ format below.
 - Give constructive feedback on student answers — praise correct reasoning, gently correct mistakes.
+- When a student answers correctly: give your feedback/praise, then place "---" on its own line, then continue with the next concept or question. This creates a natural message break between your encouragement and the next teaching step. Use "---" ONLY at this transition — do not use it mid-explanation or for any other purpose.
 - Never expose the correct answer in visible text before the student answers.
 - When the student demonstrates solid understanding of all objectives, end your response with this hidden control line on its own line: ASSESSMENT:READY
 - Do not tell the student to mark the lesson complete. The app will unlock the next lesson after ASSESSMENT:READY.
@@ -337,24 +375,42 @@ function conversationText(message: ChatMessage): string {
 }
 
 function conversationMessages(limit = 18) {
-  return messages.value
-    .filter(message => !message.streaming)
-    .map(message => ({
-      role: message.role === 'professor' ? 'assistant' as const : 'user' as const,
-      content: conversationText(message),
-    }))
-    .filter(message => message.content.trim())
-    .slice(-limit)
+  const merged: { role: 'assistant' | 'user'; content: string }[] = []
+  for (const message of messages.value.filter(m => !m.streaming)) {
+    const content = conversationText(message)
+    if (!content.trim()) continue
+    const role = message.role === 'professor' ? 'assistant' as const : 'user' as const
+    const last = merged[merged.length - 1]
+    // Merge consecutive professor segments (split bubbles) back into one assistant turn
+    if (last && last.role === role && role === 'assistant') {
+      last.content += '\n\n' + content
+    }
+    else {
+      merged.push({ role, content })
+    }
+  }
+  return merged.slice(-limit)
 }
 
 function buildPrompt(): string {
   const priorMessages = messages.value.filter(message => !message.streaming)
-  const history = priorMessages.slice(-14).map(m => {
+  // Merge consecutive professor segments before formatting history
+  const merged: { role: 'professor' | 'student'; text: string; model?: string }[] = []
+  for (const m of priorMessages) {
+    const last = merged[merged.length - 1]
+    if (last && last.role === m.role && m.role === 'professor') {
+      last.text += '\n\n' + conversationText(m)
+    }
+    else {
+      merged.push({ role: m.role, text: conversationText(m), model: m.model })
+    }
+  }
+  const history = merged.slice(-14).map(m => {
     const prefix = m.role === 'professor' ? 'Professor' : 'Student'
-    return `${prefix}: ${conversationText(m)}`
+    return `${prefix}: ${m.text}`
   }).join('\n\n')
-  const memory = priorMessages.length
-    ? priorMessages.map(m => `${m.role === 'professor' ? 'Professor' : 'Student'} (${m.model ?? 'saved'}): ${conversationText(m)}`).slice(-24).join('\n')
+  const memory = merged.length
+    ? merged.map(m => `${m.role === 'professor' ? 'Professor' : 'Student'} (${m.model ?? 'saved'}): ${m.text}`).slice(-24).join('\n')
     : 'No previous lesson conversation yet.'
 
   return `${buildSystemPrompt()}
@@ -601,43 +657,30 @@ watch(() => props.lesson.id, () => {
           <p class="text-center text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">
             Choose AI model
           </p>
-          <div class="space-y-2">
+          <div class="grid grid-cols-2 gap-2">
             <button
               v-for="m in modelOptions"
               :key="m.id ?? ''"
-              class="flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-all"
-              :class="m.disabled
-                ? 'cursor-not-allowed border-[var(--border)] opacity-50'
-                : pendingModel === m.id
-                  ? [m.border, m.bg]
-                  : 'border-[var(--border)] hover:border-white/10 hover:bg-white/[0.02]'"
+              class="rounded-xl border p-2.5 text-left transition-all"
+              :class="[
+                m.id === 'core' ? 'col-span-2' : '',
+                m.disabled
+                  ? 'cursor-not-allowed border-[var(--border)] opacity-50'
+                  : pendingModel === m.id
+                    ? [m.border, m.bg]
+                    : 'border-[var(--border)] hover:border-white/10 hover:bg-white/[0.02]',
+              ]"
               :disabled="m.disabled"
               @click="!m.disabled && (pendingModel = m.id)"
             >
-              <!-- Radio dot -->
-              <div
-                class="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors"
-                :class="pendingModel === m.id && !m.disabled
-                  ? [m.border, m.bg]
-                  : 'border-[var(--border)]'"
-              >
-                <div
-                  v-if="pendingModel === m.id && !m.disabled"
-                  class="size-2 rounded-full"
-                  :class="m.color.replace('text-', 'bg-')"
-                />
+              <div class="flex items-center gap-1.5 mb-1">
+                <component :is="m.icon" class="size-3.5 shrink-0" :class="m.color" />
+                <span class="text-xs font-semibold text-[var(--text)]">{{ m.label }}</span>
+                <span v-if="m.id === 'claude'" class="ml-auto rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-px text-[8px] font-semibold text-violet-300">Best</span>
+                <span v-if="m.soon" class="ml-auto rounded-full border border-rose-500/25 bg-rose-500/10 px-1.5 py-px text-[9px] font-semibold text-rose-300">Soon</span>
               </div>
-
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-1.5">
-                  <component :is="m.icon" class="size-3.5 shrink-0" :class="m.color" />
-                  <span class="text-xs font-semibold text-[var(--text)]">{{ m.label }}</span>
-                  <span v-if="m.id === 'claude'" class="rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-violet-300">Recommended</span>
-                  <span v-if="m.soon" class="rounded-full border border-rose-500/25 bg-rose-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-rose-300">Soon</span>
-                </div>
-                <p class="mt-0.5 text-[11px] text-[var(--text-faint)]">{{ m.sublabel }}</p>
-                <p v-if="m.note" class="mt-0.5 text-[10px] text-amber-400/70 italic">{{ m.note }}</p>
-              </div>
+              <p class="text-[10px] text-[var(--text-faint)] leading-relaxed">{{ m.sublabel }}</p>
+              <p v-if="m.note" class="mt-0.5 text-[10px] text-amber-400/70 italic">{{ m.note }}</p>
             </button>
           </div>
         </div>
@@ -685,15 +728,19 @@ watch(() => props.lesson.id, () => {
 
           <template v-for="msg in messages" :key="msg.id">
             <!-- Professor message -->
-            <div v-if="msg.role === 'professor'" class="flex items-start gap-2">
-              <div class="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border border-indigo-500/20 bg-indigo-500/10">
+            <div v-if="msg.role === 'professor'" class="flex items-start gap-2" :class="msg.isContinuation ? '-mt-1' : ''">
+              <div
+                class="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border border-indigo-500/20 bg-indigo-500/10"
+                :class="msg.isContinuation ? 'invisible' : ''"
+              >
                 <Bot class="size-3.5 text-indigo-300" />
               </div>
               <div class="flex-1 min-w-0 space-y-2">
                 <!-- Text -->
                 <div
                   v-if="msg.text"
-                  class="professor-bubble rounded-xl rounded-tl-none border border-indigo-500/15 bg-indigo-500/[0.08] px-3 py-2.5 text-xs leading-relaxed text-[var(--text-muted)]"
+                  class="professor-bubble border border-indigo-500/15 bg-indigo-500/[0.08] px-3 py-2.5 text-xs leading-relaxed text-[var(--text-muted)]"
+                  :class="msg.isContinuation ? 'rounded-xl' : 'rounded-xl rounded-tl-none'"
                   v-html="renderText(msg.text)"
                   @click="handleBubbleClick($event, msg)"
                 />

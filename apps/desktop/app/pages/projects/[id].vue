@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { AlertTriangle, Clock3, FileText, Github, KeyRound, PackageSearch, PanelBottomOpen, Radar, Settings, ShieldCheck } from 'lucide-vue-next'
+import { AlertTriangle, Clock3, FileText, Github, KeyRound, PackageSearch, PanelBottomOpen, Radar, Settings, ShieldCheck, ShieldMinus } from 'lucide-vue-next'
 import type { Component } from 'vue'
 
-type SecurityWorkspaceTab = 'overview' | 'scanner' | 'findings' | 'dependencies' | 'secrets' | 'reports' | 'history' | 'settings' | 'github_issues'
+type SecurityWorkspaceTab = 'overview' | 'scanner' | 'findings' | 'whitelist' | 'dependencies' | 'secrets' | 'reports' | 'settings' | 'github_issues'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,6 +22,7 @@ const staticTabs: { id: SecurityWorkspaceTab; label: string; icon: Component }[]
   { id: 'findings', label: 'Findings', icon: AlertTriangle },
   { id: 'dependencies', label: 'Dependencies', icon: PackageSearch },
   { id: 'secrets', label: 'Secrets', icon: KeyRound },
+  { id: 'whitelist', label: 'Whitelist', icon: ShieldMinus },
   { id: 'reports', label: 'Reports', icon: FileText },
   { id: 'history', label: 'History', icon: Clock3 },
   { id: 'settings', label: 'Settings', icon: Settings },
@@ -50,7 +51,7 @@ onMounted(async () => {
 })
 
 function isSecurityTab(value: unknown): value is SecurityWorkspaceTab {
-  const allIds: SecurityWorkspaceTab[] = ['overview', 'scanner', 'findings', 'dependencies', 'secrets', 'reports', 'history', 'settings', 'github_issues']
+  const allIds: SecurityWorkspaceTab[] = ['overview', 'scanner', 'findings', 'whitelist', 'dependencies', 'secrets', 'reports', 'history', 'settings', 'github_issues']
   return allIds.includes(value as SecurityWorkspaceTab)
 }
 

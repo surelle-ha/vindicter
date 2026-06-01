@@ -4,6 +4,7 @@ use tauri::{
 };
 
 use std::io::Read;
+use std::net::IpAddr;
 
 /// GitHub OAuth App Client ID — baked in at compile time.
 /// Set the GITHUB_CLIENT_ID environment variable before building.
@@ -60,6 +61,119 @@ struct AcademyTerminalEvent {
     code: Option<i32>,
 }
 
+// ── SSRF guard ────────────────────────────────────────────────────────────────
+
+/// Hosts that `download_to_temp` is permitted to reach (and redirect through).
+/// This command exists solely to download HuggingFace model files for the Kokoro
+/// TTS feature; any other host is out of scope and must be rejected.
+const ALLOWED_DOWNLOAD_HOSTS: &[&str] = &[
+    "huggingface.co",
+    "cdn-lfs.huggingface.co",
+    "cdn-lfs-us-1.huggingface.co",
+    "cdn-lfs-us-2.huggingface.co",
+    "hf.co",
+];
+
+fn is_allowed_download_host(host: &str) -> bool {
+    let lower = host.to_lowercase();
+    ALLOWED_DOWNLOAD_HOSTS.iter().any(|&h| lower == h)
+}
+
+/// Returns `Err` if `host` must be blocked to prevent SSRF.
+///
+/// Rejects well-known internal hostnames first (no network needed), then
+/// resolves via DNS and rejects any result that maps to a loopback, private,
+/// link-local, or cloud-metadata address.  Called before every new connection
+/// **and** after every redirect, so SSRF-via-redirect chains are also blocked.
+async fn ssrf_check(host: &str) -> Result<(), String> {
+    // Block common internal hostnames before touching DNS
+    let lower = host.to_lowercase();
+    const BLOCKED_NAMES: &[&str] = &[
+        "localhost",
+        "local",
+        "metadata.google.internal",
+        "metadata.goog",
+        "0.0.0.0",
+        "::1",
+        "127.0.0.1",
+    ];
+    if BLOCKED_NAMES.contains(&lower.as_str())
+        || lower.ends_with(".localhost")
+        || lower.ends_with(".local")
+        || lower.ends_with(".internal")
+    {
+        return Err(format!("Host '{}' is not permitted.", host));
+    }
+
+    // DNS-resolve and inspect every returned address
+    let owned = host.to_owned();
+    let addrs = tauri::async_runtime::spawn_blocking(move || {
+        use std::net::ToSocketAddrs;
+        format!("{}:80", owned)
+            .to_socket_addrs()
+            .map(|i| i.collect::<Vec<_>>())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| format!("Cannot resolve host '{}': {}", host, e))?;
+
+    for addr in addrs {
+        if is_blocked_ip(addr.ip()) {
+            return Err(format!(
+                "Host '{}' resolves to a private or reserved IP address and is not permitted.",
+                host,
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Returns `true` for any IP that must not be reachable from a renderer-triggered
+/// HTTP request: loopback, RFC-1918 private, link-local (169.254/16 covers AWS
+/// IMDSv1), broadcast, multicast, unspecified, and their IPv6 equivalents.
+fn is_blocked_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_broadcast()
+                || v4.is_multicast()
+                || v4.is_unspecified()
+        }
+        IpAddr::V6(v6) => {
+            if v6.is_loopback() || v6.is_unspecified() || v6.is_multicast() {
+                return true;
+            }
+            let s = v6.segments();
+            // Unique-local (fc00::/7)
+            let unique_local = (s[0] & 0xfe00) == 0xfc00;
+            // Link-local (fe80::/10)
+            let link_local = (s[0] & 0xffc0) == 0xfe80;
+            // IPv4-mapped (::ffff:0:0/96) — check the embedded IPv4 value
+            let ipv4_mapped = s[0] == 0
+                && s[1] == 0
+                && s[2] == 0
+                && s[3] == 0
+                && s[4] == 0
+                && s[5] == 0xffff;
+            if unique_local || link_local {
+                return true;
+            }
+            if ipv4_mapped {
+                let embedded = std::net::Ipv4Addr::new(
+                    (s[6] >> 8) as u8,
+                    s[6] as u8,
+                    (s[7] >> 8) as u8,
+                    s[7] as u8,
+                );
+                return is_blocked_ip(IpAddr::V4(embedded));
+            }
+            false
+        }
+    }
+}
+
 /// Download a URL to a temporary file via reqwest (bypasses WebView CSP/CORS).
 /// Returns the absolute path of the temp file so the JS side can read it via
 /// the fs plugin. The caller is responsible for deleting the temp file.
@@ -73,9 +187,29 @@ async fn download_to_temp(url: String) -> Result<String, String> {
         return Err("URL is not valid.".to_string());
     }
 
+    // Allowlist: this command exists only to fetch HuggingFace model files.
+    // Reject any other host so a compromised renderer cannot use it for SSRF.
+    let parsed = reqwest::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
+    let host = parsed.host_str().ok_or("URL has no host.")?;
+    if !is_allowed_download_host(host) {
+        return Err(format!(
+            "Downloads from '{}' are not permitted. Only huggingface.co model files are supported.",
+            host
+        ));
+    }
+
+    // Custom redirect policy: only follow redirects to the same allowlisted hosts
+    // (HuggingFace CDN redirects are expected; anything else is rejected).
     let client = reqwest::Client::builder()
         .user_agent("Mozilla/5.0 (compatible; Vindicta/0.1; Kokoro model downloader)")
-        .redirect(reqwest::redirect::Policy::limited(15))
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            let redir_host = attempt.url().host_str().unwrap_or("").to_lowercase();
+            if ALLOWED_DOWNLOAD_HOSTS.iter().any(|&h| redir_host == h) {
+                attempt.follow()
+            } else {
+                attempt.stop()
+            }
+        }))
         .timeout(std::time::Duration::from_secs(600))
         .build()
         .map_err(|e| e.to_string())?;
@@ -225,32 +359,116 @@ async fn github_poll_access_token(device_code: String) -> Result<GithubTokenPoll
 
 #[tauri::command]
 async fn fetch_rss_source(url: String) -> Result<String, String> {
-    let url = url.trim();
-    if !(url.starts_with("https://") || url.starts_with("http://")) {
+    const MAX_REDIRECTS: usize = 5;
+    const MAX_RESPONSE_BYTES: usize = 5 * 1024 * 1024; // 5 MB
+
+    let raw = url.trim().to_owned();
+    if !(raw.starts_with("https://") || raw.starts_with("http://")) {
         return Err("RSS source must be an http:// or https:// URL.".to_string());
     }
-    if url.len() > 1000 || url.chars().any(|c| c.is_control()) {
+    if raw.len() > 1000 || raw.chars().any(|c| c.is_control()) {
         return Err("RSS source URL is not valid.".to_string());
     }
 
+    // Redirects are followed manually so every new destination is SSRF-checked
+    // before the connection is made.
     let client = reqwest::Client::builder()
         .user_agent("Vindicta/0.1 Security News Reader")
-        .redirect(reqwest::redirect::Policy::limited(5))
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(30))
         .build()
-        .map_err(|error| error.to_string())?;
+        .map_err(|e| e.to_string())?;
 
-    let response = client
-        .get(url)
-        .send()
-        .await
-        .map_err(|error| error.to_string())?;
+    let mut current_url = raw;
+    let mut hops: usize = 0;
 
-    let status = response.status();
-    if !status.is_success() {
-        return Err(format!("RSS source returned HTTP {}", status.as_u16()));
+    loop {
+        // Parse and SSRF-check the destination before opening a connection
+        let parsed = reqwest::Url::parse(&current_url)
+            .map_err(|e| format!("Invalid RSS URL: {}", e))?;
+        let host = parsed.host_str().ok_or("RSS URL has no host.")?.to_owned();
+        ssrf_check(&host).await?;
+
+        let response = client
+            .get(&current_url)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let status = response.status();
+
+        // Manual redirect following — re-runs the SSRF check for each new target
+        if matches!(status.as_u16(), 301 | 302 | 303 | 307 | 308) {
+            if hops >= MAX_REDIRECTS {
+                return Err("RSS source returned too many redirects.".to_string());
+            }
+            let location = response
+                .headers()
+                .get("location")
+                .and_then(|v| v.to_str().ok())
+                .ok_or_else(|| "Redirect response is missing a Location header.".to_string())?
+                .to_owned();
+            // Resolve relative Location values against the current URL
+            current_url = if location.starts_with("http://") || location.starts_with("https://") {
+                location
+            } else {
+                parsed
+                    .join(&location)
+                    .map_err(|e| format!("Invalid redirect target: {}", e))?
+                    .to_string()
+            };
+            if current_url.len() > 1000 || current_url.chars().any(|c| c.is_control()) {
+                return Err("Redirect URL is not valid.".to_string());
+            }
+            hops += 1;
+            continue;
+        }
+
+        if !status.is_success() {
+            return Err(format!("RSS source returned HTTP {}", status.as_u16()));
+        }
+
+        // Reject responses with content types that are clearly not feeds
+        let ct = response
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_lowercase();
+        if !ct.is_empty()
+            && !ct.contains("xml")
+            && !ct.contains("rss")
+            && !ct.contains("atom")
+            && !ct.contains("json")
+            && !ct.contains("text")
+        {
+            return Err(format!(
+                "RSS source returned an unexpected content type: '{}'.",
+                ct
+            ));
+        }
+
+        // Enforce a response-body size limit before reading into memory.
+        // Content-Length is advisory; the hard cap on `bytes.len()` below is authoritative.
+        if let Some(claimed) = response.content_length() {
+            if claimed > MAX_RESPONSE_BYTES as u64 {
+                return Err(format!(
+                    "RSS source is too large ({} bytes; limit is {} bytes).",
+                    claimed, MAX_RESPONSE_BYTES
+                ));
+            }
+        }
+        let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+        if bytes.len() > MAX_RESPONSE_BYTES {
+            return Err(format!(
+                "RSS source response exceeds the {} MB limit.",
+                MAX_RESPONSE_BYTES / (1024 * 1024)
+            ));
+        }
+
+        return String::from_utf8(bytes.to_vec())
+            .map_err(|_| "RSS source returned non-UTF-8 content.".to_string());
     }
-
-    response.text().await.map_err(|error| error.to_string())
 }
 
 const PENTEST_USER: &str = "pentest";

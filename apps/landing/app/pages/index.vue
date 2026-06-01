@@ -261,7 +261,7 @@ const badgeClass: Record<string, string> = {
           style="animation-delay:0.55s"
         >
           <NuxtLink
-            to="/beta"
+            to="/standard-beta"
             class="group flex items-center gap-2.5 rounded-2xl bg-accent px-8 py-3.5 text-[14px] font-bold text-white shadow-lg transition-all hover:bg-accent/90 hover:scale-[1.03] hover:shadow-accent/40 hover:shadow-2xl active:scale-[0.98]"
           >
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -362,10 +362,10 @@ const badgeClass: Record<string, string> = {
         <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div
             v-for="(provider, i) in [
-              { name: 'Claude',      sub: 'Anthropic',   badge: 'Live',       badgeCls: 'bg-ok/15 text-ok',          icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z', glow: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.20)' },
-              { name: 'OpenRouter',  sub: 'Multi-model',  badge: 'Live',       badgeCls: 'bg-ok/15 text-ok',          icon: 'M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z', glow: 'rgba(14,165,233,0.10)', border: 'rgba(14,165,233,0.20)' },
-              { name: 'Ollama',      sub: 'Local / Offline', badge: 'Live',   badgeCls: 'bg-ok/15 text-ok',          icon: 'M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 15V5.25m19.5 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 7.409a2.25 2.25 0 01-1.07-1.916V5.25', glow: 'rgba(249,115,22,0.10)', border: 'rgba(249,115,22,0.20)' },
-              { name: 'Core AI',     sub: 'Vindicta',     badge: 'Soon',       badgeCls: 'bg-white/8 text-white/40',  icon: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z', glow: 'rgba(139,92,246,0.07)', border: 'rgba(139,92,246,0.12)' },
+              { name: 'Claude',      sub: 'Anthropic',      badge: 'Live', badgeCls: 'bg-ok/15 text-ok',         link: null, icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z', glow: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.20)' },
+              { name: 'OpenRouter',  sub: 'Multi-model',    badge: 'Live', badgeCls: 'bg-ok/15 text-ok',         link: null, icon: 'M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z', glow: 'rgba(14,165,233,0.10)', border: 'rgba(14,165,233,0.20)' },
+              { name: 'Ollama',      sub: 'Local / Offline', badge: 'Live', badgeCls: 'bg-ok/15 text-ok',        link: null, icon: 'M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 15V5.25m19.5 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 7.409a2.25 2.25 0 01-1.07-1.916V5.25', glow: 'rgba(249,115,22,0.10)', border: 'rgba(249,115,22,0.20)' },
+              { name: 'DefendCore',  sub: 'Vindicta AI',    badge: 'Soon', badgeCls: 'bg-white/8 text-white/40', link: '/defendcore', icon: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z', glow: 'rgba(139,92,246,0.07)', border: 'rgba(139,92,246,0.12)' },
             ]"
             :key="provider.name"
             :data-reveal="`provider-${i}`"
@@ -388,6 +388,16 @@ const badgeClass: Record<string, string> = {
             <div class="relative z-10">
               <p class="text-[13px] font-semibold text-white">{{ provider.name }}</p>
               <p class="text-[11px] text-white/35 mt-0.5">{{ provider.sub }}</p>
+              <NuxtLink
+                v-if="provider.link"
+                :to="provider.link"
+                class="mt-2 inline-flex items-center gap-1 text-[10px] text-accent/60 hover:text-accent transition-colors"
+              >
+                Learn more
+                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+              </NuxtLink>
             </div>
           </div>
         </div>
@@ -653,7 +663,7 @@ const badgeClass: Record<string, string> = {
         </p>
         <div class="flex flex-col sm:flex-row items-center gap-4">
           <NuxtLink
-            to="/beta"
+            to="/standard-beta"
             class="group flex items-center gap-2.5 rounded-2xl bg-accent px-10 py-4 text-[15px] font-bold text-white shadow-lg transition-all hover:bg-accent/90 hover:scale-[1.03] hover:shadow-accent/40 hover:shadow-2xl active:scale-[0.98]"
           >
             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">

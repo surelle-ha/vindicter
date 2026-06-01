@@ -7,12 +7,14 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Clipboard,
   Clock3,
   Download,
   ExternalLink,
   FileJson,
   FileSearch,
   FileText,
+  FlaskConical,
   FolderOpen,
   Github,
   History,
@@ -21,11 +23,17 @@ import {
   LockKeyhole,
   PackageSearch,
   Plus,
+  RotateCcw,
   Search,
+  SearchCheck,
   Settings,
   ShieldCheck,
+  ShieldMinus,
+  ShieldX,
   Terminal,
   Trash2,
+  TriangleAlert,
+  X,
 } from 'lucide-vue-next'
 import { runCodexExec } from '~/composables/useCodexShell'
 import { runClaudeExec } from '~/composables/useClaudeAI'
@@ -40,10 +48,10 @@ import type {
   SecurityScanFinding,
   SecuritySeverity,
 } from '~/types/vindicta'
-import { createVindictaSecurityDocx } from '~/utils/docx'
+import { createVindictaSecurityDocx, createVindictaRawReportDocx, buildFixPromptsMarkdown, buildSecurityReviewMarkdown, buildRawReportMarkdown } from '~/utils/docx'
 
 type SecurityAITool = 'codex' | 'claude' | 'openrouter' | 'ollama'
-type SecurityWorkspaceTab = 'overview' | 'scanner' | 'findings' | 'dependencies' | 'secrets' | 'reports' | 'history' | 'settings' | 'github_issues'
+type SecurityWorkspaceTab = 'overview' | 'scanner' | 'findings' | 'whitelist' | 'dependencies' | 'secrets' | 'reports' | 'settings' | 'github_issues'
 type ScanActivityStatus = 'pending' | 'running' | 'done' | 'warning' | 'error'
 
 interface ParsedScanResult {
@@ -82,6 +90,7 @@ const emit = defineEmits<{
 }>()
 
 const security = useSecurityStore()
+const feed = useNotificationFeedStore()
 const aiActivity = useAIActivityStore()
 const app = useAppStore()
 const auth = useAuthStore()
@@ -104,7 +113,44 @@ const scopeLoading = ref(false)
 const aiScanRunning = ref(false)
 const creatingRemediation = ref(false)
 const exportingDocs = ref(false)
+const showExportModal = ref(false)
+const exportingFormat = ref<'review' | 'raw' | 'prompts' | null>(null)
 const confirmClearFindings = ref(false)
+const showHistoryDrawer    = ref(false)
+
+// ── Finding validation ────────────────────────────────────────────────────────
+interface ValidationResult {
+  status: 'resolved' | 'present' | 'regressed' | 'new_issue'
+  verdict: string
+  evidence: string
+  recommendation: string
+  newFinding?: {
+    title: string
+    severity: string
+    category: string
+    area: string
+    detail: string
+    recommendation: string
+  }
+}
+const showValidateModal = ref(false)
+const validateFinding = ref<SecurityFinding | null>(null)
+const validateAITool = ref<SecurityAITool>('codex')
+const validateRunning = ref(false)
+const validateResult = ref<ValidationResult | null>(null)
+const validateError = ref('')
+
+// ── Project stack detection ───────────────────────────────────────────────────
+const detectedStack = ref<Awaited<ReturnType<typeof detectProjectStack>>>([])
+
+// ── OSS scanner state ─────────────────────────────────────────────────────────
+interface OssToolStatus { name: string; status: 'idle' | 'running' | 'done' | 'skipped' | 'error'; count: number; error?: string }
+const ossTools = ref<OssToolStatus[]>([
+  { name: 'npm audit', status: 'idle', count: 0 },
+  { name: 'Trivy', status: 'idle', count: 0 },
+  { name: 'Semgrep', status: 'idle', count: 0 },
+])
+const ossRunning = ref(false)
 
 const showGitHubIssueModal = ref(false)
 const ghIssueFinding = ref<SecurityFinding | null>(null)
@@ -120,7 +166,9 @@ watch(() => props.project.githubRepo, (v) => { ghRepoInput.value = v ?? '' })
 async function saveGitHubRepo() {
   ghRepoSaving.value = true
   try {
-    await projects.updateProjectMeta(props.project.id, { githubRepo: ghRepoInput.value.trim() || null })
+    const githubRepo = ghRepoInput.value.trim() || null
+    await projects.updateProjectMeta(props.project.id, { githubRepo })
+    await useVindictaJson().patchMeta(props.project.absolutePath, { githubRepo }).catch(() => {})
     notify('GitHub repository saved.', 'success')
   } catch (e: any) {
     notify(e?.message ?? 'Could not save repository.', 'error')
@@ -206,6 +254,177 @@ async function clearAllFindingsConfirmed() {
   confirmClearFindings.value = false
   notify('All findings cleared.', 'success')
 }
+
+function buildFixPrompt(finding: SecurityFinding): string {
+  const lines: string[] = [
+    `You are a security engineer. Fix the following security finding in this codebase.`,
+    ``,
+    `Finding: ${finding.title}`,
+    `Severity: ${finding.severity.toUpperCase()}`,
+    `Category: ${finding.category}`,
+    `Affected area: ${finding.area}`,
+  ]
+  if (finding.detail) lines.push(``, `Description:`, finding.detail)
+  if (finding.evidence) lines.push(``, `Evidence:`, finding.evidence)
+  if (finding.recommendation) lines.push(``, `Recommended fix:`, finding.recommendation)
+  lines.push(``, `Apply the minimum-scope fix needed to resolve this finding without breaking existing functionality. Explain what you changed and why.`)
+  return lines.join('\n')
+}
+
+async function copyFixPrompt(finding: SecurityFinding) {
+  await navigator.clipboard.writeText(buildFixPrompt(finding))
+  notify('Fix prompt copied to clipboard.', 'success')
+}
+
+function openValidateModal(finding: SecurityFinding) {
+  validateFinding.value = finding
+  validateResult.value = null
+  validateError.value = ''
+  showValidateModal.value = true
+}
+
+function buildValidationPrompt(finding: SecurityFinding): string {
+  return `You are a security validation agent for the project "${props.project.name}".
+
+A security finding was previously identified. Inspect the codebase and determine whether it has been resolved, is still present, has regressed, or whether a new related issue has emerged.
+
+Finding to validate:
+  Title: ${finding.title}
+  Severity: ${finding.severity.toUpperCase()}
+  Category: ${finding.category}
+  Affected area: ${finding.area}
+  Description: ${finding.detail}
+${finding.evidence ? `  Evidence: ${finding.evidence}\n` : ''}  Recommended fix: ${finding.recommendation}
+
+Inspect the relevant source files, configuration, and logic paths. Look for:
+- Evidence the fix described in the recommendation was applied
+- Any remaining instances of the vulnerable pattern
+- Any regression or new related vulnerability introduced by a fix attempt
+
+Return ONLY valid JSON — no markdown fences, no extra text:
+{
+  "status": "resolved" | "present" | "regressed" | "new_issue",
+  "verdict": "One concise sentence summarising what you found",
+  "evidence": "Specific code paths, file locations, or patterns you observed",
+  "recommendation": "Clear next action for the developer",
+  "newFinding": {
+    "title": "...",
+    "severity": "critical|high|medium|low",
+    "category": "...",
+    "area": "...",
+    "detail": "...",
+    "recommendation": "..."
+  }
+}
+Include "newFinding" only when status is "new_issue". Omit it otherwise.`
+}
+
+function parseValidationResponse(text: string): ValidationResult {
+  const raw = parseJsonPayload(text) as Record<string, unknown>
+  const status = ['resolved', 'present', 'regressed', 'new_issue'].includes(String(raw?.status))
+    ? (raw.status as ValidationResult['status'])
+    : 'present'
+  return {
+    status,
+    verdict: stringValue(raw?.verdict, 'No verdict returned.'),
+    evidence: stringValue(raw?.evidence, ''),
+    recommendation: stringValue(raw?.recommendation, ''),
+    newFinding: status === 'new_issue' && raw?.newFinding
+      ? {
+          title: stringValue((raw.newFinding as any)?.title, 'Untitled finding'),
+          severity: stringValue((raw.newFinding as any)?.severity, 'medium'),
+          category: stringValue((raw.newFinding as any)?.category, finding.category),
+          area: stringValue((raw.newFinding as any)?.area, finding.area),
+          detail: stringValue((raw.newFinding as any)?.detail, ''),
+          recommendation: stringValue((raw.newFinding as any)?.recommendation, ''),
+        }
+      : undefined,
+  }
+}
+
+async function runValidation() {
+  const finding = validateFinding.value
+  if (!finding || !props.project.absolutePath) return
+
+  validateRunning.value = true
+  validateResult.value = null
+  validateError.value = ''
+
+  const tool = validateAITool.value
+  const prompt = buildValidationPrompt(finding)
+
+  try {
+    let responseText = ''
+
+    if (tool === 'openrouter') {
+      responseText = await runOpenRouterChat({
+        apiKey: app.openRouter.apiKey,
+        model: app.openRouter.model,
+        messages: [
+          { role: 'system', content: 'You are Vindicta, an AI security validator. Return only the JSON requested by the user.' },
+          { role: 'user', content: prompt },
+        ],
+      })
+    }
+    else if (tool === 'ollama') {
+      responseText = await runOllamaChat({
+        url: app.ollama.url,
+        model: app.ollama.model,
+        messages: [
+          { role: 'system', content: 'You are Vindicta, an AI security validator. Return only the JSON requested by the user.' },
+          { role: 'user', content: prompt },
+        ],
+      })
+    }
+    else if (tool === 'claude') {
+      const r = await runClaudeExec({ projectPath: props.project.absolutePath, prompt, model: 'Claude CLI default', reasoningEffort: 'medium' })
+      responseText = [r.stdout, r.stderr].filter(Boolean).join('\n').trim()
+    }
+    else {
+      const r = await runCodexExec({ projectPath: props.project.absolutePath, prompt, model: 'Codex CLI default', reasoningEffort: 'medium' })
+      responseText = [r.stdout, r.stderr].filter(Boolean).join('\n').trim()
+    }
+
+    if (!responseText) throw new Error('AI returned no output.')
+    validateResult.value = parseValidationResponse(responseText)
+  }
+  catch (e: any) {
+    validateError.value = e?.message ?? 'Validation failed.'
+  }
+  finally {
+    validateRunning.value = false
+  }
+}
+
+async function applyValidationResolved() {
+  const finding = validateFinding.value
+  if (!finding) return
+  await security.updateFindingStatus(finding.id, 'resolved')
+  notify(`"${finding.title}" marked as resolved.`, 'success')
+  showValidateModal.value = false
+}
+
+async function addValidationNewFinding() {
+  const result = validateResult.value
+  const finding = validateFinding.value
+  if (!result?.newFinding || !finding) return
+  const nf = result.newFinding
+  await security.createRemediationItems(finding.scanId, [{
+    id: `VAL-${Date.now()}`,
+    title: nf.title,
+    severity: normalizeSeverity(nf.severity),
+    category: nf.category || finding.category,
+    source: finding.source,
+    area: nf.area || finding.area,
+    detail: nf.detail,
+    evidence: '',
+    recommendation: nf.recommendation,
+    selected: true,
+  }])
+  notify(`New finding "${nf.title}" added to remediation list.`, 'success')
+  showValidateModal.value = false
+}
+
 const dependencyLoading = ref(false)
 const secretsLoading = ref(false)
 const dependencyInventory = ref<DependencyInventoryItem[]>([])
@@ -387,6 +606,14 @@ const latestScan = computed(() => security.latestScan)
 const activeScan = computed(() => security.scans.find(scan => scan.id === activeScanId.value) ?? latestScan.value)
 const scanFindings = computed(() => activeScan.value?.findings ?? [])
 const selectedScanFindings = computed(() => scanFindings.value.filter(finding => finding.selected))
+const remediatedTitles = computed(() => new Set(security.findings.map(f => f.title.trim().toLowerCase())))
+const whitelistedTitles = computed(() => new Set(security.whitelist.map(w => `${w.title.trim().toLowerCase()}||${w.category.trim().toLowerCase()}`)))
+function isAlreadyRemediated(finding: SecurityScanFinding) {
+  return remediatedTitles.value.has(finding.title.trim().toLowerCase())
+}
+function isAlreadyWhitelisted(finding: SecurityScanFinding) {
+  return Boolean(finding.whitelisted) || whitelistedTitles.value.has(`${finding.title.trim().toLowerCase()}||${finding.category.trim().toLowerCase()}`)
+}
 const canRunAIScan = computed(() => Boolean(props.project.absolutePath) && !aiScanRunning.value && canUseSelectedAITool.value)
 const canExportDocs = computed(() => Boolean(activeScan.value || security.findings.length) && !exportingDocs.value)
 const formattedLastScan = computed(() => latestScan.value ? new Date(latestScan.value.scannedAt).toLocaleString() : 'Not run')
@@ -434,13 +661,41 @@ onMounted(async () => {
     metricsCollapsed.value = localStorage.getItem('vindicta-security-metrics-collapsed') === 'true'
   }
   await initializeWorkspace()
+  checkStaleFindings()
 })
+
+function checkStaleFindings() {
+  const key = `vindicta:stale-notif:${props.project.id}`
+  const lastNotified = Number(localStorage.getItem(key) ?? 0)
+  if (Date.now() - lastNotified < 24 * 60 * 60 * 1000) return
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const stale = security.findings.filter(f =>
+    (f.status === 'open' || f.status === 'in_progress' || f.status === 'triaged')
+    && new Date(f.updatedAt).getTime() < cutoff,
+  )
+  if (!stale.length) return
+  const high = stale.filter(f => f.severity === 'critical' || f.severity === 'high').length
+  feed.push({
+    category: 'finding_stale',
+    title: `${stale.length} finding${stale.length === 1 ? '' : 's'} stale in ${props.project.name}`,
+    body: `${stale.length} open finding${stale.length === 1 ? '' : 's'} haven't been updated in over 7 days${high ? ` (${high} high/critical)` : ''}.`,
+    link: '/notifications',
+    meta: { projectId: props.project.id },
+  })
+  localStorage.setItem(key, String(Date.now()))
+}
 
 watch(() => props.project.id, async () => {
   await initializeWorkspace()
 })
 
 watch(() => props.tab, async (tab) => {
+  if ((tab as string) === 'history') {
+    // History is now a drawer inside the scanner tab
+    showHistoryDrawer.value = true
+    emit('changeTab', 'scanner')
+    return
+  }
   if (tab === 'dependencies' && !dependencyLoading.value && !dependencyInventory.value.length) {
     await scanDependencies(false)
   }
@@ -478,6 +733,7 @@ async function detectAndSaveGitHubRepo() {
     if (!ghMatch) return
     const repoSlug = `${ghMatch[1]}/${ghMatch[2]}`
     await projects.updateProjectMeta(props.project.id, { githubRepo: repoSlug })
+    await useVindictaJson().patchMeta(props.project.absolutePath, { githubRepo: repoSlug }).catch(() => {})
   } catch { /* git config unreadable — not a git repo or no origin */ }
 }
 
@@ -489,11 +745,8 @@ async function initializeWorkspace() {
   restoreActiveSecurityJob()
   void detectAndSaveGitHubRepo()
   await Promise.allSettled([scanDependencies(false), scanSecrets(false), scanConfig()])
-  if (security.shouldAutoScan() && autoScanStartedForProject !== props.project.id && !hasRunningSecurityJob()) {
-    autoScanStartedForProject = props.project.id
-    selectedScanEffort.value = security.settings.autoScanEffort
-    selectedFindingLimit.value = security.settings.aiFindingLimit
-    void runAIScan(security.settings.autoScanEffort, true)
+  if (props.project.absolutePath) {
+    detectedStack.value = await detectProjectStack(props.project.absolutePath).catch(() => [])
   }
 }
 
@@ -688,8 +941,28 @@ function buildExistingSecurityContext() {
     .sort((a, b) => b.number - a.number)
     .slice(0, 40)
     .map(finding => `#${finding.number} [${finding.status}/${finding.severity}/${finding.source}] ${finding.title}; area: ${finding.area}; category: ${finding.category}; detail: ${finding.detail.replace(/\s+/g, ' ').slice(0, 220)}`)
-  if (!persisted.length) return 'No existing security remediation items were loaded.'
-  return persisted.join('\n')
+
+  const lines: string[] = []
+  if (persisted.length) {
+    lines.push('Existing security remediation items for duplicate avoidance:')
+    lines.push(...persisted)
+  } else {
+    lines.push('No existing security remediation items were loaded.')
+  }
+
+  const whitelist = security.whitelist
+  if (whitelist.length) {
+    lines.push('')
+    lines.push('Whitelisted/suppressed findings — do NOT report these even if found:')
+    whitelist.forEach(w => lines.push(`- [${w.category}] ${w.title} (area: ${w.area})`))
+  }
+
+  return lines.join('\n')
+}
+
+function whitelistFinding(finding: SecurityScanFinding) {
+  void security.addToWhitelist(finding)
+  notify(`"${finding.title}" added to whitelist. AI will skip this in future scans.`, 'success')
 }
 
 function buildSecurityScanPrompt(projectName: string, existingFindingContext: string, effort: typeof scanEffortOptions[number], findingLimit: number) {
@@ -841,6 +1114,270 @@ function parseAiScanResponse(text: string): ParsedScanResult {
   }
 }
 
+// ── OSS Security Scanner functions ───────────────────────────────────────────
+
+function ossToolStatusClass(tool: OssToolStatus) {
+  if (tool.status === 'done') return tool.count > 0 ? 'text-amber-300' : 'text-emerald-300'
+  if (tool.status === 'running') return 'text-sky-300'
+  if (tool.status === 'error') return 'text-red-400'
+  if (tool.status === 'skipped') return 'text-[var(--text-faint)]'
+  return 'text-[var(--text-faint)]'
+}
+
+function ossToolStatusLabel(tool: OssToolStatus) {
+  if (tool.status === 'running') return 'Scanning…'
+  if (tool.status === 'done') return tool.count > 0 ? `${tool.count} finding${tool.count !== 1 ? 's' : ''}` : 'Clean'
+  if (tool.status === 'error') return 'Error'
+  if (tool.status === 'skipped') return 'Not available'
+  return 'Idle'
+}
+
+function normalizeSeverityOss(raw: string): SecuritySeverity {
+  const s = raw.toLowerCase()
+  if (s === 'critical') return 'critical'
+  if (s === 'high' || s === 'error') return 'high'
+  if (s === 'moderate' || s === 'medium' || s === 'warning') return 'medium'
+  return 'low'
+}
+
+async function runNpmAuditScan(projectPath: string): Promise<SecurityScanFinding[]> {
+  const fs = useTauriFs()
+  const sep = projectPath.includes('\\') ? '\\' : '/'
+  const hasPackageJson = await fs.exists(`${projectPath}${sep}package.json`).catch(() => false)
+  if (!hasPackageJson) return []
+
+  const { Command } = await import('@tauri-apps/plugin-shell')
+  const isWin = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent)
+  const cmdName = isWin ? 'npm-cmd-audit' : 'npm-audit'
+
+  let stdout = '', stderr = ''
+  try {
+    const res = await Command.create(cmdName, ['audit', '--json', '--prefix', projectPath]).execute()
+    stdout = res.stdout; stderr = res.stderr
+  } catch { return [] }
+
+  const text = (stdout || stderr).trim()
+  if (!text) return []
+
+  let parsed: any
+  try {
+    const start = text.indexOf('{')
+    if (start < 0) return []
+    parsed = JSON.parse(text.slice(start))
+  } catch { return [] }
+
+  const vulns: Record<string, any> = parsed?.vulnerabilities ?? {}
+  const severityOrder = ['critical', 'high', 'moderate', 'low', 'info']
+  const entries = Object.values(vulns)
+    .sort((a, b) => severityOrder.indexOf(a.severity) - severityOrder.indexOf(b.severity))
+    .slice(0, 15)
+
+  return entries.map((v: any) => {
+    const via = Array.isArray(v.via) ? v.via.filter((x: any) => typeof x === 'object') : []
+    const cves: string[] = via.flatMap((x: any) => x.cves ?? [])
+    const cveStr = cves.length ? ` (${cves.slice(0, 3).join(', ')})` : ''
+    const detail = via[0]?.overview ?? `${v.name} has a known ${v.severity} vulnerability.`
+    return {
+      id: `NPM-${String(v.name).replace(/[^a-zA-Z0-9]/g, '-').toUpperCase().slice(0, 18)}`,
+      title: `${String(v.severity).toUpperCase()}: ${v.name}${cveStr}`,
+      severity: normalizeSeverityOss(v.severity),
+      category: 'Vulnerable and outdated components',
+      source: 'dependency' as const,
+      area: `npm · ${v.name}@${v.range ?? 'unknown'}`,
+      detail,
+      evidence: `${v.name} range ${v.range ?? '?'}${cveStr}. Fix available: ${v.fixAvailable ? 'yes' : 'no'}.`,
+      recommendation: v.fixAvailable === true
+        ? `Run \`npm audit fix\` to upgrade ${v.name} to a patched version.`
+        : `Manually upgrade or replace ${v.name}. No automated fix is available.`,
+      selected: true,
+    } satisfies SecurityScanFinding
+  })
+}
+
+async function runTrivyScan(projectPath: string): Promise<SecurityScanFinding[]> {
+  const { Command } = await import('@tauri-apps/plugin-shell')
+  try { await Command.create('trivy-version', ['--version']).execute() } catch { return [] }
+
+  let stdout = '', stderr = ''
+  try {
+    const res = await Command.create('trivy-fs-scan', ['fs', '--format', 'json', '--quiet', '--no-progress', projectPath]).execute()
+    stdout = res.stdout; stderr = res.stderr
+  } catch { return [] }
+
+  let parsed: any
+  try { parsed = JSON.parse((stdout || stderr).trim()) } catch { return [] }
+
+  const trivyResults: any[] = parsed?.Results ?? parsed?.results ?? []
+  const allVulns: Array<{ v: any; target: string }> = []
+  for (const r of trivyResults) {
+    for (const v of (r.Vulnerabilities ?? r.vulnerabilities ?? [])) {
+      allVulns.push({ v, target: r.Target ?? 'unknown' })
+    }
+  }
+
+  const sevOrder = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN']
+  allVulns.sort((a, b) => sevOrder.indexOf(a.v.Severity?.toUpperCase() ?? '') - sevOrder.indexOf(b.v.Severity?.toUpperCase() ?? ''))
+
+  const seen = new Set<string>()
+  const findings: SecurityScanFinding[] = []
+  for (const { v, target } of allVulns) {
+    const key = `${v.PkgName}@${v.VulnerabilityID}`
+    if (seen.has(key) || findings.length >= 15) continue
+    seen.add(key)
+    findings.push({
+      id: `TRIVY-${String(v.VulnerabilityID ?? v.PkgName).replace(/[^a-zA-Z0-9]/g, '-').slice(0, 18)}`,
+      title: `${v.Severity ?? 'UNKNOWN'}: ${v.VulnerabilityID ?? 'CVE'} in ${v.PkgName}`,
+      severity: normalizeSeverityOss(v.Severity ?? 'low'),
+      category: 'Vulnerable and outdated components',
+      source: 'dependency' as const,
+      area: `${target} · ${v.PkgName}@${v.InstalledVersion ?? '?'}`,
+      detail: v.Description ?? v.Title ?? `${v.PkgName} has a ${v.Severity?.toLowerCase() ?? 'unknown'} severity vulnerability.`,
+      evidence: `${v.VulnerabilityID ?? '?'} in ${v.PkgName}@${v.InstalledVersion ?? '?'}. Fixed in: ${v.FixedVersion ?? 'none'}.`,
+      recommendation: v.FixedVersion
+        ? `Upgrade ${v.PkgName} to version ${v.FixedVersion} or later.`
+        : `No fix available for ${v.PkgName}. Consider replacing the dependency.`,
+      selected: true,
+    } satisfies SecurityScanFinding)
+  }
+  return findings
+}
+
+async function runSemgrepScan(projectPath: string): Promise<SecurityScanFinding[]> {
+  const { Command } = await import('@tauri-apps/plugin-shell')
+  try { await Command.create('semgrep-version', ['--version']).execute() } catch { return [] }
+
+  let stdout = '', stderr = ''
+  try {
+    const res = await Command.create('semgrep-scan', ['--config=auto', '--json', '--quiet', projectPath]).execute()
+    stdout = res.stdout; stderr = res.stderr
+  } catch { return [] }
+
+  let parsed: any
+  try {
+    const text = (stdout || stderr).trim()
+    const start = text.indexOf('{')
+    if (start < 0) return []
+    parsed = JSON.parse(text.slice(start))
+  } catch { return [] }
+
+  const results: any[] = parsed?.results ?? []
+  const sevOrder = ['ERROR', 'WARNING', 'INFO']
+  const sorted = results.slice().sort((a, b) =>
+    sevOrder.indexOf((a.extra?.severity ?? '').toUpperCase()) - sevOrder.indexOf((b.extra?.severity ?? '').toUpperCase()),
+  )
+
+  const seen = new Set<string>()
+  const findings: SecurityScanFinding[] = []
+  const base = projectPath.replace(/[/\\]$/, '')
+
+  for (const item of sorted) {
+    const ruleId = item.check_id ?? 'unknown'
+    if (seen.has(ruleId) || findings.length >= 15) continue
+    seen.add(ruleId)
+
+    const owasp: string[] = item.extra?.metadata?.owasp ?? []
+    const cwe: string[] = item.extra?.metadata?.cwe ?? []
+    const category = owasp.length ? String(owasp[0]).replace(/^A\d+:\d{4}\s*-\s*/i, '') : 'Static analysis'
+    const relPath = (item.path ?? '').replace(base, '').replace(/^[/\\]/, '')
+
+    findings.push({
+      id: `SEMGREP-${ruleId.split('.').pop()?.toUpperCase().replace(/[^A-Z0-9]/g, '-').slice(0, 18) ?? 'RULE'}`,
+      title: item.extra?.message ?? ruleId,
+      severity: normalizeSeverityOss(item.extra?.severity ?? 'warning'),
+      category,
+      source: 'config' as const,
+      area: relPath || item.path || 'project files',
+      detail: item.extra?.message ?? 'Static analysis finding.',
+      evidence: `${relPath} line ${item.start?.line ?? '?'}${cwe.length ? `. ${cwe.slice(0, 2).join(', ')}` : ''}`,
+      recommendation: item.extra?.fix ?? 'Review the flagged code and apply the security fix described in the Semgrep rule documentation.',
+      selected: true,
+    } satisfies SecurityScanFinding)
+  }
+  return findings
+}
+
+async function runCargoAuditScan(projectPath: string): Promise<SecurityScanFinding[]> {
+  const fs = useTauriFs()
+  const sep = projectPath.includes('\\') ? '\\' : '/'
+  const lockPath = `${projectPath}${sep}Cargo.lock`
+  if (!await fs.exists(lockPath).catch(() => false)) return []
+
+  const { Command } = await import('@tauri-apps/plugin-shell')
+  try { await Command.create('cargo-version', ['--version']).execute() } catch { return [] }
+
+  let stdout = '', stderr = ''
+  try {
+    const res = await Command.create('cargo-audit-scan', ['audit', '--json', '--file', lockPath]).execute()
+    stdout = res.stdout; stderr = res.stderr
+  } catch { return [] }
+
+  let parsed: any
+  try {
+    const text = (stdout || stderr).trim()
+    const start = text.indexOf('{')
+    if (start < 0) return []
+    parsed = JSON.parse(text.slice(start))
+  } catch { return [] }
+
+  const list: any[] = parsed?.vulnerabilities?.list ?? []
+  const sevMap: Record<string, SecuritySeverity> = { critical: 'critical', high: 'high', medium: 'medium', low: 'low' }
+
+  return list.slice(0, 15).map((entry: any) => {
+    const adv = entry.advisory ?? {}
+    const pkg = entry.package ?? {}
+    const patched: string[] = entry.versions?.patched ?? []
+    const aliases: string[] = adv.aliases ?? []
+    const cveStr = aliases.length ? ` (${aliases.slice(0, 2).join(', ')})` : ''
+    return {
+      id: `RUSTSEC-${String(adv.id ?? pkg.name).replace(/[^a-zA-Z0-9]/g, '-').slice(0, 18)}`,
+      title: `${adv.id ?? 'Vulnerability'} in ${pkg.name}${cveStr}`,
+      severity: sevMap[String(adv.severity ?? 'medium').toLowerCase()] ?? 'medium',
+      category: 'Vulnerable and outdated components',
+      source: 'dependency' as const,
+      area: `Cargo · ${pkg.name}@${pkg.version ?? '?'}`,
+      detail: adv.title ?? adv.description ?? `${pkg.name} has a known vulnerability.`,
+      evidence: `${adv.id ?? '?'} in ${pkg.name}@${pkg.version ?? '?'}${cveStr}. Fixed in: ${patched.length ? patched.join(', ') : 'no patch listed'}.`,
+      recommendation: patched.length
+        ? `Upgrade ${pkg.name} to ${patched[0]} or later. See ${adv.url ?? 'https://rustsec.org'}.`
+        : `No patched version listed. Review the advisory at ${adv.url ?? 'https://rustsec.org'}.`,
+      selected: true,
+    } satisfies SecurityScanFinding
+  })
+}
+
+async function runOssScanners(): Promise<SecurityScanFinding[]> {
+  const projectPath = props.project.absolutePath
+  if (!projectPath) return []
+
+  ossTools.value = [
+    { name: 'npm audit',   status: 'running', count: 0 },
+    { name: 'cargo audit', status: 'running', count: 0 },
+    { name: 'Trivy',       status: 'running', count: 0 },
+    { name: 'Semgrep',     status: 'running', count: 0 },
+  ]
+  ossRunning.value = true
+
+  const [npmResult, cargoResult, trivyResult, semgrepResult] = await Promise.allSettled([
+    runNpmAuditScan(projectPath),
+    runCargoAuditScan(projectPath),
+    runTrivyScan(projectPath),
+    runSemgrepScan(projectPath),
+  ])
+
+  const allFindings: SecurityScanFinding[] = []
+  const results = [npmResult, cargoResult, trivyResult, semgrepResult]
+  ossTools.value = ossTools.value.map((tool, i) => {
+    const r = results[i]!
+    if (r.status === 'fulfilled') {
+      allFindings.push(...r.value)
+      return { ...tool, status: r.value.length ? 'done' as const : 'skipped' as const, count: r.value.length }
+    }
+    return { ...tool, status: 'error' as const, count: 0, error: String((r as any).reason?.message ?? 'failed') }
+  })
+  ossRunning.value = false
+  return allFindings
+}
+
 async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false) {
   if (!props.project.absolutePath) {
     notify('Select a project before running an AI security scan.', 'warning')
@@ -874,6 +1411,9 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
   scanError.value = null
   parseWarning.value = null
   if (!automatic) emit('changeTab', 'scanner')
+
+  // Start OSS scanners in parallel with the AI scan
+  const ossPromise = runOssScanners()
 
   try {
     const scopeConstraint = automatic ? '' : buildScopeConstraint()
@@ -931,37 +1471,68 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
     try {
       setScanStage(4)
       const parsed = parseAiScanResponse(responseText)
+
+      // Wait for OSS scanners and merge findings
+      const ossFindings = await ossPromise
+      const allFindings = [...parsed.findings, ...ossFindings]
+      const ossCount = ossFindings.length
+      const aiCount = parsed.findings.length
+      const ossNote = ossCount ? ` + ${ossCount} OSS scanner finding${ossCount !== 1 ? 's' : ''}` : ''
+
       const scan = await security.recordScan(props.project, {
         effort: effort.value,
         status: 'done',
-        summary: parsed.summary,
+        summary: parsed.summary + (ossCount ? ` [${ossCount} additional finding${ossCount !== 1 ? 's' : ''} from OSS scanners]` : ''),
         rawReport: parsed.raw,
-        findings: parsed.findings,
+        findings: allFindings,
         parseWarning: null,
       })
       activeScanId.value = scan.id
-      finishScanActivity('done', `Parsed ${parsed.findings.length} structured finding${parsed.findings.length === 1 ? '' : 's'} from the ${toolLabel} report.`, parsed.raw)
-      notify(`AI security scan complete: ${parsed.findings.length} finding${parsed.findings.length === 1 ? '' : 's'}.`, 'success')
+      finishScanActivity('done', `${aiCount} AI finding${aiCount !== 1 ? 's' : ''}${ossNote} from the ${toolLabel} report.`, parsed.raw)
+      notify(`Security scan complete: ${allFindings.length} finding${allFindings.length !== 1 ? 's' : ''} (AI: ${aiCount}${ossNote}).`, 'success')
+      feed.push({
+        category: 'scan_complete',
+        title: `Scan complete — ${allFindings.length} finding${allFindings.length !== 1 ? 's' : ''} in ${props.project.name}`,
+        body: parsed.summary || `${aiCount} AI finding${aiCount !== 1 ? 's' : ''}${ossNote} detected.`,
+        link: '/security',
+        meta: { projectId: props.project.id, tool: toolLabel },
+      })
     }
     catch (e: any) {
+      const ossFindings = await ossPromise.catch(() => [])
       parseWarning.value = e?.message ?? `${toolLabel} returned a report, but Vindicta could not parse structured findings.`
       const scan = await security.recordScan(props.project, {
         effort: effort.value,
-        status: 'warning',
+        status: ossFindings.length ? 'warning' : 'warning',
         summary: `${toolLabel} returned a report, but Vindicta could not parse it into structured findings.`,
         rawReport: responseText,
-        findings: [],
+        findings: ossFindings,
         parseWarning: parseWarning.value,
       })
       activeScanId.value = scan.id
-      finishScanActivity('warning', `${toolLabel} returned a report, but Vindicta could not parse it into structured findings.`, responseText)
-      notify('AI scan finished, but the findings could not be parsed into remediation-ready items.', 'warning')
+      finishScanActivity('warning', `${toolLabel} returned a report, but structured findings could not be parsed.${ossFindings.length ? ` ${ossFindings.length} OSS scanner finding${ossFindings.length !== 1 ? 's' : ''} included.` : ''}`, responseText)
+      notify('AI scan parse error. OSS scanner results may still be available.', 'warning')
+      feed.push({
+        category: 'scan_error',
+        title: `Scan parse error in ${props.project.name}`,
+        body: `${toolLabel} returned output but structured findings could not be extracted.${ossFindings.length ? ` ${ossFindings.length} OSS finding${ossFindings.length !== 1 ? 's' : ''} included.` : ''}`,
+        link: '/security',
+        meta: { projectId: props.project.id, tool: toolLabel },
+      })
     }
   }
   catch (e: any) {
+    await ossPromise.catch(() => [])
     scanError.value = e?.message ?? 'AI security scan failed.'
     finishScanActivity('error', scanError.value)
     notify('AI security scan failed.', 'error')
+    feed.push({
+      category: 'scan_error',
+      title: `Scan failed in ${props.project.name}`,
+      body: scanError.value,
+      link: '/security',
+      meta: { projectId: props.project.id },
+    })
   }
   finally {
     stopScanActivityTimer()
@@ -980,13 +1551,18 @@ function sanitizeFileName(value: string) {
 function ensureDocxExtension(path: string) {
   return path.toLowerCase().endsWith('.docx') ? path : `${path}.docx`
 }
+function ensureMdExtension(path: string) {
+  return path.toLowerCase().endsWith('.md') ? path : `${path}.md`
+}
 
 function currentDocxReport() {
   const scan = activeScan.value
+  const storedProject = projects.projects.find(project => project.id === props.project.id)
   return {
     projectName: props.project.name,
     projectCode: props.project.code,
     projectPath: props.project.absolutePath,
+    githubRepo: props.project.githubRepo || storedProject?.githubRepo || null,
     generatedAt: new Date().toISOString(),
     scannedAt: scan?.scannedAt ?? new Date().toISOString(),
     summary: scan?.summary || 'No summary was captured for this security workspace.',
@@ -1027,28 +1603,121 @@ function remediationFindingRoute(finding: SecurityFinding) {
   }
 }
 
-async function exportDocs() {
+function openExportModal() {
+  showExportModal.value = true
+}
+
+async function exportSecurityReview(format: 'docx' | 'md') {
   const report = currentDocxReport()
+  exportingFormat.value = 'review'
   exportingDocs.value = true
+  showExportModal.value = false
   try {
     const dialog = useTauriDialog()
     const date = new Date(report.scannedAt).toISOString().slice(0, 10)
-    const defaultName = sanitizeFileName(`Vindicta Security Review - ${report.projectCode || report.projectName} - ${date}.docx`)
+    const ext = format === 'md' ? 'md' : 'docx'
+    const defaultName = sanitizeFileName(`Vindicta Security Review - ${report.projectCode || report.projectName} - ${date}.${ext}`)
     const selected = await dialog.saveFile({
       title: 'Export Security Review',
       defaultPath: defaultName,
-      filters: [{ name: 'Word Document', extensions: ['docx'] }],
+      filters: format === 'md'
+        ? [{ name: 'Markdown', extensions: ['md'] }]
+        : [{ name: 'Word Document', extensions: ['docx'] }],
     })
     if (!selected) return
     const fs = useTauriFs()
-    await fs.writeFile(ensureDocxExtension(selected), createVindictaSecurityDocx(report))
-    notify('Security report exported as DOCX.', 'success')
+    if (format === 'md') {
+      await fs.writeFile(ensureMdExtension(selected), new TextEncoder().encode(buildSecurityReviewMarkdown(report)))
+      notify('Security review exported as Markdown.', 'success')
+    }
+    else {
+      await fs.writeFile(ensureDocxExtension(selected), createVindictaSecurityDocx(report))
+      notify('Security review exported as DOCX.', 'success')
+    }
   }
   catch (e: any) {
-    notify(e?.message ?? 'Could not export security report.', 'error')
+    notify(e?.message ?? 'Could not export security review.', 'error')
   }
   finally {
     exportingDocs.value = false
+    exportingFormat.value = null
+  }
+}
+
+async function exportRawReport(format: 'docx' | 'md') {
+  const report = currentDocxReport()
+  if (!report.rawReport) {
+    notify('No raw AI report available for the active scan.', 'warning')
+    showExportModal.value = false
+    return
+  }
+  exportingFormat.value = 'raw'
+  exportingDocs.value = true
+  showExportModal.value = false
+  try {
+    const dialog = useTauriDialog()
+    const date = new Date(report.scannedAt).toISOString().slice(0, 10)
+    const ext = format === 'md' ? 'md' : 'docx'
+    const defaultName = sanitizeFileName(`Vindicta Raw AI Report - ${report.projectCode || report.projectName} - ${date}.${ext}`)
+    const selected = await dialog.saveFile({
+      title: 'Export Raw AI Report',
+      defaultPath: defaultName,
+      filters: format === 'md'
+        ? [{ name: 'Markdown', extensions: ['md'] }]
+        : [{ name: 'Word Document', extensions: ['docx'] }],
+    })
+    if (!selected) return
+    const fs = useTauriFs()
+    if (format === 'md') {
+      await fs.writeFile(ensureMdExtension(selected), new TextEncoder().encode(buildRawReportMarkdown(report)))
+      notify('Raw AI report exported as Markdown.', 'success')
+    }
+    else {
+      await fs.writeFile(ensureDocxExtension(selected), createVindictaRawReportDocx(report))
+      notify('Raw AI report exported as DOCX.', 'success')
+    }
+  }
+  catch (e: any) {
+    notify(e?.message ?? 'Could not export raw report.', 'error')
+  }
+  finally {
+    exportingDocs.value = false
+    exportingFormat.value = null
+  }
+}
+
+async function exportFixPrompts() {
+  const report = currentDocxReport()
+  if (!report.findings.length) {
+    notify('No findings available to export fix prompts for.', 'warning')
+    showExportModal.value = false
+    return
+  }
+  exportingFormat.value = 'prompts'
+  exportingDocs.value = true
+  showExportModal.value = false
+  try {
+    const dialog = useTauriDialog()
+    const date = new Date(report.scannedAt).toISOString().slice(0, 10)
+    const defaultName = sanitizeFileName(`Vindicta Fix Prompts - ${report.projectCode || report.projectName} - ${date}.md`)
+    const selected = await dialog.saveFile({
+      title: 'Export Fix Prompts',
+      defaultPath: defaultName,
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    })
+    if (!selected) return
+    const fs = useTauriFs()
+    const markdown = buildFixPromptsMarkdown(report)
+    const ensureMd = (p: string) => p.toLowerCase().endsWith('.md') ? p : `${p}.md`
+    await fs.writeFile(ensureMd(selected), new TextEncoder().encode(markdown))
+    notify('Fix prompts exported as Markdown.', 'success')
+  }
+  catch (e: any) {
+    notify(e?.message ?? 'Could not export fix prompts.', 'error')
+  }
+  finally {
+    exportingDocs.value = false
+    exportingFormat.value = null
   }
 }
 
@@ -1059,6 +1728,16 @@ async function createRemediationItems() {
   try {
     await security.createRemediationItems(activeScan.value?.id ?? null, selected)
     notify(`Created ${selected.length} remediation item${selected.length === 1 ? '' : 's'}.`, 'success')
+    const highRisk = selected.filter(f => f.severity === 'critical' || f.severity === 'high')
+    if (highRisk.length) {
+      feed.push({
+        category: 'finding_new',
+        title: `${highRisk.length} high-risk finding${highRisk.length === 1 ? '' : 's'} added in ${props.project.name}`,
+        body: highRisk.slice(0, 3).map(f => `[${f.severity.toUpperCase()}] ${f.title}`).join(' • '),
+        link: '/security',
+        meta: { projectId: props.project.id },
+      })
+    }
     emit('changeTab', 'findings')
   }
   catch (e: any) {
@@ -1476,28 +2155,66 @@ async function clearScanHistory() {
       </aside>
     </section>
 
-    <section v-else-if="tab === 'scanner'" class="grid gap-5 xl:grid-cols-[1fr_24rem]">
+    <section v-else-if="tab === 'scanner'" class="grid gap-5" :class="(scanActivity.length || aiScanRunning || ossRunning || showHistoryDrawer) ? 'xl:grid-cols-[1fr_18rem]' : 'xl:grid-cols-1'">
       <main class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
-        <div class="flex flex-col gap-3 border-b border-[var(--border)] p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 class="text-sm font-semibold text-[var(--text)]">AI Scanner</h2>
-            <p class="mt-0.5 text-xs text-[var(--text-muted)]">{{ activeScan?.summary || 'Run an AI scan against this project to collect vulnerability findings.' }}</p>
+        <div class="border-b border-[var(--border)] p-4">
+          <!-- Top row: title + actions -->
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0">
+              <h2 class="text-sm font-semibold text-[var(--text)]">AI Scanner</h2>
+              <p class="mt-0.5 text-xs text-[var(--text-muted)]">{{ activeScan?.summary || 'Run an AI scan against this project to collect vulnerability findings.' }}</p>
+            </div>
+            <div class="flex flex-wrap gap-2 shrink-0">
+              <button class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="!canRunAIScan" @click="openAIScanPicker">
+                <Loader2 v-if="aiScanRunning" class="size-3.5 animate-spin" />
+                <Bot v-else class="size-3.5" />
+                {{ aiScanRunning ? 'AI Scanning' : 'Run AI Scan' }}
+              </button>
+              <button class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-500/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="!canExportDocs" @click="openExportModal">
+                <Loader2 v-if="exportingDocs" class="size-3.5 animate-spin" />
+                <Download v-else class="size-3.5" />
+                Export
+              </button>
+              <button
+                class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors"
+                :class="showHistoryDrawer
+                  ? 'border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/15'
+                  : 'border-white/10 bg-white/[0.04] text-[var(--text-muted)] hover:bg-white/[0.07] hover:text-[var(--text)]'"
+                :title="showHistoryDrawer ? 'Hide history' : 'Show scan history'"
+                @click="showHistoryDrawer = !showHistoryDrawer"
+              >
+                <History class="size-3.5" />
+                History
+                <span v-if="security.scans.length" class="ml-0.5 tabular-nums text-[10px] opacity-70">{{ security.scans.length }}</span>
+              </button>
+            </div>
           </div>
-          <div class="flex flex-wrap gap-2">
-            <button class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="!canRunAIScan" @click="openAIScanPicker">
-              <Loader2 v-if="aiScanRunning" class="size-3.5 animate-spin" />
-              <Bot v-else class="size-3.5" />
-              {{ aiScanRunning ? 'AI Scanning' : 'Run AI Scan' }}
-            </button>
-            <button class="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-[var(--text-muted)] hover:bg-white/[0.07] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50" :disabled="!activeScan?.rawReport" @click="scrollToReport">
-              <Terminal class="size-3.5" />
-              View Report
-            </button>
-            <button class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-500/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="!canExportDocs" @click="exportDocs">
-              <Loader2 v-if="exportingDocs" class="size-3.5 animate-spin" />
-              <Download v-else class="size-3.5" />
-              Export Docs
-            </button>
+          <!-- Inline scan config + stack + OSS status chips -->
+          <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
+            <span class="rounded-md border border-[var(--border)] bg-black/10 px-2 py-0.5 text-[10px]" :class="securityToolAccentClass(selectedAITool)">{{ selectedAIToolLabel }}</span>
+            <span class="rounded-md border border-indigo-500/20 bg-indigo-500/[0.06] px-2 py-0.5 text-[10px] text-indigo-300">{{ selectedEffortOption.label }}</span>
+            <!-- Detected stack badges -->
+            <span
+              v-for="item in detectedStack"
+              :key="item.language"
+              class="rounded-md border px-2 py-0.5 text-[10px] font-medium"
+              :class="[item.border, item.bg, item.color]"
+            >{{ item.language }} · {{ item.manager }}</span>
+            <span v-if="!detectedStack.length" class="rounded-md border border-[var(--border)] bg-black/10 px-2 py-0.5 text-[10px] text-[var(--text-faint)] truncate max-w-xs" :title="project.absolutePath">{{ project.name }}</span>
+            <template v-for="tool in ossTools" :key="tool.name">
+              <span
+                v-if="tool.status !== 'idle'"
+                class="flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] transition-colors"
+                :class="tool.status === 'running' ? 'border-sky-500/20 bg-sky-500/[0.06] text-sky-300'
+                  : tool.status === 'done' && tool.count > 0 ? 'border-amber-500/20 bg-amber-500/[0.06] text-amber-300'
+                  : tool.status === 'done' ? 'border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-300'
+                  : tool.status === 'skipped' ? 'border-[var(--border)] text-[var(--text-faint)]'
+                  : 'border-red-500/20 text-red-400'"
+              >
+                <Loader2 v-if="tool.status === 'running'" class="size-2.5 animate-spin" />
+                {{ tool.name }}: {{ ossToolStatusLabel(tool) }}
+              </span>
+            </template>
           </div>
         </div>
 
@@ -1531,6 +2248,14 @@ async function clearScanHistory() {
                   <span class="font-mono text-[10px] text-[var(--text-faint)]">{{ finding.id }}</span>
                   <span class="rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize" :class="severityClasses[finding.severity]">{{ finding.severity }}</span>
                   <span class="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">{{ finding.category }}</span>
+                  <span v-if="isAlreadyRemediated(finding)" class="flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                    <CheckCircle2 class="size-2.5" />
+                    In Findings
+                  </span>
+                  <span v-else-if="isAlreadyWhitelisted(finding)" class="flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+                    <ShieldMinus class="size-2.5" />
+                    Whitelisted
+                  </span>
                 </div>
                 <h3 class="mt-2 text-sm font-semibold text-[var(--text)]">{{ finding.title }}</h3>
                 <p class="mt-1 line-clamp-3 break-words text-xs leading-relaxed text-[var(--text-muted)]">{{ finding.detail }}</p>
@@ -1541,9 +2266,23 @@ async function clearScanHistory() {
                 <p class="mt-1 truncate text-xs text-[var(--text-muted)]">{{ finding.area }}</p>
               </div>
             </div>
-            <div class="mt-3 flex items-start gap-2 rounded-lg border border-indigo-500/15 bg-indigo-500/[0.06] p-3">
-              <CheckCircle2 class="mt-0.5 size-3.5 shrink-0 text-indigo-300" />
-              <p class="text-xs leading-relaxed text-[var(--text-muted)]">{{ finding.recommendation }}</p>
+            <div class="mt-3 flex items-start gap-2">
+              <div class="flex-1 flex items-start gap-2 rounded-lg border border-indigo-500/15 bg-indigo-500/[0.06] p-3">
+                <CheckCircle2 class="mt-0.5 size-3.5 shrink-0 text-indigo-300" />
+                <p class="text-xs leading-relaxed text-[var(--text-muted)]">{{ finding.recommendation }}</p>
+              </div>
+              <button
+                class="flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors"
+                :class="isAlreadyWhitelisted(finding)
+                  ? 'cursor-default border-amber-500/20 bg-amber-500/[0.08] text-amber-400 opacity-70'
+                  : 'border-[var(--border)] text-[var(--text-faint)] hover:border-amber-500/30 hover:bg-amber-500/[0.06] hover:text-amber-300'"
+                :title="isAlreadyWhitelisted(finding) ? 'Already whitelisted — AI will skip this finding in future scans' : 'Add to whitelist — AI skips this in future scans'"
+                :disabled="isAlreadyWhitelisted(finding)"
+                @click.stop.prevent="whitelistFinding(finding)"
+              >
+                <ShieldMinus class="size-3.5" />
+                {{ isAlreadyWhitelisted(finding) ? 'Whitelisted' : 'Whitelist' }}
+              </button>
             </div>
           </article>
 
@@ -1558,17 +2297,17 @@ async function clearScanHistory() {
         </div>
       </main>
 
-      <aside class="space-y-5">
-        <section v-if="scanActivity.length || aiScanRunning" class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
+      <aside v-if="scanActivity.length || aiScanRunning || ossRunning || showHistoryDrawer" class="space-y-4">
+        <!-- Scan Activity (shows during/after a scan) -->
+        <section v-if="scanActivity.length || aiScanRunning || ossRunning" class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-2">
               <Bot class="size-3.5 text-emerald-300" />
-              <h2 class="text-sm font-semibold text-[var(--text)]">AI Scan Activity</h2>
+              <h2 class="text-sm font-semibold text-[var(--text)]">Scan Activity</h2>
             </div>
             <span class="font-mono text-[10px] text-[var(--text-faint)]">{{ scanElapsedLabel }}</span>
           </div>
-          <p class="mt-3 text-xs leading-relaxed text-[var(--text-muted)]">Vindicta shows scan phases and tool output status. Private model thoughts are not exposed.</p>
-          <div class="mt-3 space-y-2">
+          <div class="mt-3 space-y-1.5">
             <div v-for="item in scanActivity" :key="item.id" class="rounded-lg border px-3 py-2" :class="scanActivityClasses[item.status]">
               <div class="flex items-center justify-between gap-2">
                 <p class="text-xs font-medium">{{ item.label }}</p>
@@ -1577,29 +2316,84 @@ async function clearScanHistory() {
               <p class="mt-1 text-[10px] leading-relaxed opacity-75">{{ item.detail }}</p>
             </div>
           </div>
+
+          <!-- OSS scanner progress (when running) -->
+          <template v-if="ossRunning || ossTools.some(t => t.status !== 'idle')">
+            <p class="mt-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">Scanners</p>
+            <div class="space-y-1.5">
+              <div v-for="tool in ossTools" :key="tool.name" class="flex items-center justify-between rounded-lg border border-[var(--border)] bg-black/10 px-3 py-1.5">
+                <div class="flex items-center gap-1.5">
+                  <PackageSearch class="size-3 shrink-0 text-[var(--text-faint)]" />
+                  <span class="text-xs text-[var(--text-muted)]">{{ tool.name }}</span>
+                </div>
+                <span class="flex items-center gap-1 text-[10px]" :class="ossToolStatusClass(tool)">
+                  <Loader2 v-if="tool.status === 'running'" class="size-2.5 animate-spin" />
+                  {{ ossToolStatusLabel(tool) }}
+                </span>
+              </div>
+            </div>
+          </template>
         </section>
-        <section class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
-          <div class="flex items-center gap-2">
-            <LockKeyhole class="size-3.5 text-emerald-300" />
-            <h2 class="text-sm font-semibold text-[var(--text)]">Scan Modules</h2>
-          </div>
-          <div class="mt-3 space-y-2">
-            <div class="flex items-center justify-between rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2"><span class="text-xs text-[var(--text-muted)]">AI Code Review</span><span class="text-[10px]" :class="securityToolAccentClass(selectedAITool)">{{ selectedAIToolLabel }}</span></div>
-            <div class="flex items-center justify-between rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2"><span class="text-xs text-[var(--text-muted)]">Effort</span><span class="text-[10px] text-indigo-300">{{ selectedEffortOption.label }}</span></div>
-            <div class="flex items-center justify-between rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2"><span class="text-xs text-[var(--text-muted)]">OWASP Mapping</span><span class="text-[10px]" :class="latestScan ? 'text-emerald-300' : 'text-[var(--text-faint)]'">{{ latestScan ? 'Done' : 'Pending' }}</span></div>
-            <div class="flex items-center justify-between rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2"><span class="text-xs text-[var(--text-muted)]">OpenRouter Scan</span><span class="text-[10px]" :class="app.openRouter.enabled && app.openRouter.apiKey ? 'text-emerald-300' : 'text-[var(--text-faint)]'">{{ app.openRouter.enabled && app.openRouter.apiKey ? 'Available' : 'Configure' }}</span></div>
-          </div>
-        </section>
-        <section class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
-          <div class="flex items-center gap-2">
-            <FolderOpen class="size-3.5 text-violet-300" />
-            <h2 class="text-sm font-semibold text-[var(--text)]">Project Scope</h2>
-          </div>
-          <div class="mt-3 rounded-lg border border-[var(--border)] bg-black/10 p-3">
-            <p class="text-xs font-medium text-[var(--text)]">{{ project.name }}</p>
-            <p class="mt-1 break-words text-[10px] leading-relaxed text-[var(--text-muted)]">{{ project.absolutePath }}</p>
-          </div>
-        </section>
+
+        <!-- History drawer -->
+        <Transition
+          enter-active-class="transition-all duration-200 ease-out"
+          enter-from-class="opacity-0 -translate-y-2"
+          enter-to-class="opacity-100 translate-y-0"
+          leave-active-class="transition-all duration-150 ease-in"
+          leave-from-class="opacity-100 translate-y-0"
+          leave-to-class="opacity-0 -translate-y-2"
+        >
+          <section v-if="showHistoryDrawer" class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+            <!-- History header -->
+            <div class="flex items-center gap-2 border-b border-[var(--border)] px-4 py-3">
+              <History class="size-3.5 text-indigo-300 shrink-0" />
+              <h2 class="flex-1 text-sm font-semibold text-[var(--text)]">Scan History</h2>
+              <button
+                v-if="security.scans.length"
+                class="size-6 grid place-items-center rounded text-[var(--text-faint)] hover:text-red-300 hover:bg-red-500/10 transition-colors"
+                title="Clear history"
+                @click="clearScanHistory"
+              >
+                <Trash2 class="size-3" />
+              </button>
+              <button
+                class="size-6 grid place-items-center rounded text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-white/[0.06] transition-colors"
+                title="Close history"
+                @click="showHistoryDrawer = false"
+              >
+                <X class="size-3" />
+              </button>
+            </div>
+
+            <!-- History list -->
+            <div v-if="security.scans.length" class="divide-y divide-[var(--border)]">
+              <button
+                v-for="scan in security.scans"
+                :key="scan.id"
+                class="w-full px-4 py-3 text-left transition-colors hover:bg-white/[0.03]"
+                :class="scan.id === activeScanId ? 'bg-indigo-500/[0.07]' : ''"
+                @click="activeScanId = scan.id"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <div
+                    class="size-1.5 rounded-full shrink-0"
+                    :class="scan.id === activeScanId ? 'bg-indigo-400' : 'bg-[var(--border)]'"
+                  />
+                  <span class="flex-1 truncate text-[11px] font-medium text-[var(--text)]">
+                    {{ new Date(scan.scannedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
+                  </span>
+                  <span class="shrink-0 rounded-full border border-[var(--border)] px-1.5 py-px text-[9px] text-[var(--text-faint)] tabular-nums">{{ scan.findings.length }}</span>
+                </div>
+                <p class="mt-1 line-clamp-2 pl-3.5 text-[10px] leading-relaxed text-[var(--text-muted)]">{{ scan.summary || scan.parseWarning || 'No summary captured.' }}</p>
+              </button>
+            </div>
+            <div v-else class="px-4 py-10 text-center">
+              <FileJson class="mx-auto size-5 text-[var(--text-faint)]" />
+              <p class="mt-2 text-xs text-[var(--text-muted)]">No saved scans yet.</p>
+            </div>
+          </section>
+        </Transition>
       </aside>
     </section>
 
@@ -1640,6 +2434,14 @@ async function clearScanHistory() {
               <button v-if="auth.isGitHubConnected" class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-[var(--text-muted)] transition-colors hover:border-white/20 hover:bg-white/[0.07] hover:text-[var(--text)]" @click="openGitHubIssueModal(finding)">
                 <Github class="size-3.5" />
                 Create Issue
+              </button>
+              <button class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-[var(--text-muted)] transition-colors hover:border-white/20 hover:bg-white/[0.07] hover:text-[var(--text)]" @click="copyFixPrompt(finding)">
+                <Clipboard class="size-3.5" />
+                Copy Fix Prompt
+              </button>
+              <button class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2 text-xs font-medium text-violet-300 transition-colors hover:border-violet-500/35 hover:bg-violet-500/10" @click="openValidateModal(finding)">
+                <FlaskConical class="size-3.5" />
+                Validate Fix
               </button>
             </div>
           </div>
@@ -1702,6 +2504,49 @@ async function clearScanHistory() {
       </div>
     </section>
 
+    <section v-else-if="tab === 'whitelist'" class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+      <div class="flex flex-col gap-3 border-b border-[var(--border)] p-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 class="text-sm font-semibold text-[var(--text)]">Whitelist</h2>
+          <p class="mt-0.5 text-xs text-[var(--text-muted)]">Suppressed findings. The AI will not re-report these on future scans.</p>
+        </div>
+        <button
+          v-if="security.whitelist.length"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-red-300 hover:border-red-500/25 hover:bg-red-500/[0.06] transition-colors"
+          @click="security.whitelist.forEach(w => security.removeFromWhitelist(w.id))"
+        >
+          <Trash2 class="size-3.5" /> Clear all
+        </button>
+      </div>
+      <div v-if="security.whitelist.length" class="divide-y divide-[var(--border)]">
+        <div v-for="item in security.whitelist" :key="item.id" class="flex items-start gap-3 px-4 py-4">
+          <ShieldMinus class="mt-0.5 size-3.5 shrink-0 text-amber-400/70" />
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-2 mb-1">
+              <span class="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300">{{ item.category }}</span>
+              <span class="text-[10px] text-[var(--text-faint)]">{{ item.area }}</span>
+            </div>
+            <p class="text-xs font-medium text-[var(--text)]">{{ item.title }}</p>
+            <p class="mt-0.5 text-[10px] text-[var(--text-faint)]">Whitelisted {{ new Date(item.addedAt).toLocaleDateString() }}</p>
+          </div>
+          <button
+            class="size-7 shrink-0 grid place-items-center rounded-lg border border-[var(--border)] text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-white/[0.06] transition-colors"
+            title="Remove from whitelist"
+            @click="security.removeFromWhitelist(item.id)"
+          >
+            <X class="size-3.5" />
+          </button>
+        </div>
+      </div>
+      <div v-else class="px-4 py-14 text-center">
+        <ShieldMinus class="mx-auto size-6 text-[var(--text-faint)]" />
+        <p class="mt-3 text-sm font-medium text-[var(--text-muted)]">No whitelisted findings</p>
+        <p class="mt-1.5 text-xs text-[var(--text-faint)] max-w-sm mx-auto leading-relaxed">
+          Click <ShieldMinus class="inline size-3 mx-0.5" /> on any scan result to suppress it. The AI will skip whitelisted findings on future scans.
+        </p>
+      </div>
+    </section>
+
     <section v-else-if="tab === 'reports'" class="space-y-5">
       <section class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
         <div class="flex items-center justify-between gap-3">
@@ -1712,7 +2557,7 @@ async function clearScanHistory() {
               <p class="mt-0.5 text-xs text-[var(--text-muted)]">Export the selected scan or current remediation queue.</p>
             </div>
           </div>
-          <button class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-500/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="!canExportDocs" @click="exportDocs">
+          <button class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-500/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="!canExportDocs" @click="openExportModal">
             <Loader2 v-if="exportingDocs" class="size-3.5 animate-spin" />
             <Download v-else class="size-3.5" />
             Export DOCX
@@ -1726,31 +2571,6 @@ async function clearScanHistory() {
         </div>
         <pre class="mt-3 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-[var(--border)] bg-black/20 p-3 text-[11px] leading-relaxed text-[var(--text-muted)] custom-scroll">{{ activeScan.rawReport }}</pre>
       </section>
-    </section>
-
-    <section v-else-if="tab === 'history'" class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
-      <div class="flex items-center justify-between gap-3">
-        <div class="flex items-center gap-2">
-          <History class="size-4 text-indigo-300" />
-          <h2 class="text-sm font-semibold text-[var(--text)]">Scan History</h2>
-        </div>
-        <button v-if="security.scans.length" class="grid size-7 place-items-center rounded-lg border border-white/10 text-[var(--text-faint)] hover:bg-white/[0.06] hover:text-red-300" title="Clear history" @click="clearScanHistory">
-          <Trash2 class="size-3.5" />
-        </button>
-      </div>
-      <div v-if="security.scans.length" class="mt-3 space-y-2">
-        <button v-for="scan in security.scans" :key="scan.id" class="w-full rounded-lg border px-3 py-2 text-left transition-colors" :class="scan.id === activeScanId ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="activeScanId = scan.id; emit('changeTab', 'scanner')">
-          <div class="flex items-center justify-between gap-2">
-            <span class="truncate text-xs font-medium text-[var(--text)]">{{ new Date(scan.scannedAt).toLocaleString() }}</span>
-            <span class="shrink-0 text-[10px] text-[var(--text-faint)]">{{ scan.findings.length }} finding{{ scan.findings.length === 1 ? '' : 's' }}</span>
-          </div>
-          <p class="mt-1 line-clamp-2 text-[10px] leading-relaxed text-[var(--text-muted)]">{{ scan.summary || scan.parseWarning || 'No summary captured.' }}</p>
-        </button>
-      </div>
-      <div v-else class="mt-3 rounded-lg border border-dashed border-[var(--border)] bg-black/10 px-3 py-8 text-center">
-        <FileJson class="mx-auto size-4 text-[var(--text-faint)]" />
-        <p class="mt-2 text-xs text-[var(--text-muted)]">No saved scans yet.</p>
-      </div>
     </section>
 
     <section v-else-if="tab === 'github_issues'" class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
@@ -1949,56 +2769,46 @@ async function clearScanHistory() {
     <GlassModal v-model="showToolPicker" title="Run AI Scan" max-width="md">
       <div class="space-y-4">
         <p class="text-sm text-[var(--text-muted)]">Choose the AI tool Vindicta should use for this security review.</p>
-        <div class="grid gap-3">
-          <button class="flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors" :class="selectedAITool === 'codex' ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="selectedAITool = 'codex'">
-            <div class="grid size-9 place-items-center rounded-lg border border-emerald-500/30 bg-emerald-500/15 text-sm font-semibold text-emerald-200">C</div>
-            <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-2">
-                <p class="text-sm font-semibold text-[var(--text)]">Codex</p>
-                <span class="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-emerald-300">Suggested</span>
-              </div>
-              <p class="mt-0.5 text-xs text-[var(--text-muted)]">Runs a read-only security review with the local Codex CLI.</p>
+        <div class="grid grid-cols-2 gap-2">
+          <button class="rounded-xl border p-3 text-left transition-colors" :class="selectedAITool === 'codex' ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="selectedAITool = 'codex'">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="size-6 shrink-0 grid place-items-center rounded-md border border-emerald-500/30 bg-emerald-500/15 text-[11px] font-bold text-emerald-200">C</div>
+              <p class="text-xs font-semibold text-[var(--text)]">Codex</p>
+              <span class="ml-auto rounded-full border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-px text-[8px] font-semibold text-emerald-300">CLI</span>
             </div>
+            <p class="text-[10px] text-[var(--text-faint)] leading-relaxed">Read-only local code review via Codex CLI.</p>
           </button>
-          <button class="flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors" :class="selectedAITool === 'claude' ? 'border-violet-500/30 bg-violet-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="selectedAITool = 'claude'">
-            <div class="grid size-9 place-items-center rounded-lg border border-violet-500/30 bg-violet-500/15 text-sm font-semibold text-violet-200">Cl</div>
-            <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-2">
-                <p class="text-sm font-semibold text-[var(--text)]">Claude</p>
-                <span class="rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-violet-300">Suggested</span>
-              </div>
-              <p class="mt-0.5 text-xs text-[var(--text-muted)]">Runs a read-only security review with the local Claude CLI.</p>
+          <button class="rounded-xl border p-3 text-left transition-colors" :class="selectedAITool === 'claude' ? 'border-violet-500/30 bg-violet-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="selectedAITool = 'claude'">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="size-6 shrink-0 grid place-items-center rounded-md border border-violet-500/30 bg-violet-500/15 text-[11px] font-bold text-violet-200">Cl</div>
+              <p class="text-xs font-semibold text-[var(--text)]">Claude</p>
+              <span class="ml-auto rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-px text-[8px] font-semibold text-violet-300">CLI</span>
             </div>
+            <p class="text-[10px] text-[var(--text-faint)] leading-relaxed">Read-only local code review via Claude CLI.</p>
           </button>
-          <button class="flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors" :class="selectedAITool === 'openrouter' ? 'border-sky-500/30 bg-sky-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="selectedAITool = 'openrouter'">
-            <div class="grid size-9 place-items-center rounded-lg border border-sky-500/30 bg-sky-500/15 text-sm font-semibold text-sky-200">OR</div>
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-[var(--text)]">OpenRouter</p>
-              <p class="mt-0.5 text-xs text-[var(--text-muted)]">Runs this review with the configured OpenRouter API model.</p>
-              <p class="mt-1 text-[10px]" :class="app.openRouter.enabled && app.openRouter.apiKey ? 'text-sky-300' : 'text-amber-300'">
-                {{ app.openRouter.enabled && app.openRouter.apiKey ? app.openRouter.model : 'Configure API key in AI Models' }}
-              </p>
+          <button class="rounded-xl border p-3 text-left transition-colors" :class="selectedAITool === 'openrouter' ? 'border-sky-500/30 bg-sky-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="selectedAITool = 'openrouter'">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="size-6 shrink-0 grid place-items-center rounded-md border border-sky-500/30 bg-sky-500/15 text-[11px] font-bold text-sky-200">OR</div>
+              <p class="text-xs font-semibold text-[var(--text)]">OpenRouter</p>
             </div>
+            <p class="text-[10px] leading-relaxed" :class="app.openRouter.enabled && app.openRouter.apiKey ? 'text-sky-300' : 'text-amber-300'">
+              {{ app.openRouter.enabled && app.openRouter.apiKey ? app.openRouter.model : 'Configure API key first' }}
+            </p>
           </button>
-          <button class="flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors" :class="selectedAITool === 'ollama' ? 'border-orange-500/30 bg-orange-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="selectedAITool = 'ollama'">
-            <div class="grid size-9 place-items-center rounded-lg border border-orange-500/30 bg-orange-500/15 text-sm font-semibold text-orange-200">Ol</div>
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-[var(--text)]">Ollama</p>
-              <p class="mt-0.5 text-xs text-[var(--text-muted)]">Runs this review with a local Ollama model. No data leaves your machine.</p>
-              <p class="mt-1 text-[10px]" :class="app.ollama.url ? 'text-orange-300' : 'text-amber-300'">
-                {{ app.ollama.url ? `${app.ollama.model} · ${app.ollama.url}` : 'Configure Ollama URL in AI Models' }}
-              </p>
+          <button class="rounded-xl border p-3 text-left transition-colors" :class="selectedAITool === 'ollama' ? 'border-orange-500/30 bg-orange-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="selectedAITool = 'ollama'">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="size-6 shrink-0 grid place-items-center rounded-md border border-orange-500/30 bg-orange-500/15 text-[11px] font-bold text-orange-200">Ol</div>
+              <p class="text-xs font-semibold text-[var(--text)]">Ollama</p>
             </div>
+            <p class="text-[10px] leading-relaxed" :class="app.ollama.url ? 'text-orange-300' : 'text-amber-300'">
+              {{ app.ollama.url ? app.ollama.model : 'Configure Ollama URL first' }}
+            </p>
           </button>
-          <div class="flex w-full cursor-not-allowed items-center gap-3 rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3 opacity-50">
-            <div class="grid size-9 place-items-center rounded-lg border border-rose-500/30 bg-rose-500/15 text-sm font-semibold text-rose-200">C</div>
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2">
-                <p class="text-sm font-semibold text-[var(--text)]">Core AI</p>
-                <span class="rounded-full border border-rose-500/25 bg-rose-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-rose-300">Soon</span>
-              </div>
-              <p class="mt-0.5 text-xs text-[var(--text-muted)]">Vindicta's native AI model — currently in training.</p>
-            </div>
+          <div class="col-span-2 flex cursor-not-allowed items-center gap-3 rounded-xl border border-[var(--border)] bg-black/10 p-3 opacity-50">
+            <div class="size-6 shrink-0 grid place-items-center rounded-md border border-rose-500/30 bg-rose-500/15 text-[11px] font-bold text-rose-200">C</div>
+            <p class="text-xs font-semibold text-[var(--text)]">DefendCore</p>
+            <span class="rounded-full border border-rose-500/25 bg-rose-500/10 px-1.5 py-px text-[9px] font-semibold text-rose-300">Soon</span>
+            <p class="ml-1 text-[10px] text-[var(--text-faint)]">Vindicta's native model — in training.</p>
           </div>
         </div>
         <div class="space-y-2">
@@ -2097,6 +2907,258 @@ async function clearScanHistory() {
             <Bot class="size-3.5" />
             Run {{ selectedEffortOption.label }} Scan with {{ selectedAIToolLabel }}
           </button>
+        </div>
+      </div>
+    </GlassModal>
+
+    <!-- ── Export Modal ──────────────────────────────────────────────────────── -->
+    <GlassModal v-model="showExportModal" title="Export Report" max-width="sm">
+      <div class="space-y-3">
+        <p class="text-xs text-[var(--text-muted)]">Choose what to export. Each format is a separate file.</p>
+
+        <!-- Security Review -->
+        <div class="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3 text-left">
+          <div class="grid size-9 shrink-0 place-items-center rounded-lg border border-indigo-500/20 bg-indigo-500/10">
+            <FileText class="size-4 text-indigo-300" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold text-[var(--text)]">Security Review</p>
+            <p class="mt-0.5 text-[11px] leading-relaxed text-[var(--text-muted)]">
+              Branded DOCX — cover page, executive summary, risk table, all findings with severity, evidence, and recommended fixes.
+            </p>
+          </div>
+          <div class="flex shrink-0 gap-1.5">
+            <button class="rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-300 hover:bg-indigo-500/15" @click="exportSecurityReview('docx')">DOCX</button>
+            <button class="rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-300 hover:bg-indigo-500/15" @click="exportSecurityReview('md')">MD</button>
+          </div>
+        </div>
+
+        <!-- Raw AI Report -->
+        <div
+          class="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3 text-left"
+          :class="!activeScan?.rawReport ? 'opacity-50' : ''"
+        >
+          <div class="grid size-9 shrink-0 place-items-center rounded-lg border border-sky-500/20 bg-sky-500/10">
+            <FileJson class="size-4 text-sky-300" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold text-[var(--text)]">Raw AI Report</p>
+            <p class="mt-0.5 text-[11px] leading-relaxed text-[var(--text-muted)]">
+              Verbatim AI output before parsing — useful for audit, debugging, or manual review. Only available when a scan has a stored report.
+            </p>
+          </div>
+          <div class="flex shrink-0 gap-1.5">
+            <button class="rounded-lg border border-sky-500/20 bg-sky-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-sky-300 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="!activeScan?.rawReport" @click="exportRawReport('docx')">DOCX</button>
+            <button class="rounded-lg border border-sky-500/20 bg-sky-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-sky-300 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="!activeScan?.rawReport" @click="exportRawReport('md')">MD</button>
+          </div>
+        </div>
+
+        <!-- Fix Prompts Markdown -->
+        <button
+          class="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3 text-left transition-colors hover:border-emerald-500/30 hover:bg-emerald-500/[0.04]"
+          :class="!currentDocxReport().findings.length ? 'opacity-50 cursor-not-allowed' : ''"
+          :disabled="!currentDocxReport().findings.length"
+          @click="exportFixPrompts"
+        >
+          <div class="grid size-9 shrink-0 place-items-center rounded-lg border border-emerald-500/20 bg-emerald-500/10">
+            <Clipboard class="size-4 text-emerald-300" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold text-[var(--text)]">Fix Prompts</p>
+            <p class="mt-0.5 text-[11px] leading-relaxed text-[var(--text-muted)]">
+              Consolidated Markdown file of ready-to-paste AI fix prompts — one per finding, same format as the "Copy Fix Prompt" button.
+            </p>
+          </div>
+          <span class="shrink-0 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-semibold text-emerald-300">.md</span>
+        </button>
+
+        <div class="flex justify-end border-t border-[var(--border)] pt-3">
+          <button
+            class="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+            @click="showExportModal = false"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </GlassModal>
+
+    <!-- ── Validate Finding Modal ──────────────────────────────────────────── -->
+    <GlassModal v-model="showValidateModal" title="Validate Fix with AI" max-width="md">
+      <div v-if="validateFinding" class="space-y-4">
+
+        <!-- Finding summary -->
+        <div class="rounded-lg border border-[var(--border)] bg-black/10 p-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize" :class="severityClasses[validateFinding.severity]">{{ validateFinding.severity }}</span>
+            <span class="rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize" :class="statusClasses[validateFinding.status]">{{ validateFinding.status.replace('_', ' ') }}</span>
+            <span class="font-mono text-[10px] text-[var(--text-faint)]">SEC-{{ validateFinding.number }}</span>
+          </div>
+          <p class="mt-1.5 text-xs font-semibold text-[var(--text)]">{{ validateFinding.title }}</p>
+          <p class="mt-0.5 text-[11px] text-[var(--text-muted)]">{{ validateFinding.area }}</p>
+        </div>
+
+        <!-- AI tool selector -->
+        <div v-if="!validateResult" class="space-y-2">
+          <p class="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">Choose AI tool</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button class="rounded-xl border p-3 text-left transition-colors" :class="validateAITool === 'codex' ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="validateAITool = 'codex'">
+              <div class="flex items-center gap-2 mb-1.5">
+                <div class="size-6 shrink-0 grid place-items-center rounded-md border border-emerald-500/30 bg-emerald-500/15 text-[11px] font-bold text-emerald-200">C</div>
+                <p class="text-xs font-semibold text-[var(--text)]">Codex</p>
+                <span class="ml-auto rounded-full border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-px text-[8px] font-semibold text-emerald-300">CLI</span>
+              </div>
+              <p class="text-[10px] text-[var(--text-faint)]">Read-only local code review via Codex CLI.</p>
+            </button>
+            <button class="rounded-xl border p-3 text-left transition-colors" :class="validateAITool === 'claude' ? 'border-violet-500/30 bg-violet-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="validateAITool = 'claude'">
+              <div class="flex items-center gap-2 mb-1.5">
+                <div class="size-6 shrink-0 grid place-items-center rounded-md border border-violet-500/30 bg-violet-500/15 text-[11px] font-bold text-violet-200">Cl</div>
+                <p class="text-xs font-semibold text-[var(--text)]">Claude</p>
+                <span class="ml-auto rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-px text-[8px] font-semibold text-violet-300">CLI</span>
+              </div>
+              <p class="text-[10px] text-[var(--text-faint)]">Read-only local code review via Claude CLI.</p>
+            </button>
+            <button class="rounded-xl border p-3 text-left transition-colors" :class="validateAITool === 'openrouter' ? 'border-sky-500/30 bg-sky-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="validateAITool = 'openrouter'">
+              <div class="flex items-center gap-2 mb-1.5">
+                <div class="size-6 shrink-0 grid place-items-center rounded-md border border-sky-500/30 bg-sky-500/15 text-[11px] font-bold text-sky-200">OR</div>
+                <p class="text-xs font-semibold text-[var(--text)]">OpenRouter</p>
+              </div>
+              <p class="text-[10px]" :class="app.openRouter.enabled && app.openRouter.apiKey ? 'text-sky-300' : 'text-amber-300'">
+                {{ app.openRouter.enabled && app.openRouter.apiKey ? app.openRouter.model : 'Configure API key first' }}
+              </p>
+            </button>
+            <button class="rounded-xl border p-3 text-left transition-colors" :class="validateAITool === 'ollama' ? 'border-orange-500/30 bg-orange-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="validateAITool = 'ollama'">
+              <div class="flex items-center gap-2 mb-1.5">
+                <div class="size-6 shrink-0 grid place-items-center rounded-md border border-orange-500/30 bg-orange-500/15 text-[11px] font-bold text-orange-200">Ol</div>
+                <p class="text-xs font-semibold text-[var(--text)]">Ollama</p>
+              </div>
+              <p class="text-[10px]" :class="app.ollama.url ? 'text-orange-300' : 'text-amber-300'">
+                {{ app.ollama.url ? app.ollama.model : 'Configure Ollama URL first' }}
+              </p>
+            </button>
+          </div>
+        </div>
+
+        <!-- Error -->
+        <div v-if="validateError" class="rounded-lg border border-red-500/20 bg-red-500/[0.07] px-3 py-2.5 text-xs text-red-300">
+          {{ validateError }}
+        </div>
+
+        <!-- Running indicator -->
+        <div v-if="validateRunning" class="flex items-center gap-3 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-3 py-3">
+          <Loader2 class="size-4 shrink-0 animate-spin text-violet-400" />
+          <div>
+            <p class="text-xs font-semibold text-violet-300">Validating…</p>
+            <p class="text-[10px] text-[var(--text-muted)]">AI is inspecting the codebase for this finding.</p>
+          </div>
+        </div>
+
+        <!-- Result -->
+        <div v-if="validateResult && !validateRunning" class="space-y-3">
+          <!-- Status banner -->
+          <div
+            class="flex items-start gap-3 rounded-lg border p-3"
+            :class="{
+              'border-emerald-500/25 bg-emerald-500/[0.08]': validateResult.status === 'resolved',
+              'border-red-500/20 bg-red-500/[0.07]': validateResult.status === 'present',
+              'border-amber-500/20 bg-amber-500/[0.07]': validateResult.status === 'regressed',
+              'border-violet-500/20 bg-violet-500/[0.07]': validateResult.status === 'new_issue',
+            }"
+          >
+            <component
+              :is="{ resolved: ShieldCheck, present: ShieldX, regressed: RotateCcw, new_issue: TriangleAlert }[validateResult.status]"
+              class="mt-0.5 size-4 shrink-0"
+              :class="{
+                'text-emerald-400': validateResult.status === 'resolved',
+                'text-red-400': validateResult.status === 'present',
+                'text-amber-400': validateResult.status === 'regressed',
+                'text-violet-400': validateResult.status === 'new_issue',
+              }"
+            />
+            <div class="min-w-0 flex-1">
+              <p
+                class="text-xs font-semibold"
+                :class="{
+                  'text-emerald-300': validateResult.status === 'resolved',
+                  'text-red-300': validateResult.status === 'present',
+                  'text-amber-300': validateResult.status === 'regressed',
+                  'text-violet-300': validateResult.status === 'new_issue',
+                }"
+              >
+                {{ { resolved: 'Resolved', present: 'Still Present', regressed: 'Regression Detected', new_issue: 'New Issue Found' }[validateResult.status] }}
+              </p>
+              <p class="mt-0.5 text-xs text-[var(--text-muted)]">{{ validateResult.verdict }}</p>
+            </div>
+          </div>
+
+          <!-- Evidence -->
+          <div v-if="validateResult.evidence" class="rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2.5">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">Evidence</p>
+            <p class="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">{{ validateResult.evidence }}</p>
+          </div>
+
+          <!-- Recommendation -->
+          <div v-if="validateResult.recommendation" class="flex items-start gap-2 rounded-lg border border-indigo-500/15 bg-indigo-500/[0.06] px-3 py-2.5">
+            <SearchCheck class="mt-0.5 size-3.5 shrink-0 text-indigo-300" />
+            <p class="text-[11px] leading-relaxed text-[var(--text-muted)]">{{ validateResult.recommendation }}</p>
+          </div>
+
+          <!-- New finding detail -->
+          <div v-if="validateResult.status === 'new_issue' && validateResult.newFinding" class="space-y-1.5 rounded-lg border border-violet-500/20 bg-violet-500/[0.05] p-3">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-violet-400">New Issue Detected</p>
+            <p class="text-xs font-medium text-[var(--text)]">{{ validateResult.newFinding.title }}</p>
+            <div class="flex items-center gap-2">
+              <span class="rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize" :class="severityClasses[normalizeSeverity(validateResult.newFinding.severity)]">{{ validateResult.newFinding.severity }}</span>
+              <span class="text-[10px] text-[var(--text-faint)]">{{ validateResult.newFinding.area }}</span>
+            </div>
+            <p v-if="validateResult.newFinding.detail" class="text-[11px] text-[var(--text-muted)]">{{ validateResult.newFinding.detail }}</p>
+          </div>
+        </div>
+
+        <!-- Footer actions -->
+        <div class="flex items-center justify-between gap-2 border-t border-[var(--border)] pt-3">
+          <button
+            v-if="validateResult"
+            class="text-xs text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors"
+            @click="validateResult = null; validateError = ''"
+          >
+            ← Re-run
+          </button>
+          <div class="ml-auto flex items-center gap-2">
+            <button class="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text)]" @click="showValidateModal = false">
+              Close
+            </button>
+            <!-- Run validation -->
+            <button
+              v-if="!validateResult"
+              class="flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              :class="securityToolRunButtonClass(validateAITool)"
+              :disabled="validateRunning"
+              @click="runValidation"
+            >
+              <Loader2 v-if="validateRunning" class="size-3.5 animate-spin" />
+              <FlaskConical v-else class="size-3.5" />
+              {{ validateRunning ? 'Validating…' : `Validate Fix with ${securityToolLabel(validateAITool)}` }}
+            </button>
+            <!-- Mark resolved -->
+            <button
+              v-if="validateResult?.status === 'resolved'"
+              class="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-500"
+              @click="applyValidationResolved"
+            >
+              <ShieldCheck class="size-3.5" />
+              Mark as Resolved
+            </button>
+            <!-- Add new finding -->
+            <button
+              v-if="validateResult?.status === 'new_issue' && validateResult.newFinding"
+              class="flex items-center gap-1.5 rounded-lg bg-violet-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-violet-500"
+              @click="addValidationNewFinding"
+            >
+              <Plus class="size-3.5" />
+              Add to Findings
+            </button>
+          </div>
         </div>
       </div>
     </GlassModal>

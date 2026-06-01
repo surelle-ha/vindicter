@@ -1,7 +1,7 @@
 <script setup lang="ts">
 useLandingSeo({
   title: 'Vindicta Terms of Service',
-  description: 'Review the Vindicta terms for responsible security testing, MIT licensing, educational Academy content, AI provider usage, and warranty limits.',
+  description: 'Review the Vindicta terms for responsible security testing, licensing, educational Academy content, AI provider usage, and warranty limits.',
   path: '/terms',
 })
 

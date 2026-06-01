@@ -12,6 +12,7 @@ export interface AcademyChatMessage {
   createdAt: string
   model: Exclude<AcademyAIModel, null>
   quiz?: AcademyChatQuiz | null
+  isContinuation?: boolean
 }
 
 export interface AcademyChatQuiz {

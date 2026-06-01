@@ -34,8 +34,8 @@ Vindicta is a local-first security workspace for scanning projects, tracking vul
 ```text
 apps/
   desktop/   Nuxt 4 + Tauri 2 desktop app
-  api/       NestJS API prototype with TypeORM/Postgres modules
   landing/   Nuxt landing page
+  web-admin/ Nuxt admin dashboard for beta, newsletter, and support operations
 schema/
   v8.json    JSON schema for per-project vindicta.json files
 ```
@@ -87,7 +87,14 @@ pnpm --filter @vindicta/desktop dev
 Run the Tauri desktop app:
 
 ```bash
-pnpm app:dev
+pnpm desktop:dev
+```
+
+Run the landing or admin apps:
+
+```bash
+pnpm landing:dev
+pnpm admin:dev
 ```
 
 Build the desktop frontend:
@@ -107,5 +114,5 @@ pnpm --filter @vindicta/desktop tauri:build
 - Prefer local project data and existing stores/composables over new global state.
 - Keep Tauri shell commands allowlisted and narrow.
 - Do not embed production secrets in source or bundled app assets.
-- Generated artifacts such as Nuxt output, Tauri targets, and API `dist` files should not be hand-edited.
+- Generated artifacts such as Nuxt output and Tauri targets should not be hand-edited.
 - When changing Codex prompts, keep outputs structured and user-facing; do not ask for private chain-of-thought.
