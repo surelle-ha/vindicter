@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import {
-  LayoutDashboard, ShieldCheck, Newspaper,
-  PanelLeftClose, LogOut, Loader2, ChevronRight,
-  User, Users, MessageCircle, Star, ChevronDown,
+  Newspaper, Key, User, Users, MessageCircle, Star,
+  PanelLeftClose, LogOut, Loader2, ChevronRight, ChevronDown, Settings,
 } from 'lucide-vue-next'
 
 const route  = useRoute()
@@ -33,9 +32,7 @@ onMounted(async () => {
   document.addEventListener('click', outsideClickHandler)
 })
 
-onUnmounted(() => {
-  document.removeEventListener('click', outsideClickHandler)
-})
+onUnmounted(() => document.removeEventListener('click', outsideClickHandler))
 
 async function handleSignOut() {
   userMenuOpen.value = false
@@ -46,21 +43,19 @@ async function handleSignOut() {
 }
 
 const nav = [
-  { label: 'Overview',   to: '/dashboard',              icon: LayoutDashboard },
-  { label: 'DefendCore', to: '/dashboard/subscription', icon: ShieldCheck },
-  { label: 'Updates',    to: '/dashboard/updates',      icon: Newspaper },
+  { label: 'News',    to: '/news',    icon: Newspaper },
+  { label: 'API',     to: '/api',     icon: Key },
+  { label: 'Updates', to: '/updates', icon: Newspaper },
 ]
 
 const adminNav = [
-  { label: 'Users',         to: '/dashboard/admin/users',   icon: Users },
-  { label: 'Tickets',       to: '/dashboard/admin/tickets', icon: MessageCircle },
-  { label: 'Beta Requests', to: '/dashboard/admin/beta',    icon: Star },
+  { label: 'Users',         to: '/admin/users',   icon: Users },
+  { label: 'Tickets',       to: '/admin/tickets', icon: MessageCircle },
+  { label: 'Beta Requests', to: '/admin/beta',    icon: Star },
 ]
 
 function active(to: string) {
-  return to === '/dashboard'
-    ? route.path === '/dashboard'
-    : route.path.startsWith(to)
+  return route.path === to || (to !== '/news' && route.path.startsWith(to))
 }
 
 const displayName = computed(() => {
@@ -70,19 +65,24 @@ const displayName = computed(() => {
   return (meta?.display_name as string) ?? (u.email as string) ?? 'User'
 })
 
+const userEmail = computed(() => {
+  if (!user.value) return ''
+  return ((user.value as any).email as string) ?? ''
+})
+
 const initials = computed(() =>
   displayName.value.split(' ').map((n) => n[0] ?? '').join('').slice(0, 2).toUpperCase()
 )
 
 const pageTitle = computed(() => {
   const p = route.path
-  if (p === '/dashboard') return 'Overview'
-  if (p.startsWith('/dashboard/subscription')) return 'DefendCore'
-  if (p.startsWith('/dashboard/updates')) return 'Updates'
-  if (p.startsWith('/dashboard/profile')) return 'Profile'
-  if (p.startsWith('/dashboard/admin/users')) return 'User Management'
-  if (p.startsWith('/dashboard/admin/tickets')) return 'Support Tickets'
-  if (p.startsWith('/dashboard/admin/beta')) return 'Beta Requests'
+  if (p === '/news')        return 'News'
+  if (p === '/api')         return 'API & Keys'
+  if (p === '/updates')     return 'Updates'
+  if (p === '/profile')     return 'Profile'
+  if (p.startsWith('/admin/users'))   return 'User Management'
+  if (p.startsWith('/admin/tickets')) return 'Support Tickets'
+  if (p.startsWith('/admin/beta'))    return 'Beta Requests'
   return 'Dashboard'
 })
 
@@ -90,19 +90,16 @@ const currentYear = new Date().getFullYear()
 </script>
 
 <template>
-  <div
-    class="h-screen flex flex-col overflow-hidden"
-    style="background:#111215;color:white;font-family:Inter,system-ui,sans-serif;"
-  >
+  <div class="h-screen flex flex-col overflow-hidden" style="background:#111215;color:white;font-family:Inter,system-ui,sans-serif;">
 
-    <!-- Orb background -->
+    <!-- Background orbs -->
     <div class="pointer-events-none fixed inset-0 -z-10" aria-hidden="true">
       <div class="absolute inset-0" style="background:#111215;" />
-      <div style="position:absolute;width:700px;height:700px;border-radius:50%;filter:blur(130px);background:radial-gradient(circle,#3730a3 0%,transparent 70%);top:-250px;left:-150px;opacity:0.07;" />
-      <div style="position:absolute;width:500px;height:500px;border-radius:50%;filter:blur(130px);background:radial-gradient(circle,#4c1d95 0%,transparent 70%);bottom:-150px;right:-100px;opacity:0.05;" />
+      <div style="position:absolute;width:600px;height:600px;border-radius:50%;filter:blur(130px);background:radial-gradient(circle,#3730a3 0%,transparent 70%);top:-220px;left:-120px;opacity:0.08;" />
+      <div style="position:absolute;width:400px;height:400px;border-radius:50%;filter:blur(130px);background:radial-gradient(circle,#4c1d95 0%,transparent 70%);bottom:-120px;right:-80px;opacity:0.06;" />
     </div>
 
-    <!-- Checking -->
+    <!-- Auth checking spinner -->
     <div v-if="dashState === 'checking'" class="flex flex-1 items-center justify-center">
       <div class="flex flex-col items-center gap-3">
         <img src="/icon.png" alt="" class="h-10 w-10 opacity-40" />
@@ -120,39 +117,33 @@ const currentYear = new Date().getFullYear()
       <aside
         class="shrink-0 flex flex-col overflow-hidden transition-[width] duration-200 ease-in-out"
         :class="collapsed ? 'w-12' : 'w-52'"
-        style="background:rgba(20,21,26,0.97);border-right:1px solid rgba(255,255,255,0.07);"
+        style="background:rgba(17,18,21,0.98);border-right:1px solid rgba(255,255,255,0.07);"
       >
-        <!-- Brand + collapse toggle -->
+        <!-- Brand + collapse -->
         <div
           class="h-11 px-3 flex items-center"
           :class="collapsed ? 'justify-center' : 'gap-2'"
           style="border-bottom:1px solid rgba(255,255,255,0.07);"
         >
           <template v-if="!collapsed">
-            <img src="/icon.png" alt="" class="size-6 shrink-0 rounded-md object-cover" />
+            <img src="/icon.png" alt="" class="size-6 shrink-0 rounded-md" />
             <span class="font-display flex-1 text-sm font-semibold truncate" style="color:rgba(255,255,255,0.90);">Vindicter</span>
           </template>
           <button
             class="size-6 flex items-center justify-center rounded transition-colors hover:bg-white/[0.06] cursor-pointer"
-            style="color:rgba(255,255,255,0.40);"
+            style="color:rgba(255,255,255,0.35);"
             :title="collapsed ? 'Expand' : 'Collapse'"
             @click="collapsed = !collapsed"
           >
             <PanelLeftClose v-if="!collapsed" class="size-3.5" />
-            <img v-else src="/icon.png" alt="" class="size-6 rounded-md object-cover" />
+            <img v-else src="/icon.png" alt="" class="size-6 rounded-md" />
           </button>
         </div>
 
-        <!-- Nav items -->
+        <!-- Nav -->
         <nav class="flex-1 p-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
-          <p
-            v-if="!collapsed"
-            class="px-2 mb-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
-            style="color:rgba(255,255,255,0.20);"
-          >
-            Menu
-          </p>
-          <div v-else class="h-px mx-1 mb-2" style="background:rgba(255,255,255,0.08);" />
+          <p v-if="!collapsed" class="px-2 mb-1 text-[10px] font-semibold uppercase tracking-[0.12em]" style="color:rgba(255,255,255,0.18);">Menu</p>
+          <div v-else class="h-px mx-1 mb-2" style="background:rgba(255,255,255,0.07);" />
 
           <NuxtLink
             v-for="item in nav"
@@ -161,9 +152,7 @@ const currentYear = new Date().getFullYear()
             class="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer"
             :class="[
               collapsed ? 'justify-center' : '',
-              active(item.to)
-                ? 'bg-indigo-600/15 text-indigo-400'
-                : 'text-white/45 hover:text-white/80 hover:bg-white/[0.05]',
+              active(item.to) ? 'bg-indigo-600/15 text-indigo-400' : 'text-white/45 hover:text-white/80 hover:bg-white/[0.05]',
             ]"
             :title="collapsed ? item.label : undefined"
           >
@@ -171,16 +160,10 @@ const currentYear = new Date().getFullYear()
             <span v-if="!collapsed">{{ item.label }}</span>
           </NuxtLink>
 
-          <!-- Admin nav section -->
+          <!-- Admin -->
           <template v-if="isAdmin">
             <div class="h-px mx-1 my-2" style="background:rgba(255,255,255,0.07);" />
-            <p
-              v-if="!collapsed"
-              class="px-2 mb-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
-              style="color:rgba(248,113,113,0.35);"
-            >
-              Admin
-            </p>
+            <p v-if="!collapsed" class="px-2 mb-1 text-[10px] font-semibold uppercase tracking-[0.12em]" style="color:rgba(248,113,113,0.35);">Admin</p>
             <NuxtLink
               v-for="item in adminNav"
               :key="item.to"
@@ -188,9 +171,7 @@ const currentYear = new Date().getFullYear()
               class="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer"
               :class="[
                 collapsed ? 'justify-center' : '',
-                active(item.to)
-                  ? 'bg-red-500/10 text-red-400'
-                  : 'text-white/35 hover:text-white/70 hover:bg-white/[0.04]',
+                active(item.to) ? 'bg-red-500/10 text-red-400' : 'text-white/35 hover:text-white/70 hover:bg-white/[0.04]',
               ]"
               :title="collapsed ? item.label : undefined"
             >
@@ -201,96 +182,113 @@ const currentYear = new Date().getFullYear()
         </nav>
       </aside>
 
-      <!-- Right column: topbar + content + footer -->
+      <!-- Main area -->
       <div class="flex flex-1 flex-col overflow-hidden">
 
         <!-- Topbar -->
         <header
           class="h-11 shrink-0 flex items-center justify-between px-5"
-          style="border-bottom:1px solid rgba(255,255,255,0.07);background:rgba(17,18,21,0.90);"
+          style="border-bottom:1px solid rgba(255,255,255,0.07);background:rgba(17,18,21,0.95);"
         >
           <!-- Breadcrumb -->
-          <div class="flex items-center gap-1.5 text-[11px]" style="color:rgba(255,255,255,0.30);">
-            <span>Dashboard</span>
+          <div class="flex items-center gap-1.5 text-[11px]" style="color:rgba(255,255,255,0.28);">
+            <span style="color:rgba(139,92,246,0.50);">dashboard</span>
             <ChevronRight class="size-3 shrink-0" />
             <span class="font-semibold" style="color:rgba(255,255,255,0.70);">{{ pageTitle }}</span>
           </div>
 
-          <!-- User dropdown trigger -->
+          <!-- User menu -->
           <div ref="userMenuRef" class="relative">
             <button
-              class="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-white/[0.05] cursor-pointer"
+              class="flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 transition-colors hover:bg-white/[0.05] cursor-pointer"
               @click.stop="userMenuOpen = !userMenuOpen"
             >
-              <div class="text-right hidden sm:block">
-                <p class="text-[11px] font-medium leading-none truncate max-w-[130px]" style="color:rgba(255,255,255,0.70);">{{ displayName }}</p>
-                <p v-if="isAdmin" class="text-[9px] mt-0.5 font-semibold uppercase tracking-wider" style="color:rgba(139,92,246,0.65);">Administrator</p>
-                <p v-else class="text-[9px] mt-0.5" style="color:rgba(255,255,255,0.25);">Member</p>
-              </div>
+              <!-- Avatar -->
               <div
                 class="h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
                 :style="isAdmin
-                  ? 'background:rgba(139,92,246,0.18);border:1px solid rgba(139,92,246,0.35);color:rgba(167,139,250,0.90);'
-                  : 'background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.55);'"
+                  ? 'background:rgba(139,92,246,0.20);border:1.5px solid rgba(139,92,246,0.40);color:rgba(167,139,250,0.95);'
+                  : 'background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.60);'"
               >
                 {{ initials }}
               </div>
-              <ChevronDown
-                class="size-3 shrink-0 transition-transform"
-                :class="userMenuOpen ? 'rotate-180' : ''"
-                style="color:rgba(255,255,255,0.25);"
-              />
+              <div class="hidden sm:block text-left">
+                <p class="text-[12px] font-semibold leading-none truncate max-w-[120px]" style="color:rgba(255,255,255,0.75);">{{ displayName }}</p>
+                <p class="text-[9px] mt-0.5 font-semibold uppercase tracking-wider" :style="isAdmin ? 'color:rgba(139,92,246,0.60);' : 'color:rgba(255,255,255,0.25);'">
+                  {{ isAdmin ? 'Admin' : 'Member' }}
+                </p>
+              </div>
+              <ChevronDown class="size-3 shrink-0 transition-transform" :class="userMenuOpen ? 'rotate-180' : ''" style="color:rgba(255,255,255,0.22);" />
             </button>
 
             <!-- Dropdown -->
-            <div
-              v-if="userMenuOpen"
-              class="absolute right-0 top-full mt-1.5 w-44 rounded-xl overflow-hidden z-50"
-              style="background:rgba(22,23,28,0.98);border:1px solid rgba(255,255,255,0.10);box-shadow:0 16px 48px rgba(0,0,0,0.5);"
+            <Transition
+              enter-active-class="transition-all duration-150 ease-out"
+              enter-from-class="opacity-0 scale-95 -translate-y-1"
+              enter-to-class="opacity-100 scale-100 translate-y-0"
+              leave-active-class="transition-all duration-100 ease-in"
+              leave-from-class="opacity-100 scale-100 translate-y-0"
+              leave-to-class="opacity-0 scale-95 -translate-y-1"
             >
-              <NuxtLink
-                to="/dashboard/profile"
-                class="flex items-center gap-2.5 px-3.5 py-2.5 text-[12px] transition-colors hover:bg-white/[0.05] cursor-pointer"
-                style="color:rgba(255,255,255,0.65);"
-                @click="userMenuOpen = false"
+              <div
+                v-if="userMenuOpen"
+                class="absolute right-0 top-full mt-2 w-52 rounded-xl overflow-hidden z-50"
+                style="background:rgba(22,23,28,0.99);border:1px solid rgba(255,255,255,0.10);box-shadow:0 20px 60px rgba(0,0,0,0.6);"
               >
-                <User class="h-3.5 w-3.5 shrink-0" style="color:rgba(255,255,255,0.35);" />
-                My Profile
-              </NuxtLink>
-              <div class="h-px mx-2.5" style="background:rgba(255,255,255,0.07);" />
-              <button
-                class="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[12px] transition-colors hover:bg-red-400/[0.07] cursor-pointer"
-                style="color:rgba(248,113,113,0.70);"
-                @click="handleSignOut"
-              >
-                <LogOut class="h-3.5 w-3.5 shrink-0" />
-                Sign out
-              </button>
-            </div>
+                <!-- User info header -->
+                <div class="px-3.5 py-3" style="border-bottom:1px solid rgba(255,255,255,0.07);">
+                  <p class="text-[12px] font-semibold truncate" style="color:rgba(255,255,255,0.80);">{{ displayName }}</p>
+                  <p class="text-[10px] mt-0.5 truncate" style="color:rgba(255,255,255,0.30);">{{ userEmail }}</p>
+                  <span
+                    class="mt-1.5 inline-block rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                    :style="isAdmin
+                      ? 'background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.25);color:rgba(167,139,250,0.90);'
+                      : 'background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);color:rgba(255,255,255,0.40);'"
+                  >
+                    {{ isAdmin ? 'Admin' : 'Member' }}
+                  </span>
+                </div>
+
+                <!-- Links -->
+                <div class="p-1">
+                  <NuxtLink
+                    to="/profile"
+                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] transition-colors hover:bg-white/[0.05] cursor-pointer"
+                    style="color:rgba(255,255,255,0.60);"
+                    @click="userMenuOpen = false"
+                  >
+                    <User class="h-3.5 w-3.5 shrink-0" style="color:rgba(255,255,255,0.30);" />
+                    Profile settings
+                  </NuxtLink>
+                  <div class="my-1 mx-1 h-px" style="background:rgba(255,255,255,0.07);" />
+                  <button
+                    class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] transition-colors hover:bg-red-500/[0.08] cursor-pointer"
+                    style="color:rgba(248,113,113,0.65);"
+                    @click="handleSignOut"
+                  >
+                    <LogOut class="h-3.5 w-3.5 shrink-0" />
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            </Transition>
           </div>
         </header>
 
         <!-- Page content -->
-        <main
-          class="flex-1 overflow-y-auto p-5"
-          style="scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.10) transparent;"
-        >
+        <main class="flex-1 overflow-y-auto p-5" style="scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.08) transparent;">
           <slot />
         </main>
 
         <!-- Footer -->
-        <footer
-          class="shrink-0 flex items-center justify-between px-5 py-2"
-          style="border-top:1px solid rgba(255,255,255,0.05);"
-        >
-          <p class="text-[10px]" style="color:rgba(255,255,255,0.15);">&copy; {{ currentYear }} Surelle-ha. Local-first security review.</p>
+        <footer class="shrink-0 flex items-center justify-between px-5 py-2" style="border-top:1px solid rgba(255,255,255,0.05);">
+          <p class="text-[10px]" style="color:rgba(255,255,255,0.15);">&copy; {{ currentYear }} Surelle-ha — local-first security review.</p>
           <div class="flex items-center gap-4">
-            <NuxtLink to="/docs" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Docs</NuxtLink>
-            <NuxtLink to="/support" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Support</NuxtLink>
-            <NuxtLink to="/privacy" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Privacy</NuxtLink>
+            <a href="https://vindicter.xyz/docs" target="_blank" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Docs</a>
+            <a href="https://vindicter.xyz/support" target="_blank" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Support</a>
+            <a href="https://vindicter.xyz/privacy" target="_blank" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Privacy</a>
           </div>
         </footer>
-
       </div>
     </div>
   </div>

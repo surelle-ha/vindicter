@@ -81,7 +81,7 @@ const lastUpdated = 'May 28, 2026'
           <section>
             <h2>4. Cookies & Tracking</h2>
             <p>The Vindicter desktop application does not use cookies, browser storage, or any tracking technology.</p>
-            <p>The landing website (<code>vindicta.xyz</code>) also does not use cookies, analytics scripts, or advertising trackers. It serves static HTML with no session tracking.</p>
+            <p>The landing website (<code>vindicter.xyz</code>) also does not use cookies, analytics scripts, or advertising trackers. It serves static HTML with no session tracking.</p>
           </section>
 
           <section>
@@ -93,7 +93,7 @@ const lastUpdated = 'May 28, 2026'
             <h2>6. Data Retention</h2>
             <p>
               Beta sign-up information (name and email) is retained for the duration of the beta programme. You may request deletion at any time by emailing
-              <a href="mailto:privacy@vindicta.xyz">privacy@vindicta.xyz</a>.
+              <a href="mailto:privacy@vindicter.xyz">privacy@vindicter.xyz</a>.
             </p>
           </section>
 
@@ -106,7 +106,7 @@ const lastUpdated = 'May 28, 2026'
             <h2>8. Contact</h2>
             <p>
               Questions about this policy? Email us at
-              <a href="mailto:privacy@vindicta.xyz">privacy@vindicta.xyz</a>.
+              <a href="mailto:privacy@vindicter.xyz">privacy@vindicter.xyz</a>.
             </p>
           </section>
 

@@ -68,7 +68,7 @@ const features = [
     title: 'Portable Security Record',
     badge: 'No account',
     badgeColor: 'ok',
-    desc: 'Store scans, findings, and history in a local vindicta.json file. Offline-first, readable, no account required.',
+    desc: 'Store scans, findings, and history in a local vindicter.json file. Offline-first, readable, no account required.',
     icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
   },
   {
@@ -237,7 +237,7 @@ const badgeClass: Record<string, string> = {
           class="animate-fade-up font-display text-[72px] sm:text-[96px] lg:text-[120px] font-black uppercase leading-none tracking-[0.08em]"
           style="animation-delay:0.2s; text-shadow: 0 0 120px rgba(139,92,246,0.5), 0 4px 40px rgba(0,0,0,0.8)"
         >
-          VINDICTA
+          VINDICTER
         </h1>
         <p
           class="animate-fade-up text-[13px] sm:text-[16px] font-semibold uppercase tracking-[0.5em] text-white/40 mt-1"

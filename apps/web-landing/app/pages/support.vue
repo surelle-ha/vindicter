@@ -81,7 +81,7 @@ async function submitSupport() {
     successEmail.value = form.email.trim()
     step.value = 'done'
   } catch {
-    apiError.value = 'Something went wrong. Please try again or email support@vindicta.xyz.'
+    apiError.value = 'Something went wrong. Please try again or email support@vindicter.xyz.'
   } finally {
     loading.value = false
   }

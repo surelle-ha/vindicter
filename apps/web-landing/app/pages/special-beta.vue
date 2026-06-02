@@ -144,7 +144,7 @@ async function submit() {
     if (error) throw error
     success.value = true
   } catch {
-    apiError.value = 'Something went wrong. Please try again or contact support@vindicta.xyz.'
+    apiError.value = 'Something went wrong. Please try again or contact support@vindicter.xyz.'
   } finally {
     loading.value = false
   }

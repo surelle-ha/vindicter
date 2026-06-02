@@ -2,6 +2,7 @@
 useHead({ title: 'Download Vindicter — Open Beta' })
 
 const MANIFEST = 'https://pub-1dcbd264e42f475e9f95858cc16ab6b7.r2.dev/releases/latest/update.json'
+const TOKEN_KEY = 'vindicter:download-token'
 
 // ── Release manifest ────────────────────────────────────────────────────────
 const manifestLoading = ref(true)
@@ -29,26 +30,75 @@ onMounted(async () => {
   } finally {
     manifestLoading.value = false
   }
+
+  await checkExistingAccess()
 })
 
-// ── Newsletter flow ─────────────────────────────────────────────────────────
-// step: 'question' → 'newsletter' (yes) | 'download' (no)
-//        'newsletter' → 'download' (after submit or skip)
-type Step = 'question' | 'newsletter' | 'download'
-const step = ref<Step>('question')
-
+// ── Token gate ──────────────────────────────────────────────────────────────
+type Step = 'gate' | 'download'
+const step         = ref<Step>('gate')
 const email        = ref('')
 const emailError   = ref('')
 const submitLoading = ref(false)
-const submitDone    = ref(false)
+const tokenVerifying = ref(false)
+const tokenEmail   = ref('')
 
 function validateEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 }
 
-async function submitNewsletter() {
+async function checkExistingAccess() {
+  const route = useRoute()
+  const urlToken = route.query.token as string | undefined
+
+  // Priority 1: URL token parameter
+  if (urlToken) {
+    tokenVerifying.value = true
+    try {
+      const supabase = useSupabase()
+      const { data } = await supabase
+        .from('newsletter_signups')
+        .select('email, download_token')
+        .eq('download_token', urlToken)
+        .maybeSingle()
+      if (data) {
+        tokenEmail.value = data.email ?? ''
+        localStorage.setItem(TOKEN_KEY, urlToken)
+        step.value = 'download'
+        return
+      }
+    } catch { /* fall through */ } finally {
+      tokenVerifying.value = false
+    }
+  }
+
+  // Priority 2: localStorage saved token
+  const saved = localStorage.getItem(TOKEN_KEY)
+  if (saved) {
+    tokenVerifying.value = true
+    try {
+      const supabase = useSupabase()
+      const { data } = await supabase
+        .from('newsletter_signups')
+        .select('email')
+        .eq('download_token', saved)
+        .maybeSingle()
+      if (data) {
+        tokenEmail.value = data.email ?? ''
+        step.value = 'download'
+      } else {
+        localStorage.removeItem(TOKEN_KEY)
+      }
+    } catch { /* ignore */ } finally {
+      tokenVerifying.value = false
+    }
+  }
+}
+
+async function submitEmail() {
   emailError.value = ''
-  if (!validateEmail(email.value.trim())) {
+  const raw = email.value.trim()
+  if (!validateEmail(raw)) {
     emailError.value = 'Please enter a valid email address.'
     return
   }
@@ -56,20 +106,34 @@ async function submitNewsletter() {
   submitLoading.value = true
   try {
     const supabase = useSupabase()
+    const token = crypto.randomUUID().replace(/-/g, '')
+
+    // Upsert: same email gets a fresh token each time
     const { error } = await supabase
       .from('newsletter_signups')
-      .insert({ email: email.value.trim() })
+      .upsert(
+        { email: raw, download_token: token, account_type: 'individual' },
+        { onConflict: 'email' },
+      )
 
-    // 23505 = unique_violation — duplicate email is fine, just skip
-    if (error && error.code !== '23505') {
-      console.error('[newsletter] insert error:', error.message, error.code)
-    }
+    if (error && error.code !== '23505') throw error
+
+    // For duplicate email, fetch the existing token so returning users get access
+    const { data: existing } = await supabase
+      .from('newsletter_signups')
+      .select('download_token')
+      .eq('email', raw)
+      .maybeSingle()
+
+    const finalToken = existing?.download_token ?? token
+    localStorage.setItem(TOKEN_KEY, finalToken)
+    tokenEmail.value = raw
+    step.value = 'download'
   } catch (err) {
-    console.error('[newsletter] exception:', err)
+    emailError.value = 'Something went wrong. Please try again.'
+    console.error('[download-gate]', err)
   } finally {
     submitLoading.value = false
-    submitDone.value = true
-    step.value = 'download'
   }
 }
 </script>
@@ -111,105 +175,71 @@ async function submitNewsletter() {
           <p class="text-[12px] text-white/40 leading-relaxed">
             Representing an organisation?
             <NuxtLink to="/special-beta" class="text-accent/70 hover:text-accent transition-colors underline underline-offset-2">
-              Join the Special Beta Test Programme
+              Join the Special Beta Programme
             </NuxtLink>
-            — dedicated support, partner access, and early feature previews for teams.
+            — dedicated support, partner access, and early feature previews.
           </p>
         </div>
 
-        <!-- ── Step: question ────────────────────────────────────────────── -->
-        <div v-if="step === 'question'" class="rounded-2xl border border-white/8 bg-surface/60 p-6 sm:p-8">
-          <p class="text-[14px] font-semibold text-white mb-2 text-center">Stay in the loop?</p>
-          <p class="text-[12px] text-white/40 text-center mb-8 leading-relaxed">
-            Would you like to receive updates, release notes, and news about Vindicter?
-          </p>
-          <div class="grid grid-cols-2 gap-3">
-            <button
-              @click="step = 'newsletter'"
-              class="flex flex-col items-center gap-2 rounded-xl border border-accent/25 bg-accent/8 px-4 py-5 text-center transition-all hover:border-accent/50 hover:bg-accent/15 group"
-            >
-              <svg class="h-6 w-6 text-accent/70 group-hover:text-accent transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 9v.906a2.25 2.25 0 01-1.183 1.981l-6.478 3.488M2.25 9v.906a2.25 2.25 0 001.183 1.981l6.478 3.488m8.839 2.51l-4.66-2.51m0 0l-1.023-.55a2.25 2.25 0 00-2.134 0l-1.022.55m0 0l-4.661 2.51m16.5 1.615a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V8.844a2.25 2.25 0 011.183-1.981l7.5-4.039a2.25 2.25 0 012.134 0l7.5 4.039a2.25 2.25 0 011.183 1.98V19.5z" />
-              </svg>
-              <span class="text-[13px] font-semibold text-white">Yes, sign me up</span>
-              <span class="text-[10px] text-white/35 leading-relaxed">Updates & release notes</span>
-            </button>
-            <button
-              @click="step = 'download'"
-              class="flex flex-col items-center gap-2 rounded-xl border border-white/8 bg-white/[0.03] px-4 py-5 text-center transition-all hover:border-white/15 hover:bg-white/[0.06] group"
-            >
-              <svg class="h-6 w-6 text-white/30 group-hover:text-white/50 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-              <span class="text-[13px] font-semibold text-white/60">No, just download</span>
-              <span class="text-[10px] text-white/25 leading-relaxed">Skip to installer</span>
-            </button>
-          </div>
+        <!-- Verifying spinner -->
+        <div v-if="tokenVerifying" class="flex justify-center py-10">
+          <svg class="h-7 w-7 text-accent/40 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 100 16v-4l-3 3 3 3v-4a8 8 0 01-8-8z" />
+          </svg>
         </div>
 
-        <!-- ── Step: newsletter ──────────────────────────────────────────── -->
-        <div v-else-if="step === 'newsletter'" class="rounded-2xl border border-white/8 bg-surface/60 p-6 sm:p-8">
-          <div class="flex items-center gap-3 mb-6">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10 border border-accent/20">
-              <svg class="h-4 w-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 9v.906a2.25 2.25 0 01-1.183 1.981l-6.478 3.488M2.25 9v.906a2.25 2.25 0 001.183 1.981l6.478 3.488m8.839 2.51l-4.66-2.51m0 0l-1.023-.55a2.25 2.25 0 00-2.134 0l-1.022.55m0 0l-4.661 2.51m16.5 1.615a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V8.844a2.25 2.25 0 011.183-1.981l7.5-4.039a2.25 2.25 0 012.134 0l7.5 4.039a2.25 2.25 0 011.183 1.98V19.5z" />
-              </svg>
-            </div>
-            <div>
-              <p class="text-[13px] font-semibold text-white">Subscribe to updates</p>
-              <p class="text-[11px] text-white/35">We'll notify you of new releases and features</p>
-            </div>
-          </div>
+        <!-- ── Step: gate (email required) ─────────────────────────────── -->
+        <div v-else-if="step === 'gate'" class="rounded-2xl border border-white/8 bg-surface/60 p-6 sm:p-8">
+          <p class="text-[15px] font-semibold text-white mb-1.5 text-center">Get your download link</p>
+          <p class="text-[12px] text-white/40 text-center mb-6 leading-relaxed">
+            Enter your email to receive a personal download link. We'll also send you release notes.
+          </p>
 
           <div class="mb-4">
             <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/40 mb-2">
-              Email Address
+              Email address
             </label>
             <input
               v-model="email"
               type="email"
               placeholder="you@example.com"
               :disabled="submitLoading"
-              @keydown.enter="submitNewsletter"
+              autocomplete="email"
+              @keydown.enter="submitEmail"
               class="w-full rounded-xl border border-white/8 bg-white/[0.04] px-4 py-3 text-[13px] text-white placeholder-white/20 outline-none focus:border-accent/40 transition-colors disabled:opacity-50"
             />
             <p v-if="emailError" class="mt-1.5 text-[11px] text-err/80">{{ emailError }}</p>
           </div>
 
           <button
-            @click="submitNewsletter"
+            @click="submitEmail"
             :disabled="submitLoading || !email.trim()"
-            class="w-full flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3.5 text-[13px] font-bold text-white transition-colors hover:bg-accent/85 disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+            class="w-full flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3.5 text-[13px] font-bold text-white transition-colors hover:bg-accent/85 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg v-if="submitLoading" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 100 16v-4l-3 3 3 3v-4a8 8 0 01-8-8z" />
             </svg>
-            {{ submitLoading ? 'Saving…' : 'Subscribe & Download' }}
+            {{ submitLoading ? 'Generating link…' : 'Get Download Link →' }}
           </button>
 
-          <button
-            @click="step = 'download'"
-            class="w-full text-[11px] text-white/25 hover:text-white/50 transition-colors py-1"
-          >
-            Skip and download without subscribing
-          </button>
+          <p class="mt-3 text-center text-[10px] text-white/20">
+            No spam. Unsubscribe any time. Personal link is reusable.
+          </p>
         </div>
 
         <!-- ── Step: download ────────────────────────────────────────────── -->
         <div v-else>
-          <!-- Subscribed confirmation -->
-          <div
-            v-if="submitDone"
-            class="mb-5 rounded-xl border border-ok/20 bg-ok/5 px-4 py-3 flex items-center gap-3"
-          >
+          <!-- Registered confirmation -->
+          <div v-if="tokenEmail" class="mb-5 rounded-xl border border-ok/20 bg-ok/5 px-4 py-3 flex items-center gap-3">
             <svg class="h-4 w-4 text-ok shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p class="text-[12px] text-ok/80">Subscribed! You'll receive updates at {{ email }}.</p>
+            <p class="text-[12px] text-ok/80">Access granted for <strong>{{ tokenEmail }}</strong>.</p>
           </div>
 
-          <!-- Loading -->
+          <!-- Loading manifest -->
           <div v-if="manifestLoading" class="flex justify-center py-6">
             <svg class="h-7 w-7 text-accent/40 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -217,7 +247,7 @@ async function submitNewsletter() {
             </svg>
           </div>
 
-          <!-- Error -->
+          <!-- Manifest error -->
           <div v-else-if="manifestError" class="rounded-2xl border border-err/20 bg-err/5 px-5 py-4 text-center">
             <p class="text-[13px] text-err/80">Could not load release info. Try refreshing the page.</p>
           </div>

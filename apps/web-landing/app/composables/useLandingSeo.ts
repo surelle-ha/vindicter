@@ -5,7 +5,7 @@ interface LandingSeoOptions {
   image?: string
 }
 
-const SITE_URL = 'https://vindicta.xyz'
+const SITE_URL = 'https://vindicter.xyz'
 const SITE_NAME = 'Vindicter'
 
 export function useLandingSeo(options: LandingSeoOptions) {

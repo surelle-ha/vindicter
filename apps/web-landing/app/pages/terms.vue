@@ -120,7 +120,7 @@ const lastUpdated = 'May 28, 2026'
             <h2>9. Contact</h2>
             <p>
               For questions or concerns about these terms, email us at
-              <a href="mailto:legal@vindicta.xyz">legal@vindicta.xyz</a>.
+              <a href="mailto:legal@vindicter.xyz">legal@vindicter.xyz</a>.
             </p>
           </section>
 

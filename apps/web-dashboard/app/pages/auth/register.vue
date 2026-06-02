@@ -30,7 +30,7 @@ async function register() {
     })
     if (error) throw error
     if (data.session) {
-      await router.push('/dashboard')
+      await router.push('/news')
       return
     }
     notice.value = 'Account created. Check your email to confirm your account before logging in.'

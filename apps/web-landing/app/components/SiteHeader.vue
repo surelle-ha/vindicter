@@ -33,7 +33,7 @@ onUnmounted(() => unsubscribe?.())
       <NuxtLink to="/#academy" class="hidden transition-colors hover:text-white sm:inline">Academy</NuxtLink>
       <NuxtLink to="/defendcore" class="hidden transition-colors hover:text-white sm:inline">DefendCore</NuxtLink>
       <a
-        href="https://dashboard.vendicter.xyz"
+        href="https://dashboard.vindicter.xyz"
         class="inline-flex items-center rounded-lg border border-white/10 px-4 py-1.5 text-[12px] font-semibold text-white/70 transition hover:border-accent/40 hover:bg-white/[0.04] hover:text-white"
       >
         {{ isLoggedIn ? 'Dashboard' : 'Login' }}

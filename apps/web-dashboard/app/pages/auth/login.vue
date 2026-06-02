@@ -24,7 +24,7 @@ async function login() {
       password: password.value,
     })
     if (error) throw error
-    await router.push(String(route.query.redirect ?? '/dashboard'))
+    await router.push(String(route.query.redirect ?? '/news'))
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Unable to login right now.'
   } finally {

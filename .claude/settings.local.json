@@ -65,7 +65,17 @@
       "Bash(sed -i 's|\"@vindicter/landing\"|\"@vindicter/web-landing\"|g' apps/web-landing/package.json)",
       "Bash(sed -i 's|--filter @vindicter/landing|--filter @vindicter/web-landing|g' package.json)",
       "Bash(sed -i 's|landing:dev|web-landing:dev|g' package.json)",
-      "Bash(xargs grep -l \"selectedAITool\\\\|aiTool\\\\|AiTool\\\\|ollama\\\\|openRouter\\\\|claude\\\\|codex\")"
+      "Bash(xargs grep -l \"selectedAITool\\\\|aiTool\\\\|AiTool\\\\|ollama\\\\|openRouter\\\\|claude\\\\|codex\")",
+      "Bash(mkdir -p app/pages/admin)",
+      "Bash(mv app/pages/dashboard/index.vue app/pages/news.vue)",
+      "Bash(mv app/pages/dashboard/profile.vue app/pages/profile.vue)",
+      "Bash(mv app/pages/dashboard/updates.vue app/pages/updates.vue)",
+      "Bash(mv app/pages/dashboard/admin/users.vue app/pages/admin/users.vue)",
+      "Bash(sed -i \"s|await router.push\\('/dashboard'\\)|await router.push\\('/news'\\)|g\" apps/web-dashboard/app/pages/auth/register.vue)",
+      "Bash(sed -i \"s|router.push\\('/dashboard'\\)|router.push\\('/news'\\)|g\" apps/web-dashboard/app/pages/admin/users.vue)",
+      "Bash(sed -i \"s|'/dashboard'|'/news'|g\" apps/web-dashboard/app/pages/profile.vue)",
+      "Bash(sed -i \"s|String\\(route.query.redirect ?? '/dashboard'\\)|String\\(route.query.redirect ?? '/news'\\)|g\" apps/web-dashboard/app/pages/auth/login.vue)",
+      "Bash(git add *)"
     ]
   }
 }

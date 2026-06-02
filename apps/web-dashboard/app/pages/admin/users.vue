@@ -9,7 +9,7 @@ const { isAdmin } = useAuth()
 const router = useRouter()
 
 onMounted(() => {
-  if (!isAdmin.value) router.push('/dashboard')
+  if (!isAdmin.value) router.push('/news')
 })
 
 interface UserProfile {
