@@ -4,9 +4,6 @@ useHead({ title: 'Special Beta Program — Vindicter' })
 import { COUNTRIES } from '~/data/countries'
 
 // ── Form state ──────────────────────────────────────────────────────────────
-type PartnerType = 'partner' | 'trusted'
-
-const partnerType   = ref<PartnerType>('partner')
 const orgName       = ref('')
 const orgSize       = ref('')
 const country       = ref('')
@@ -29,18 +26,42 @@ const errors = reactive({
   captcha:      '',
 })
 
-// ── Math CAPTCHA ────────────────────────────────────────────────────────────
-const captchaA       = ref(0)
-const captchaB       = ref(0)
-const captchaAnswer  = ref('')
+// ── Cloudflare Turnstile ────────────────────────────────────────────────────
+const turnstileContainer = ref<HTMLElement | null>(null)
+const turnstileToken     = ref('')
+const config             = useRuntimeConfig()
 
-function refreshCaptcha() {
-  captchaA.value     = Math.floor(Math.random() * 9) + 1
-  captchaB.value     = Math.floor(Math.random() * 9) + 1
-  captchaAnswer.value = ''
+function onTurnstileSuccess(token: string) { turnstileToken.value = token }
+function onTurnstileExpired()              { turnstileToken.value = '' }
+function onTurnstileError()                { turnstileToken.value = '' }
+
+function mountTurnstile() {
+  if (!turnstileContainer.value) return
+  const w = window as any
+  if (!w.turnstile) return
+  w.turnstile.render(turnstileContainer.value, {
+    sitekey:           config.public.turnstileSiteKey as string,
+    theme:             'dark',
+    callback:          onTurnstileSuccess,
+    'expired-callback': onTurnstileExpired,
+    'error-callback':   onTurnstileError,
+  })
 }
 
-onMounted(() => refreshCaptcha())
+onMounted(() => {
+  if (typeof window === 'undefined') return
+  const w = window as any
+  if (w.turnstile) {
+    mountTurnstile()
+  } else {
+    w.__turnstileOnLoad = mountTurnstile
+    const s = document.createElement('script')
+    s.src   = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=__turnstileOnLoad&render=explicit'
+    s.async = true
+    s.defer = true
+    document.head.appendChild(s)
+  }
+})
 
 // Country search
 const countrySearch  = ref('')
@@ -101,15 +122,8 @@ function validate(): boolean {
   errors.orgSize     = orgSize.value            ? '' : 'Please select an organization size.'
   errors.country     = country.value            ? '' : 'Please select a country.'
   errors.contactName = contactName.value.trim() ? '' : 'Contact name is required.'
-  errors.agreedTerms = agreedTerms.value        ? '' : 'You must agree to the terms to apply.'
-
-  const captchaExpected = captchaA.value + captchaB.value
-  const captchaInput    = parseInt(captchaAnswer.value.trim(), 10)
-  errors.captcha = (!captchaAnswer.value.trim() || isNaN(captchaInput))
-    ? 'Please answer the verification question.'
-    : captchaInput !== captchaExpected
-      ? 'Incorrect answer. Please try again.'
-      : ''
+  errors.agreedTerms = agreedTerms.value ? '' : 'You must agree to the terms to apply.'
+  errors.captcha     = turnstileToken.value ? '' : 'Please complete the verification challenge.'
 
   const raw = contactEmail.value.trim()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
@@ -128,7 +142,6 @@ async function submit() {
   if (!validate()) return
 
   loading.value = true
-  refreshCaptcha()
   try {
     const supabase = useSupabase()
     const { error } = await supabase.from('special_beta_applications').insert({
@@ -137,7 +150,7 @@ async function submit() {
       country:       country.value,
       contact_name:  contactName.value.trim(),
       contact_email: contactEmail.value.trim(),
-      partner_type:  partnerType.value,
+      partner_type:  'organization',
       referral:      referral.value.trim() || null,
       agreed_terms:  agreedTerms.value,
     })
@@ -190,63 +203,37 @@ const orgSizes = [
           </div>
         </div>
 
-        <!-- Partnership tier cards -->
+        <!-- Partnership tier info -->
+        <!-- Benefits overview -->
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-12">
-          <!-- Partner -->
-          <button
-            @click="partnerType = 'partner'"
-            :class="partnerType === 'partner'
-              ? 'border-accent/40 bg-accent/8'
-              : 'border-white/8 bg-surface/40 hover:border-white/15'"
-            class="relative rounded-2xl border p-6 text-left transition-all cursor-pointer"
-          >
-            <div v-if="partnerType === 'partner'" class="absolute top-3 right-3 flex h-5 w-5 items-center justify-center rounded-full bg-accent">
-              <svg class="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
+          <div class="rounded-2xl border border-accent/25 bg-accent/6 p-6">
             <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 border border-accent/20 mb-4">
               <svg class="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
               </svg>
             </div>
-            <p class="text-[14px] font-bold text-white mb-1">Partner Organization</p>
-            <p class="text-[11px] text-white/40 leading-relaxed mb-4">For organisations that want to actively shape Vindicter's direction and be publicly recognised.</p>
+            <p class="text-[14px] font-bold text-white mb-3">Organisation Access</p>
             <ul class="space-y-1.5">
-              <li v-for="b in ['Co-marketing opportunities', 'Direct feature input & roadmap access', 'Named in release notes', 'Priority developer support']" :key="b" class="flex items-center gap-2 text-[11px] text-white/50">
+              <li v-for="b in ['Early access to all new features', 'Direct feature input & roadmap access', 'Priority developer support', 'Named in release notes']" :key="b" class="flex items-center gap-2 text-[11px] text-white/50">
                 <span class="h-1 w-1 rounded-full bg-accent/60 shrink-0" />
                 {{ b }}
               </li>
             </ul>
-          </button>
-
-          <!-- Trusted -->
-          <button
-            @click="partnerType = 'trusted'"
-            :class="partnerType === 'trusted'
-              ? 'border-violet-500/40 bg-violet-500/8'
-              : 'border-white/8 bg-surface/40 hover:border-white/15'"
-            class="relative rounded-2xl border p-6 text-left transition-all cursor-pointer"
-          >
-            <div v-if="partnerType === 'trusted'" class="absolute top-3 right-3 flex h-5 w-5 items-center justify-center rounded-full bg-violet-500">
-              <svg class="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
+          </div>
+          <div class="rounded-2xl border border-white/8 bg-surface/40 p-6">
             <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 border border-violet-500/20 mb-4">
               <svg class="h-5 w-5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
               </svg>
             </div>
-            <p class="text-[14px] font-bold text-white mb-1">Trusted Organization</p>
-            <p class="text-[11px] text-white/40 leading-relaxed mb-4">For organisations that want early access to new features and a private feedback channel with the team.</p>
+            <p class="text-[14px] font-bold text-white mb-3">Dedicated Support</p>
             <ul class="space-y-1.5">
-              <li v-for="b in ['Early access to all new features', 'Dedicated beta support channel', 'Feedback influence on roadmap', 'Quarterly update briefings']" :key="b" class="flex items-center gap-2 text-[11px] text-white/50">
+              <li v-for="b in ['Dedicated beta support channel', 'Feedback influence on roadmap', 'Quarterly update briefings', 'Co-marketing opportunities']" :key="b" class="flex items-center gap-2 text-[11px] text-white/50">
                 <span class="h-1 w-1 rounded-full bg-violet-400/60 shrink-0" />
                 {{ b }}
               </li>
             </ul>
-          </button>
+          </div>
         </div>
 
         <!-- Terms & Conditions summary -->
@@ -370,34 +357,12 @@ const orgSizes = [
               />
             </div>
 
-            <!-- Human verification -->
+            <!-- Cloudflare Turnstile -->
             <div>
               <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/40 mb-2">
                 Verification
               </label>
-              <div class="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.04] px-4 py-3">
-                <span class="text-[13px] text-white/70 whitespace-nowrap">
-                  What is {{ captchaA }} + {{ captchaB }}?
-                </span>
-                <input
-                  v-model="captchaAnswer"
-                  type="text"
-                  inputmode="numeric"
-                  pattern="[0-9]*"
-                  placeholder="Answer"
-                  maxlength="3"
-                  :disabled="loading"
-                  class="flex-1 min-w-0 bg-transparent text-[13px] text-white placeholder-white/20 outline-none"
-                />
-                <button
-                  type="button"
-                  class="text-[11px] text-white/30 hover:text-white/50 transition-colors shrink-0"
-                  title="New question"
-                  @click="refreshCaptcha"
-                >
-                  ↺
-                </button>
-              </div>
+              <div ref="turnstileContainer" />
               <p v-if="errors.captcha" class="mt-1.5 text-[11px] text-err/80">{{ errors.captcha }}</p>
             </div>
 

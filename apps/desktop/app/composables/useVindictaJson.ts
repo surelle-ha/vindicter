@@ -6,7 +6,7 @@ import { generateId } from '~/utils/id'
 import { nowISO } from '~/utils/date'
 
 const FILENAME = 'vindicta.json'
-const SCHEMA_URL = 'https://raw.githubusercontent.com/surelle-ha/vindicter/main/schema/v8.json'
+const SCHEMA_URL = 'https://raw.githubusercontent.com/Vindicter/vindicter/main/schema/v8.json'
 
 export function useVindicterJson() {
   const fs = useTauriFs()

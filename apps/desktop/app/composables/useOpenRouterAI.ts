@@ -20,7 +20,7 @@ export async function runOpenRouterChat(opts: OpenRouterChatOptions): Promise<st
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://github.com/surelle-ha/vindicter',
+      'HTTP-Referer': 'https://github.com/Vindicter/vindicter',
       'X-Title': 'Vindicter',
     },
     body: JSON.stringify({

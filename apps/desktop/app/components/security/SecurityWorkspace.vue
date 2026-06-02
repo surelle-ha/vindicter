@@ -242,7 +242,7 @@ async function submitGitHubIssue() {
       finding.recommendation,
       '',
       '---',
-      '_Created by [Vindicter](https://github.com/surelle-ha/vindicter) — AI-powered security platform_',
+      '_Created by [Vindicter](https://github.com/Vindicter/vindicter) — AI-powered security platform_',
     ].join('\n')
 
     const result = await auth.createGitHubIssue({

@@ -73,7 +73,7 @@ const DEFAULT_SMTP: SmtpSettings = {
 }
 
 const DEFAULT_CONTACT: ContactSettings = {
-  githubRepo: 'Surelle-ha/vindicter',
+  githubRepo: 'Vindicter/vindicter',
   githubToken: '',
 }
 

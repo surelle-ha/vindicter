@@ -76,7 +76,7 @@ const features = [
         </div>
 
         <p class="text-[11px]" style="color:rgba(255,255,255,0.22);">
-          &copy; {{ currentYear }} Surelle-ha. Local-first security review.
+          &copy; {{ currentYear }} Vindicter. Local-first security review.
         </p>
       </div>
     </div>
@@ -115,7 +115,7 @@ const features = [
           <slot />
 
           <p class="lg:hidden mt-8 text-center text-[11px]" style="color:rgba(255,255,255,0.22);">
-            &copy; {{ currentYear }} Surelle-ha
+            &copy; {{ currentYear }} Vindicter
           </p>
         </div>
       </div>

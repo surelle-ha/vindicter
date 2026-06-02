@@ -2,7 +2,7 @@ import type { VindicterJson } from '~/types/vindicta'
 import { VINDICTA_SCHEMA_VERSION, DEFAULT_KANBAN_COLUMNS, DEFAULT_ROLES, DEFAULT_SECURITY_DATA } from '~/types/vindicta'
 import { nowISO } from '~/utils/date'
 
-const VINDICTA_SCHEMA_URL = 'https://raw.githubusercontent.com/surelle-ha/vindicter/main/schema/v8.json'
+const VINDICTA_SCHEMA_URL = 'https://raw.githubusercontent.com/Vindicter/vindicter/main/schema/v8.json'
 
 function deriveProjectCode(name: string): string {
   const letters = name.toUpperCase().replace(/[^A-Z]/g, '')

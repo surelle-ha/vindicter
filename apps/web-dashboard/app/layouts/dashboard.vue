@@ -282,7 +282,7 @@ const currentYear = new Date().getFullYear()
 
         <!-- Footer -->
         <footer class="shrink-0 flex items-center justify-between px-5 py-2" style="border-top:1px solid rgba(255,255,255,0.05);">
-          <p class="text-[10px]" style="color:rgba(255,255,255,0.15);">&copy; {{ currentYear }} Surelle-ha — local-first security review.</p>
+          <p class="text-[10px]" style="color:rgba(255,255,255,0.15);">&copy; {{ currentYear }} Vindicter — local-first security review.</p>
           <div class="flex items-center gap-4">
             <a href="https://vindicter.xyz/docs" target="_blank" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Docs</a>
             <a href="https://vindicter.xyz/support" target="_blank" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Support</a>

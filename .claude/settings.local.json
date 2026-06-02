@@ -75,7 +75,8 @@
       "Bash(sed -i \"s|router.push\\('/dashboard'\\)|router.push\\('/news'\\)|g\" apps/web-dashboard/app/pages/admin/users.vue)",
       "Bash(sed -i \"s|'/dashboard'|'/news'|g\" apps/web-dashboard/app/pages/profile.vue)",
       "Bash(sed -i \"s|String\\(route.query.redirect ?? '/dashboard'\\)|String\\(route.query.redirect ?? '/news'\\)|g\" apps/web-dashboard/app/pages/auth/login.vue)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }

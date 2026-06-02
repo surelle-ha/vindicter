@@ -10,7 +10,7 @@ defineProps<{
       <div class="flex flex-col items-center gap-3 sm:flex-row sm:gap-5">
         <div class="flex items-center gap-3">
           <img src="/icon.png" alt="Vindicter" class="h-5 w-5 opacity-60" />
-          <span>&copy; {{ year }} Surelle-ha. All rights reserved.</span>
+          <span>&copy; {{ year }} Vindicter. All rights reserved.</span>
         </div>
         <span class="hidden text-white/15 sm:inline">/</span>
         <span class="text-white/20">Built for local-first security review.</span>

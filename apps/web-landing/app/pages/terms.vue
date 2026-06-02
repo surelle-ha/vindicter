@@ -56,7 +56,7 @@ const lastUpdated = 'May 28, 2026'
               Vindicter is proprietary software. You are granted a personal, non-transferable licence to install and use the Software on devices you own, solely for your own security research and learning purposes.
             </p>
             <p>
-              You may not redistribute, resell, sublicense, or create derivative works of the Software without prior written consent from Surelle-ha.
+              You may not redistribute, resell, sublicense, or create derivative works of the Software without prior written consent from Vindicter.
             </p>
           </section>
 

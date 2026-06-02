@@ -2,7 +2,7 @@
 name = "vindicta"
 version = "0.4.0"
 description = "Vindicta — local-first AI-powered security platform"
-authors = ["surelle-ha"]
+authors = ["Vindicter"]
 edition = "2021"
 
 [package.metadata.tauri]

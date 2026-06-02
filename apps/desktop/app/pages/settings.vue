@@ -274,14 +274,14 @@ async function checkForUpdates() {
   }
 
   try {
-    const response = await fetch('https://api.github.com/repos/surelle-ha/vindicter/releases/latest', {
+    const response = await fetch('https://api.github.com/repos/Vindicter/vindicter/releases/latest', {
       headers: { Accept: 'application/vnd.github+json' },
     })
     if (!response.ok) throw new Error(`GitHub returned HTTP ${response.status}`)
     const release = await response.json()
     latestRelease.value = {
       tagName: String(release.tag_name ?? ''),
-      htmlUrl: String(release.html_url ?? 'https://github.com/surelle-ha/vindicter/releases'),
+      htmlUrl: String(release.html_url ?? 'https://github.com/Vindicter/vindicter/releases'),
       name: String(release.name ?? release.tag_name ?? 'Latest release'),
     }
   }
@@ -295,7 +295,7 @@ async function checkForUpdates() {
 
 async function openLatestRelease() {
   const { open } = await import('@tauri-apps/plugin-shell')
-  await open(latestRelease.value?.htmlUrl || 'https://github.com/surelle-ha/vindicter/releases')
+  await open(latestRelease.value?.htmlUrl || 'https://github.com/Vindicter/vindicter/releases')
 }
 
 async function openDataFolder() {
@@ -1213,7 +1213,7 @@ onMounted(() => {
         >
           <span>
             <span class="block text-xs font-semibold text-emerald-200">Update available: {{ latestRelease?.name }}</span>
-            <span class="mt-0.5 block text-[11px] text-[var(--text-muted)]">Open surelle-ha/vindicter releases to download it.</span>
+            <span class="mt-0.5 block text-[11px] text-[var(--text-muted)]">Open Vindicter/vindicter releases to download it.</span>
           </span>
           <Download class="size-4 shrink-0 text-emerald-300" />
         </button>
@@ -1237,13 +1237,13 @@ onMounted(() => {
           </div>
         </div>
         <a
-          href="https://github.com/Surelle-ha"
+          href="https://github.com/Vindicter"
           target="_blank"
           rel="noreferrer"
           class="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-white/[0.05] hover:text-[var(--text)]"
         >
           <Github class="size-3.5" />
-          github.com/Surelle-ha
+          github.com/Vindicter
         </a>
       </div>
     </div>

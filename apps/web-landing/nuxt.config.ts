@@ -7,8 +7,9 @@ export default defineNuxtConfig({
   modules: [],
   runtimeConfig: {
     public: {
-      supabaseUrl:     process.env.SUPABASE_URL      ?? '',
-      supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? '',
+      supabaseUrl:          process.env.SUPABASE_URL                ?? '',
+      supabaseAnonKey:      process.env.SUPABASE_ANON_KEY           ?? '',
+      turnstileSiteKey:     process.env.NUXT_PUBLIC_TURNSTILE_SITE_KEY ?? '1x00000000000000000000AA',
     },
   },
   css: ['~/assets/css/main.css'],
@@ -31,7 +32,7 @@ export default defineNuxtConfig({
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'robots', content: 'index, follow' },
-        { name: 'author', content: 'Surelle-ha' },
+        { name: 'author', content: 'Vindicter' },
         { name: 'application-name', content: 'Vindicter' },
         { name: 'theme-color', content: '#1e1f22' },
         {
