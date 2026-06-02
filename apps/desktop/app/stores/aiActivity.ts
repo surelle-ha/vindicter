@@ -86,7 +86,7 @@ export const useAIActivityStore = defineStore('aiActivity', {
 
       this.jobs = normalizeJobs(saved.jobs).map((job) => {
         if (job.status !== 'running' && job.status !== 'pending') return job
-        const detail = 'Vindicta stopped before this AI job reported completion. Resume starts a new Codex run for the same scope.'
+        const detail = 'Vindicter stopped before this AI job reported completion. Resume starts a new Codex run for the same scope.'
         return {
           ...job,
           status: 'interrupted',

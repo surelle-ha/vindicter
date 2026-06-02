@@ -81,7 +81,7 @@ const editors: { slug: EditorSlug; name: string; logo: Component }[] = [
   <div class="space-y-5">
     <div>
       <h3 class="text-base font-semibold text-[var(--text)] mb-1">Which editor do you use?</h3>
-      <p class="text-sm text-[var(--text-muted)]">Helps Vindicta tailor integrations for your workflow.</p>
+      <p class="text-sm text-[var(--text-muted)]">Helps Vindicter tailor integrations for your workflow.</p>
     </div>
 
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">

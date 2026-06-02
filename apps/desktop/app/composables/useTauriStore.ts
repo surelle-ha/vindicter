@@ -2,7 +2,7 @@ let storeInstance: Awaited<ReturnType<typeof createStore>> | null = null
 
 async function createStore() {
   const { Store } = await import('@tauri-apps/plugin-store')
-  return await Store.load('vindicta-app.bin')
+  return await Store.load('vindicter-app.bin')
 }
 
 export function useTauriStore() {

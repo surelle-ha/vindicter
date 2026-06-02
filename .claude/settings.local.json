@@ -53,7 +53,19 @@
       "Bash(node --input-type=module)",
       "Bash(pnpm --filter @vindicta/desktop build)",
       "Bash(Get-ChildItem -Path \"D:\\\\workspace\\\\vindicta\\\\apps\\\\desktop\" -Recurse -Force)",
-      "Bash(Select-Object -First 50)"
+      "Bash(Select-Object -First 50)",
+      "Bash(Get-ChildItem -Path \"D:\\\\workspace\\\\vindicta\" -Force)",
+      "Bash(Select-Object Name, Mode)",
+      "Bash(xargs grep -l \"Vindicta\")",
+      "Bash(sed -i 's/`vindicta-\\\\${/`vindicter-${/g' apps/desktop/app/stores/security.ts)",
+      "Bash(sed -i \"s|'Surelle-ha/vindicta'|'Surelle-ha/vindicter'|g\" apps/desktop/app/stores/app.ts)",
+      "Bash(sed -i 's/vindicta:/vindicter:/g' apps/desktop/app/pages/mcp.vue)",
+      "Bash(sed -i \"s|'<path-to-vindicta|'<path-to-vindicter|g\" apps/desktop/app/pages/mcp.vue)",
+      "Bash(grep \"vindicter-\\\\${\" apps/desktop/app/stores/security.ts)",
+      "Bash(sed -i 's|\"@vindicter/landing\"|\"@vindicter/web-landing\"|g' apps/web-landing/package.json)",
+      "Bash(sed -i 's|--filter @vindicter/landing|--filter @vindicter/web-landing|g' package.json)",
+      "Bash(sed -i 's|landing:dev|web-landing:dev|g' package.json)",
+      "Bash(xargs grep -l \"selectedAITool\\\\|aiTool\\\\|AiTool\\\\|ollama\\\\|openRouter\\\\|claude\\\\|codex\")"
     ]
   }
 }

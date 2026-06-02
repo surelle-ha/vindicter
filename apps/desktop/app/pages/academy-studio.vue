@@ -8,7 +8,7 @@ import type { CustomLesson } from '~/data/curriculum'
 import type { TTSScriptModel } from '~/composables/useAcademyTTS'
 
 definePageMeta({ layout: 'studio' })
-useHead({ title: 'Academy Studio · Vindicta' })
+useHead({ title: 'Academy Studio · Vindicter' })
 
 function bufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer)
@@ -380,7 +380,7 @@ async function embedAudioFromCache() {
   if (!editingLesson.value) return
   audioLoading.value = true
   try {
-    const cache = await caches.open('vindicta-academy-tts')
+    const cache = await caches.open('vindicter-academy-tts')
     const res = await cache.match(`lesson-audio-${editingLesson.value.id}`)
     if (!res) return
     const blob = await res.blob()

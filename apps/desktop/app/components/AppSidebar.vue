@@ -156,7 +156,7 @@ watch(() => route.fullPath, () => {
     <div class="h-11 px-3 flex items-center border-b border-[var(--border)]" :class="collapsed ? 'justify-center' : 'gap-2'">
       <template v-if="!collapsed">
         <img src="/icon.png" alt="" class="size-6 shrink-0 rounded-md object-cover" draggable="false">
-        <span class="font-display flex-1 text-sm font-semibold text-[var(--text)] truncate opacity-90">Vindicta</span>
+        <span class="font-display flex-1 text-sm font-semibold text-[var(--text)] truncate opacity-90">Vindicter</span>
       </template>
       <button
         class="size-6 flex items-center justify-center rounded text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-white/[0.06] transition-colors shrink-0"

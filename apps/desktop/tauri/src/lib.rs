@@ -77,6 +77,8 @@ const ALLOWED_DOWNLOAD_HOSTS: &[&str] = &[
 fn is_allowed_download_host(host: &str) -> bool {
     let lower = host.to_lowercase();
     ALLOWED_DOWNLOAD_HOSTS.iter().any(|&h| lower == h)
+        || lower.ends_with(".huggingface.co")
+        || lower.ends_with(".hf.co")
 }
 
 /// Returns `Err` if `host` must be blocked to prevent SSRF.
@@ -201,7 +203,7 @@ async fn download_to_temp(url: String) -> Result<String, String> {
     // Custom redirect policy: only follow redirects to the same allowlisted hosts
     // (HuggingFace CDN redirects are expected; anything else is rejected).
     let client = reqwest::Client::builder()
-        .user_agent("Mozilla/5.0 (compatible; Vindicta/0.1; Kokoro model downloader)")
+        .user_agent("Mozilla/5.0 (compatible; Vindicter/0.1; Kokoro model downloader)")
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
             let redir_host = attempt.url().host_str().unwrap_or("").to_lowercase();
             if ALLOWED_DOWNLOAD_HOSTS.iter().any(|&h| redir_host == h) {
@@ -239,7 +241,7 @@ async fn download_to_temp(url: String) -> Result<String, String> {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    let tmp_path = std::env::temp_dir().join(format!("vindicta-dl-{}.bin", ts));
+    let tmp_path = std::env::temp_dir().join(format!("vindicter-dl-{}.bin", ts));
 
     std::fs::write(&tmp_path, &bytes).map_err(|e| format!("Failed to write temp file: {}", e))?;
 
@@ -287,7 +289,7 @@ async fn github_request_device_code(scope: String) -> Result<GithubDeviceCodeRes
         form_encode(&scope),
     );
     let client = reqwest::Client::builder()
-        .user_agent("Vindicta/0.1")
+        .user_agent("Vindicter/0.1")
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| e.to_string())?;
@@ -334,7 +336,7 @@ async fn github_poll_access_token(device_code: String) -> Result<GithubTokenPoll
         form_encode(grant_type),
     );
     let client = reqwest::Client::builder()
-        .user_agent("Vindicta/0.1")
+        .user_agent("Vindicter/0.1")
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| e.to_string())?;
@@ -373,7 +375,7 @@ async fn fetch_rss_source(url: String) -> Result<String, String> {
     // Redirects are followed manually so every new destination is SSRF-checked
     // before the connection is made.
     let client = reqwest::Client::builder()
-        .user_agent("Vindicta/0.1 Security News Reader")
+        .user_agent("Vindicter/0.1 Security News Reader")
         .redirect(reqwest::redirect::Policy::none())
         .timeout(std::time::Duration::from_secs(30))
         .build()
@@ -495,7 +497,7 @@ fn auto_start_enabled() -> Result<bool, String> {
                 "query",
                 r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
                 "/v",
-                "Vindicta",
+                "Vindicter",
             ])
             .output()
             .map_err(|error| error.to_string())?;
@@ -517,14 +519,14 @@ fn set_auto_start(enabled: bool) -> Result<bool, String> {
             let exe = std::env::current_exe().map_err(|error| error.to_string())?;
             let exe = exe
                 .to_str()
-                .ok_or_else(|| "Could not resolve Vindicta executable path.".to_string())?;
+                .ok_or_else(|| "Could not resolve Vindicter executable path.".to_string())?;
             let quoted = format!("\"{}\"", exe);
             let status = hidden_command("reg")
                 .args([
                     "add",
                     r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
                     "/v",
-                    "Vindicta",
+                    "Vindicter",
                     "/t",
                     "REG_SZ",
                     "/d",
@@ -542,7 +544,7 @@ fn set_auto_start(enabled: bool) -> Result<bool, String> {
                     "delete",
                     r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
                     "/v",
-                    "Vindicta",
+                    "Vindicter",
                     "/f",
                 ])
                 .status()
@@ -750,7 +752,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y {package}
 install -d -o {user} -g {user} /home/{user}/vindicta/tools
-printf '%s installed for the Vindicta pentest backend.\n' {package}
+printf '%s installed for the Vindicter pentest backend.\n' {package}
 "#,
         package = shell_quote(package),
         user = PENTEST_USER
@@ -898,7 +900,7 @@ fn academy_command_script(command: &str) -> String {
     )
 }
 
-/// Remove only the Vindicta-managed user accounts (pentest, academy) and their
+/// Remove only the Vindicter-managed user accounts (pentest, academy) and their
 /// home directories from a distribution — does NOT unregister the whole distro.
 #[tauri::command]
 async fn wsl_purge_vindicta_profiles(distro: String) -> Result<String, String> {
@@ -911,7 +913,7 @@ fn wsl_purge_vindicta_profiles_blocking(distro: &str) -> Result<String, String> 
     if distro.trim().is_empty() {
         return Err("Select a WSL distribution first.".to_string());
     }
-    // Vindicta manages two accounts inside WSL: 'pentest' and 'academy'
+    // Vindicter manages two accounts inside WSL: 'pentest' and 'academy'
     const VINDICTA_USERS: &[&str] = &["pentest", "academy"];
     let users_list = VINDICTA_USERS.join(" ");
     let script = format!(
@@ -922,16 +924,16 @@ for USER in {users}; do
     userdel -r "$USER" 2>&1 || true
     rm -rf "/home/$USER" 2>/dev/null || true
     REMOVED="$REMOVED $USER"
-    printf 'Removed Vindicta account: %s\n' "$USER"
+    printf 'Removed Vindicter account: %s\n' "$USER"
   else
     printf 'Account not found (skipped): %s\n' "$USER"
   fi
 done
 rm -rf /home/.vindicta-managed 2>/dev/null || true
 if [ -z "$REMOVED" ]; then
-  printf 'No Vindicta-managed accounts were found in this distribution.\n'
+  printf 'No Vindicter-managed accounts were found in this distribution.\n'
 else
-  printf 'Vindicta profiles purged:%s\n' "$REMOVED"
+  printf 'Vindicter profiles purged:%s\n' "$REMOVED"
 fi
 "#,
         users = users_list
@@ -1333,7 +1335,7 @@ pub fn run() {
             // Build system tray icon — shows the main window on left-click
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("Vindicta — click to open")
+                .tooltip("Vindicter — click to open")
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,

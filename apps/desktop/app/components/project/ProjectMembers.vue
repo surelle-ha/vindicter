@@ -23,7 +23,7 @@ const claudeMember: Member = {
       <div>
         <p class="text-sm font-medium text-indigo-300">Team members available in the cloud edition</p>
         <p class="text-xs text-[var(--text-muted)] mt-1">
-          Vindicta currently runs locally on this device. Real-time collaboration, role management, and team workspaces are coming in a future cloud release.
+          Vindicter currently runs locally on this device. Real-time collaboration, role management, and team workspaces are coming in a future cloud release.
         </p>
       </div>
     </div>

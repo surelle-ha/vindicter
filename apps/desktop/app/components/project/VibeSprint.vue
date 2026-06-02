@@ -4,7 +4,7 @@ import type { Sprint, Ticket, TicketPriority, TicketStatus, TicketType } from '~
 import { ticketKey } from '~/utils/ticket'
 import { friendlyCodexExecError, runCodexExec } from '~/composables/useCodexShell'
 import { renderMarkdown } from '~/utils/markdown'
-import { createVindictaSprintDocx, createVindictaSprintPdf } from '~/utils/docx'
+import { createVindicterSprintDocx, createVindicterSprintPdf } from '~/utils/docx'
 
 const sprint = useSprintStore()
 const kanban = useKanbanStore()
@@ -204,7 +204,7 @@ function buildSprintHandoverPrompt(s: Sprint, tickets: Ticket[], effort: typeof 
     description: ticket.description,
   }))
 
-  return `You are Codex working inside Vindicta. The user is handing over an entire sprint to you.
+  return `You are Codex working inside Vindicter. The user is handing over an entire sprint to you.
 
 Project: ${projects.activeProject?.name ?? 'Unknown project'}
 Sprint: ${s.name}
@@ -368,9 +368,9 @@ async function applyHandoverArtifacts(jobId: string, rawText: string, sprintTick
 
   for (const update of ticketUpdates) {
     const ticket = kanban.tickets.find(item => item.id === update.ticketId)
-    if (ticket?.comments?.some(comment => comment.text.startsWith('AI handover completed, but Vindicta could not parse structured ticket updates.'))) {
+    if (ticket?.comments?.some(comment => comment.text.startsWith('AI handover completed, but Vindicter could not parse structured ticket updates.'))) {
       await kanban.updateTicket(update.ticketId, {
-        comments: ticket.comments.filter(comment => !comment.text.startsWith('AI handover completed, but Vindicta could not parse structured ticket updates.')),
+        comments: ticket.comments.filter(comment => !comment.text.startsWith('AI handover completed, but Vindicter could not parse structured ticket updates.')),
       })
     }
     await kanban.moveTicket(update.ticketId, update.status)
@@ -437,7 +437,7 @@ async function runAIHandover() {
       reasoningEffort: effort.value,
       sandbox: 'workspace-write',
     })
-    aiActivity.addEvent(jobId, 'Reading Codex report', 'Codex returned control to Vindicta. Parsing the handover report and status.', 'running')
+    aiActivity.addEvent(jobId, 'Reading Codex report', 'Codex returned control to Vindicter. Parsing the handover report and status.', 'running')
     const responseText = [result.stdout, result.stderr].filter(Boolean).join('\n').trim()
     if (result.code !== 0) {
       throw new Error(responseText || 'Codex handover failed.')
@@ -543,7 +543,7 @@ async function requestClarifications(): Promise<'questions' | 'none' | 'error'> 
     ? `Sprint plan:\n${sprintPlanMarkdown.value.trim()}`
     : `Sprint goal: ${newSprintGoal.value || newSprintName.value}`
 
-  const prompt = `You are Codex helping plan a Vindicta sprint. Before generating tickets, decide whether the plan needs clarification.
+  const prompt = `You are Codex helping plan a Vindicter sprint. Before generating tickets, decide whether the plan needs clarification.
 
 ${planContext}
 
@@ -553,7 +553,7 @@ Schema:
 
 Return [] if the plan is already clear enough to generate tickets.
 Prefer questions that change scope, priority, acceptance criteria, integration constraints, or testing expectations.
-Each question should include 2-4 concrete options that help the user answer quickly. Do not include a free-text option because Vindicta already provides a notes field.`
+Each question should include 2-4 concrete options that help the user answer quickly. Do not include a free-text option because Vindicter already provides a notes field.`
 
   try {
     const output = await runCodexExec({ prompt, projectPath })
@@ -653,7 +653,7 @@ async function generateTickets() {
     ? `Clarifications from user:\n${answeredClarifications.value.map(item => `Q: ${item.question}\nA: ${item.answer}`).join('\n\n')}`
     : 'Clarifications from user: none provided.'
 
-  const prompt = `You are Codex working inside Vindicta. Generate 5-8 actionable development tickets for this sprint plan.
+  const prompt = `You are Codex working inside Vindicter. Generate 5-8 actionable development tickets for this sprint plan.
 
 ${planContext}
 
@@ -955,7 +955,7 @@ async function updateProjectDocs() {
 
     await fs.writeTextFile(changelogPath, upsertChangelog(existingChangelog, buildChangelogEntry(snapshot)))
     await fs.writeTextFile(readmePath, upsertReadmeSprintSection(existingReadme, buildReadmeSprintSection(snapshot)))
-    const { appendHistory } = useVindictaJson()
+    const { appendHistory } = useVindicterJson()
     await appendHistory(projectPath, {
       action: 'project:docs_updated',
       actor: 'local',
@@ -1054,8 +1054,8 @@ async function exportSprintReport(format: 'docx' | 'pdf') {
       incompleteTickets: snapshot.incomplete,
     }
     const bytes = format === 'docx'
-      ? createVindictaSprintDocx(report)
-      : createVindictaSprintPdf(report)
+      ? createVindicterSprintDocx(report)
+      : createVindicterSprintPdf(report)
     await fs.writeFile(ensureExtension(path, format), bytes)
     notify(`Sprint report exported as ${format.toUpperCase()}.`, 'success')
   }

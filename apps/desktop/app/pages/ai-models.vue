@@ -27,7 +27,7 @@ const models = ref<ModelStatus[]>([
     id: 'claude',
     name: 'Claude Code',
     vendor: 'Anthropic',
-    description: 'Claude\'s official CLI for AI-assisted development and security scanning. Streams structured JSON output. Powers Vindicta\'s Claude integration.',
+    description: 'Claude\'s official CLI for AI-assisted development and security scanning. Streams structured JSON output. Powers Vindicter\'s Claude integration.',
     checkCmd: 'claude',
     checkArgs: ['--version'],
     installUrl: 'https://claude.ai/download',
@@ -43,7 +43,7 @@ const models = ref<ModelStatus[]>([
     id: 'codex',
     name: 'Codex',
     vendor: 'OpenAI',
-    description: 'OpenAI\'s Codex CLI for AI-powered code analysis and security review. Supports sandboxed read-only execution. Powers Vindicta\'s Codex integration.',
+    description: 'OpenAI\'s Codex CLI for AI-powered code analysis and security review. Supports sandboxed read-only execution. Powers Vindicter\'s Codex integration.',
     checkCmd: 'codex',
     checkArgs: ['--version'],
     installUrl: 'https://github.com/openai/codex',
@@ -60,7 +60,7 @@ const models = ref<ModelStatus[]>([
 const openRouterStatus = {
   name: 'OpenRouter',
   vendor: 'OpenRouter.ai',
-  description: 'Unified API gateway for 200+ AI models. Will allow Vindicta to route security scans to any supported model — Mistral, Llama, Gemini, and more.',
+  description: 'Unified API gateway for 200+ AI models. Will allow Vindicter to route security scans to any supported model — Mistral, Llama, Gemini, and more.',
 }
 
 const ollamaUrl = ref(app.ollama.url)
@@ -571,7 +571,7 @@ onMounted(() => {
 
     <!-- DefendCore -->
     <div class="space-y-3">
-      <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">Vindicta AI</p>
+      <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">Vindicter AI</p>
       <div class="rounded-xl border border-rose-500/15 bg-[var(--bg-card)] p-5 opacity-60">
         <div class="flex items-start gap-4">
           <div class="grid size-10 shrink-0 place-items-center rounded-xl border border-rose-500/20 bg-rose-500/10">
@@ -584,7 +584,7 @@ onMounted(() => {
               <span class="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-semibold text-[var(--text-faint)]">In Training</span>
             </div>
             <p class="mt-1.5 text-xs leading-relaxed text-[var(--text-muted)]">
-              Vindicta's native AI model — purpose-built for security education and analysis. Currently in development and training. Will be available as a first-party option across the Academy, scanner, and all AI features.
+              Vindicter's native AI model — purpose-built for security education and analysis. Currently in development and training. Will be available as a first-party option across the Academy, scanner, and all AI features.
             </p>
             <div class="mt-3 rounded-lg border border-rose-500/15 bg-rose-500/[0.05] px-3 py-2.5">
               <p class="text-[11px] text-rose-300/80">No setup required — DefendCore will be available automatically when released.</p>
@@ -707,10 +707,10 @@ onMounted(() => {
     <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 space-y-2">
       <p class="text-xs font-semibold text-[var(--text)]">How AI models are used</p>
       <p class="text-xs leading-relaxed text-[var(--text-muted)]">
-        Vindicta can use locally installed AI CLIs (Claude Code, Codex) or the configured OpenRouter API model for AI-assisted workflows such as Academy and security scans.
+        Vindicter can use locally installed AI CLIs (Claude Code, Codex) or the configured OpenRouter API model for AI-assisted workflows such as Academy and security scans.
       </p>
       <p class="text-xs leading-relaxed text-[var(--text-muted)]">
-        If a CLI shows "Not found", install it globally and ensure it's accessible on your system PATH. Restart Vindicta after installation.
+        If a CLI shows "Not found", install it globally and ensure it's accessible on your system PATH. Restart Vindicter after installation.
       </p>
     </div>
   </div>

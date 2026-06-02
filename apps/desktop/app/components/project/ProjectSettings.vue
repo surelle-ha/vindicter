@@ -6,7 +6,7 @@ import { generateId } from '~/utils/id'
 
 const props = defineProps<{ projectPath: string }>()
 
-const { read, patchSettings, patchMeta, appendHistory, resetProjectData } = useVindictaJson()
+const { read, patchSettings, patchMeta, appendHistory, resetProjectData } = useVindicterJson()
 const kanban = useKanbanStore()
 const sprintStore = useSprintStore()
 const projects = useProjectsStore()
@@ -536,7 +536,7 @@ async function deleteFiles() {
           <div class="flex items-start justify-between">
             <div>
               <p class="text-sm font-medium text-white/70">Delete project</p>
-              <p class="text-xs text-white/30 mt-0.5">Remove this project from Vindicta. Optionally delete the vindicta.json file.</p>
+              <p class="text-xs text-white/30 mt-0.5">Remove this project from Vindicter. Optionally delete the vindicta.json file.</p>
             </div>
             <button
               class="ml-4 shrink-0 px-3 py-1.5 text-sm rounded-md border border-red-500/30 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium transition-colors"
@@ -629,7 +629,7 @@ async function deleteFiles() {
   <GlassModal v-model="showDeleteModal" title="Delete project" max-width="sm">
     <div class="space-y-4">
       <p class="text-sm text-[var(--text-muted)]">
-        This will remove <span class="text-[var(--text)] font-semibold">{{ project?.name }}</span> from Vindicta.
+        This will remove <span class="text-[var(--text)] font-semibold">{{ project?.name }}</span> from Vindicter.
       </p>
       <div>
         <label class="text-xs text-[var(--text-muted)] mb-1.5 block">
@@ -652,7 +652,7 @@ async function deleteFiles() {
           :disabled="!nameMatches || deleting"
           @click="removeOnly"
         >
-          Remove from Vindicta only
+          Remove from Vindicter only
           <span class="ml-auto text-[var(--text-faint)] text-[10px]">keeps your files</span>
         </GlassButton>
         <GlassButton

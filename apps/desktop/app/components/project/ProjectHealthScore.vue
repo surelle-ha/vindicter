@@ -14,7 +14,7 @@ import {
   Timer,
 } from 'lucide-vue-next'
 import { friendlyCodexExecError, runCodexExec } from '~/composables/useCodexShell'
-import type { HistoryEntry, Ticket, VindictaJson } from '~/types/vindicta'
+import type { HistoryEntry, Ticket, VindicterJson } from '~/types/vindicta'
 
 const props = defineProps<{
   projectPath: string
@@ -104,7 +104,7 @@ const { notify } = useNotifications()
 const loading = ref(true)
 const aiChecking = ref(false)
 const error = ref<string | null>(null)
-const data = ref<VindictaJson | null>(null)
+const data = ref<VindicterJson | null>(null)
 const rootEntries = ref<LocalFsEntry[]>([])
 const signals = ref<SourceSignals>(emptySignals())
 const aiError = ref<string | null>(null)
@@ -357,7 +357,7 @@ const metrics = computed<Metric[]>(() => {
       evidence: [
         projectSignals.hasChangelog ? 'CHANGELOG detected' : 'CHANGELOG missing',
         `${projectSignals.docsFiles} docs file${projectSignals.docsFiles === 1 ? '' : 's'} found`,
-        `${docsUpdates} Vindicta docs update${docsUpdates === 1 ? '' : 's'}`,
+        `${docsUpdates} Vindicter docs update${docsUpdates === 1 ? '' : 's'}`,
       ],
       aiNote: check?.scores.documentation ? 'Blended with latest AI check.' : undefined,
     },
@@ -454,7 +454,7 @@ async function collectSourceSignals(entries: LocalFsEntry[]) {
   return next
 }
 
-function buildHealthPrompt(project: VindictaJson, currentMetrics: Metric[]) {
+function buildHealthPrompt(project: VindicterJson, currentMetrics: Metric[]) {
   const scanData = {
     project: {
       name: project.meta.name,
@@ -483,7 +483,7 @@ function buildHealthPrompt(project: VindictaJson, currentMetrics: Metric[]) {
 
   return `You are running a read-only engineering health check for this project.
 
-Do not edit files. Use the provided Vindicta data and inspect the repository only when it helps validate the score.
+Do not edit files. Use the provided Vindicter data and inspect the repository only when it helps validate the score.
 
 Return only valid JSON in this shape:
 {
@@ -510,7 +510,7 @@ Return only valid JSON in this shape:
 Keep scores from 0 to 100 where higher is healthier. For aiDependency, higher means healthier autonomy and lower dependency risk.
 Limit findings to the 5 most useful items.
 
-Vindicta project data:
+Vindicter project data:
 ${JSON.stringify(scanData, null, 2)}`
 }
 
@@ -585,7 +585,7 @@ async function loadHealth() {
   loading.value = true
   error.value = null
   try {
-    const { read } = useVindictaJson()
+    const { read } = useVindicterJson()
     data.value = await read(props.projectPath)
     const entries = await fs.readDir(props.projectPath).catch(() => []) as LocalFsEntry[]
     rootEntries.value = entries
@@ -615,7 +615,7 @@ async function runAIHealthCheck() {
     if (result.code !== 0) throw new Error(output || 'AI health check failed.')
 
     const parsed = parseAIHealthResult(output)
-    const { appendHistory } = useVindictaJson()
+    const { appendHistory } = useVindicterJson()
     await appendHistory(props.projectPath, {
       action: 'project:health_checked',
       actor: 'Codex',
@@ -662,7 +662,7 @@ watch(() => props.projectPath, loadHealth, { immediate: true })
               <h2 class="text-sm font-semibold text-[var(--text)]">Engineering Health Score</h2>
             </div>
             <p class="mt-2 max-w-3xl text-xs leading-relaxed text-[var(--text-muted)]">
-              Uses Vindicta tickets, sprints, history, docs, scripts, shallow source signals, security scan history, and optional Codex AI Check.
+              Uses Vindicter tickets, sprints, history, docs, scripts, shallow source signals, security scan history, and optional Codex AI Check.
             </p>
             <div class="mt-4 flex flex-wrap gap-2 text-[11px] text-[var(--text-muted)]">
               <span class="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1">{{ signals.sourceFiles }} source files</span>

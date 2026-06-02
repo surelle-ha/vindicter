@@ -1,9 +1,10 @@
 {
-  "name": "vindicta-workspace",
+  "name": "vindicter-workspace",
   "private": true,
   "scripts": {
-    "desktop:dev": "pnpm --filter @vindicta/desktop tauri:dev",
-    "desktop:build": "pnpm --filter @vindicta/desktop tauri:build",
-    "landing:dev": "pnpm --filter @vindicta/landing dev"
+    "desktop:dev": "pnpm --filter @vindicter/desktop tauri:dev",
+    "desktop:build": "pnpm --filter @vindicter/desktop tauri:build",
+    "web-landing:dev": "pnpm --filter @vindicter/web-landing dev",
+    "web-dashboard:dev": "pnpm --filter @vindicter/web-dashboard dev"
   }
 }

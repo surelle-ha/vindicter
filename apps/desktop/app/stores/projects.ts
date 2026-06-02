@@ -35,9 +35,9 @@ export const useProjectsStore = defineStore('projects', {
         if (projects) this.projects = projects.map(normalizeProjectMeta)
       }
       catch {
-        const raw = localStorage.getItem('vindicta_projects')
+        const raw = localStorage.getItem('vindicter_projects')
         if (raw) this.projects = JSON.parse(raw).map(normalizeProjectMeta)
-        activeProjectId = localStorage.getItem('vindicta_active_project_id')
+        activeProjectId = localStorage.getItem('vindicter_active_project_id')
       }
 
       if (activeProjectId && this.projects.some(p => p.id === activeProjectId)) {
@@ -56,7 +56,7 @@ export const useProjectsStore = defineStore('projects', {
         await store.save()
       }
       catch {
-        localStorage.setItem('vindicta_projects', JSON.stringify(this.projects))
+        localStorage.setItem('vindicter_projects', JSON.stringify(this.projects))
       }
     },
 
@@ -91,10 +91,10 @@ export const useProjectsStore = defineStore('projects', {
       }
       catch {
         if (this.activeProjectId) {
-          localStorage.setItem('vindicta_active_project_id', this.activeProjectId)
+          localStorage.setItem('vindicter_active_project_id', this.activeProjectId)
         }
         else {
-          localStorage.removeItem('vindicta_active_project_id')
+          localStorage.removeItem('vindicter_active_project_id')
         }
       }
     },

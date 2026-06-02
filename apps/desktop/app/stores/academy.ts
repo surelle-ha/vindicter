@@ -41,7 +41,7 @@ export interface AcademyState {
   setupComplete: boolean
 }
 
-const STORE_FILE = 'vindicta-academy.bin'
+const STORE_FILE = 'vindicter-academy.bin'
 const STORE_KEY = 'academy-state'
 
 async function getAcademyStore() {

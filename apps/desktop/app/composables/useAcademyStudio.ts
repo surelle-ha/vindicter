@@ -7,7 +7,7 @@ import type { CustomLesson } from '~/data/curriculum'
 
 const MAGIC = 'VINDICTA-ACADEMY\0'
 const MAGIC_LEN = 17
-const AUDIO_CACHE = 'vindicta-academy-tts'
+const AUDIO_CACHE = 'vindicter-academy-tts'
 
 export interface VAFile {
   va_version: 1
@@ -24,7 +24,7 @@ export interface VAFile {
     labHint?: string
     prerequisiteId?: string | null
     exportedAt: string
-    exportedBy: 'vindicta-desktop'
+    exportedBy: 'vindicter-desktop'
   }
   content: string
   agentNotes: string
@@ -53,7 +53,7 @@ async function buildVAFile(payload: VAFile): Promise<Uint8Array> {
 
 async function parseVAFile(bytes: Uint8Array): Promise<VAFile> {
   const header = new TextDecoder().decode(bytes.slice(0, MAGIC_LEN))
-  if (header !== MAGIC) throw new Error('Not a valid Vindicta Academy (.va) file')
+  if (header !== MAGIC) throw new Error('Not a valid Vindicter Academy (.va) file')
   const compressed = bytes.slice(MAGIC_LEN)
   const stream = new DecompressionStream('gzip')
   const writer = stream.writable.getWriter()
@@ -180,7 +180,7 @@ async function importVAFile(): Promise<CustomLesson | null> {
     const { open } = await import('@tauri-apps/plugin-dialog')
     const selected = await open({
       multiple: false,
-      filters: [{ name: 'Vindicta Academy Lesson', extensions: ['va'] }],
+      filters: [{ name: 'Vindicter Academy Lesson', extensions: ['va'] }],
     })
     if (!selected || typeof selected !== 'string') return null
     const { readFile } = await import('@tauri-apps/plugin-fs')
@@ -200,7 +200,7 @@ async function exportVAFile(lesson: CustomLesson): Promise<void> {
 
   const destPath = await save({
     defaultPath: `${lesson.title.replace(/[^\w\s-]/g, '').trim()}.va`,
-    filters: [{ name: 'Vindicta Academy Lesson', extensions: ['va'] }],
+    filters: [{ name: 'Vindicter Academy Lesson', extensions: ['va'] }],
   })
   if (!destPath) return
 
@@ -238,7 +238,7 @@ function lessonToVAFile(lesson: CustomLesson): VAFile {
       objectives: lesson.objectives,
       labHint: lesson.labHint,
       exportedAt: new Date().toISOString(),
-      exportedBy: 'vindicta-desktop',
+      exportedBy: 'vindicter-desktop',
     },
     content: lesson.content,
     agentNotes: lesson.agentNotes,
@@ -279,11 +279,11 @@ async function clearLessonTtsAudio(lessonId: string): Promise<void> {
   } catch { /* ignore */ }
   try {
     if (typeof localStorage !== 'undefined') {
-      const raw = localStorage.getItem('vindicta:academy:tts:cache')
+      const raw = localStorage.getItem('vindicter:academy:tts:cache')
       if (raw) {
         const meta = JSON.parse(raw) as Record<string, unknown>
         delete meta[lessonId]
-        localStorage.setItem('vindicta:academy:tts:cache', JSON.stringify(meta))
+        localStorage.setItem('vindicter:academy:tts:cache', JSON.stringify(meta))
       }
     }
   } catch { /* ignore */ }

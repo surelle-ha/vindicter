@@ -125,15 +125,15 @@ async function sendToTray() {
       data-tauri-drag-region
       class="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]"
     >
-      {{ aiActivity.hasActiveHandover ? 'Vindicta - AI Working' : app.vigilanteEnabled ? 'Vindicta — Vigilante' : 'Vindicta' }}
+      {{ aiActivity.hasActiveHandover ? 'Vindicter - AI Working' : app.vigilanteEnabled ? 'Vindicter — Vigilante' : 'Vindicter' }}
     </span>
 
   </div>
 
-  <GlassModal v-model="showCloseModal" title="Close Vindicta?" max-width="sm">
+  <GlassModal v-model="showCloseModal" title="Close Vindicter?" max-width="sm">
     <div class="space-y-4">
       <p class="text-sm text-[var(--text-muted)]">
-        Choose how you'd like to close the window. Vindicta can keep running in the background so active scans and AI work can continue.
+        Choose how you'd like to close the window. Vindicter can keep running in the background so active scans and AI work can continue.
       </p>
       <div class="flex flex-col gap-2">
         <button
@@ -148,7 +148,7 @@ async function sendToTray() {
           </div>
           <div class="min-w-0">
             <p class="text-sm font-semibold text-[var(--text)]">Hide to Background</p>
-            <p class="mt-0.5 text-xs text-[var(--text-muted)]">Window hides but Vindicta keeps running.</p>
+            <p class="mt-0.5 text-xs text-[var(--text-muted)]">Window hides but Vindicter keeps running.</p>
           </div>
         </button>
         <button
@@ -162,7 +162,7 @@ async function sendToTray() {
           </div>
           <div class="min-w-0">
             <p class="text-sm font-semibold text-red-200">Close and Exit</p>
-            <p class="mt-0.5 text-xs text-[var(--text-muted)]">Fully quits Vindicta.</p>
+            <p class="mt-0.5 text-xs text-[var(--text-muted)]">Fully quits Vindicter.</p>
           </div>
         </button>
       </div>

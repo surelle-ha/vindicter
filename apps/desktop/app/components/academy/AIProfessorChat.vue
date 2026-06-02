@@ -40,63 +40,82 @@ type ParsedQuiz = AcademyChatQuiz
 const academy = useAcademyStore()
 const app = useAppStore()
 const projects = useProjectsStore()
+const { toolStatus, checkAIToolAvailability } = useAIToolAvailability()
 
 // ── Session gate ──────────────────────────────────────────────────────────
 const sessionStarted = ref(false)
 // Pre-fill from stored preference, default to claude
 const pendingModel = ref<AcademyAIModel>(academy.aiModel ?? 'claude')
 
-const modelOptions: { id: AcademyAIModel; label: string; sublabel: string; note?: string; color: string; bg: string; border: string; icon: any; disabled?: boolean; soon?: boolean }[] = [
+const modelOptions = computed(() => [
   {
-    id: 'claude',
+    id: 'claude' as AcademyAIModel,
     label: 'Claude',
     sublabel: 'Anthropic Claude Code',
     color: 'text-violet-300',
     bg: 'bg-violet-500/10',
     border: 'border-violet-500/25',
     icon: Sparkles,
+    disabled: !toolStatus.claude.available && !toolStatus.claude.checking,
+    checking: toolStatus.claude.checking,
+    notReady: !toolStatus.claude.available && !toolStatus.claude.checking,
   },
   {
-    id: 'codex',
+    id: 'codex' as AcademyAIModel,
     label: 'Codex',
     sublabel: 'OpenAI Codex CLI',
     color: 'text-emerald-300',
     bg: 'bg-emerald-500/10',
     border: 'border-emerald-500/25',
     icon: Zap,
+    disabled: !toolStatus.codex.available && !toolStatus.codex.checking,
+    checking: toolStatus.codex.checking,
+    notReady: !toolStatus.codex.available && !toolStatus.codex.checking,
   },
   {
-    id: 'openrouter',
+    id: 'openrouter' as AcademyAIModel,
     label: 'OpenRouter',
     sublabel: 'Configured OpenRouter model',
-    note: app.openRouter.enabled ? app.openRouter.model : 'Configure API key in AI Models',
+    note: toolStatus.openrouter.available ? app.openRouter.model : 'Configure API key in AI Models',
     color: 'text-sky-300',
     bg: 'bg-sky-500/10',
     border: 'border-sky-500/25',
     icon: Router,
+    disabled: !toolStatus.openrouter.available,
+    checking: false,
+    notReady: !toolStatus.openrouter.available,
   },
   {
-    id: 'ollama',
+    id: 'ollama' as AcademyAIModel,
     label: 'Ollama',
     sublabel: 'Local Ollama server',
-    note: app.ollama.url ? `${app.ollama.model} · ${app.ollama.url}` : 'Configure in AI Models',
+    note: toolStatus.ollama.available ? `${app.ollama.model} · ${app.ollama.url}` : 'Configure in AI Models',
     color: 'text-orange-300',
     bg: 'bg-orange-500/10',
     border: 'border-orange-500/25',
     icon: Terminal,
+    disabled: !toolStatus.ollama.available,
+    checking: false,
+    notReady: !toolStatus.ollama.available,
   },
   {
-    id: 'core',
+    id: 'core' as AcademyAIModel,
     label: 'DefendCore',
-    sublabel: 'Vindicta\'s native AI model — currently in training',
+    sublabel: 'Vindicter\'s native AI model — currently in training',
     color: 'text-rose-300',
     bg: 'bg-rose-500/10',
     border: 'border-rose-500/25',
     icon: Bot,
     disabled: true,
+    checking: false,
+    notReady: false,
     soon: true,
   },
-]
+])
+
+onMounted(() => {
+  void checkAIToolAvailability()
+})
 
 async function beginSession() {
   // Save the model selection to the store
@@ -292,7 +311,7 @@ function buildSystemPrompt(): string {
   const contentSummary = props.lesson.content.slice(0, 800) + (props.lesson.content.length > 800 ? '...' : '')
   const authorContext = props.extraContext?.trim() ? `${props.extraContext.trim()}\n\n` : ''
 
-  return `${authorContext}You are Professor Vindicta, an expert cybersecurity instructor for a flexible, self-paced security bootcamp.
+  return `${authorContext}You are Professor Vindicter, an expert cybersecurity instructor for a flexible, self-paced security bootcamp.
 The student is currently studying "${props.lesson.title}".
 
 Lesson objectives:
@@ -643,7 +662,7 @@ watch(() => props.lesson.id, () => {
           <div class="mx-auto grid size-12 place-items-center rounded-2xl border border-indigo-500/20 bg-indigo-500/10">
             <Bot class="size-6 text-indigo-300" />
           </div>
-          <p class="text-sm font-semibold text-[var(--text)]">Professor Vindicta</p>
+          <p class="text-sm font-semibold text-[var(--text)]">Professor Vindicter</p>
           <p class="text-[11px] text-[var(--text-muted)]">
             AI tutor for <span class="text-[var(--text)]">{{ lesson.title }}</span>
           </p>
@@ -676,7 +695,9 @@ watch(() => props.lesson.id, () => {
               <div class="flex items-center gap-1.5 mb-1">
                 <component :is="m.icon" class="size-3.5 shrink-0" :class="m.color" />
                 <span class="text-xs font-semibold text-[var(--text)]">{{ m.label }}</span>
-                <span v-if="m.id === 'claude'" class="ml-auto rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-px text-[8px] font-semibold text-violet-300">Best</span>
+                <span v-if="m.checking" class="ml-auto text-[8px] text-[var(--text-faint)]">…</span>
+                <span v-else-if="m.id === 'claude' && !m.notReady" class="ml-auto rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-px text-[8px] font-semibold text-violet-300">Best</span>
+                <span v-else-if="m.notReady && !m.soon" class="ml-auto rounded-full border border-red-500/25 bg-red-500/10 px-1.5 py-px text-[8px] font-semibold text-red-300">Not found</span>
                 <span v-if="m.soon" class="ml-auto rounded-full border border-rose-500/25 bg-rose-500/10 px-1.5 py-px text-[9px] font-semibold text-rose-300">Soon</span>
               </div>
               <p class="text-[10px] text-[var(--text-faint)] leading-relaxed">{{ m.sublabel }}</p>
@@ -706,7 +727,7 @@ watch(() => props.lesson.id, () => {
             <Bot class="size-4 text-indigo-300" />
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-xs font-semibold text-[var(--text)]">Professor Vindicta</p>
+            <p class="text-xs font-semibold text-[var(--text)]">Professor Vindicter</p>
             <p class="text-[10px] text-[var(--text-faint)]">
               {{ academy.aiModel === 'codex' ? 'Codex' : academy.aiModel === 'openrouter' ? 'OpenRouter' : academy.aiModel === 'ollama' ? 'Ollama' : 'Claude' }} · saved memory
             </p>
@@ -819,7 +840,7 @@ watch(() => props.lesson.id, () => {
 
           <div v-if="!lessonCompleted && messages.length > 4" class="flex justify-center pt-1">
             <p class="rounded-full border border-indigo-500/20 bg-indigo-500/[0.06] px-3 py-1.5 text-[11px] text-indigo-200/80">
-              Professor Vindicta will unlock the next lesson when you are ready.
+              Professor Vindicter will unlock the next lesson when you are ready.
             </p>
           </div>
         </div>

@@ -48,7 +48,7 @@ import type {
   SecurityScanFinding,
   SecuritySeverity,
 } from '~/types/vindicta'
-import { createVindictaSecurityDocx, createVindictaRawReportDocx, buildFixPromptsMarkdown, buildSecurityReviewMarkdown, buildRawReportMarkdown } from '~/utils/docx'
+import { createVindicterSecurityDocx, createVindicterRawReportDocx, buildFixPromptsMarkdown, buildSecurityReviewMarkdown, buildRawReportMarkdown } from '~/utils/docx'
 
 type SecurityAITool = 'codex' | 'claude' | 'openrouter' | 'ollama'
 type SecurityWorkspaceTab = 'overview' | 'scanner' | 'findings' | 'whitelist' | 'dependencies' | 'secrets' | 'reports' | 'settings' | 'github_issues'
@@ -114,7 +114,9 @@ const aiScanRunning = ref(false)
 const creatingRemediation = ref(false)
 const exportingDocs = ref(false)
 const showExportModal = ref(false)
+const showExportFormatModal = ref(false)
 const exportingFormat = ref<'review' | 'raw' | 'prompts' | null>(null)
+const pendingExportType = ref<'review' | 'raw' | 'prompts' | null>(null)
 const confirmClearFindings = ref(false)
 const showHistoryDrawer    = ref(false)
 
@@ -139,6 +141,18 @@ const validateAITool = ref<SecurityAITool>('codex')
 const validateRunning = ref(false)
 const validateResult = ref<ValidationResult | null>(null)
 const validateError = ref('')
+
+// ── AI tool availability (shared composable) ─────────────────────────────────
+const { toolStatus: toolAvailability, checkAIToolAvailability } = useAIToolAvailability()
+
+async function checkToolAvailability() {
+  await checkAIToolAvailability()
+  if (!toolAvailability[selectedAITool.value].available) {
+    const first = (['codex', 'claude', 'openrouter', 'ollama'] as SecurityAITool[])
+      .find(t => toolAvailability[t].available)
+    if (first) selectedAITool.value = first
+  }
+}
 
 // ── Project stack detection ───────────────────────────────────────────────────
 const detectedStack = ref<Awaited<ReturnType<typeof detectProjectStack>>>([])
@@ -168,7 +182,7 @@ async function saveGitHubRepo() {
   try {
     const githubRepo = ghRepoInput.value.trim() || null
     await projects.updateProjectMeta(props.project.id, { githubRepo })
-    await useVindictaJson().patchMeta(props.project.absolutePath, { githubRepo }).catch(() => {})
+    await useVindicterJson().patchMeta(props.project.absolutePath, { githubRepo }).catch(() => {})
     notify('GitHub repository saved.', 'success')
   } catch (e: any) {
     notify(e?.message ?? 'Could not save repository.', 'error')
@@ -228,7 +242,7 @@ async function submitGitHubIssue() {
       finding.recommendation,
       '',
       '---',
-      '_Created by [Vindicta](https://github.com/surelle-ha/vindicta) — AI-powered security platform_',
+      '_Created by [Vindicter](https://github.com/surelle-ha/vindicter) — AI-powered security platform_',
     ].join('\n')
 
     const result = await auth.createGitHubIssue({
@@ -361,7 +375,7 @@ async function runValidation() {
         apiKey: app.openRouter.apiKey,
         model: app.openRouter.model,
         messages: [
-          { role: 'system', content: 'You are Vindicta, an AI security validator. Return only the JSON requested by the user.' },
+          { role: 'system', content: 'You are Vindicter, an AI security validator. Return only the JSON requested by the user.' },
           { role: 'user', content: prompt },
         ],
       })
@@ -371,7 +385,7 @@ async function runValidation() {
         url: app.ollama.url,
         model: app.ollama.model,
         messages: [
-          { role: 'system', content: 'You are Vindicta, an AI security validator. Return only the JSON requested by the user.' },
+          { role: 'system', content: 'You are Vindicter, an AI security validator. Return only the JSON requested by the user.' },
           { role: 'user', content: prompt },
         ],
       })
@@ -658,14 +672,14 @@ const dependencyFindings = computed(() => security.dependencyFindings)
 
 onMounted(async () => {
   if (typeof localStorage !== 'undefined') {
-    metricsCollapsed.value = localStorage.getItem('vindicta-security-metrics-collapsed') === 'true'
+    metricsCollapsed.value = localStorage.getItem('vindicter-security-metrics-collapsed') === 'true'
   }
   await initializeWorkspace()
   checkStaleFindings()
 })
 
 function checkStaleFindings() {
-  const key = `vindicta:stale-notif:${props.project.id}`
+  const key = `vindicter:stale-notif:${props.project.id}`
   const lastNotified = Number(localStorage.getItem(key) ?? 0)
   if (Date.now() - lastNotified < 24 * 60 * 60 * 1000) return
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
@@ -710,7 +724,7 @@ watch(() => aiActivity.jobs, () => {
 
 watch(metricsCollapsed, (value) => {
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('vindicta-security-metrics-collapsed', String(value))
+    localStorage.setItem('vindicter-security-metrics-collapsed', String(value))
   }
 })
 
@@ -733,7 +747,7 @@ async function detectAndSaveGitHubRepo() {
     if (!ghMatch) return
     const repoSlug = `${ghMatch[1]}/${ghMatch[2]}`
     await projects.updateProjectMeta(props.project.id, { githubRepo: repoSlug })
-    await useVindictaJson().patchMeta(props.project.absolutePath, { githubRepo: repoSlug }).catch(() => {})
+    await useVindicterJson().patchMeta(props.project.absolutePath, { githubRepo: repoSlug }).catch(() => {})
   } catch { /* git config unreadable — not a git repo or no origin */ }
 }
 
@@ -762,6 +776,7 @@ function openAIScanPicker() {
   scanError.value = null
   selectedAITool.value = 'codex'
   showToolPicker.value = true
+  void checkToolAvailability()
 }
 
 async function openScopePicker() {
@@ -1427,7 +1442,7 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
         messages: [
           {
             role: 'system',
-            content: 'You are Vindicta, an AI security reviewer. Return only the JSON requested by the user.',
+            content: 'You are Vindicter, an AI security reviewer. Return only the JSON requested by the user.',
           },
           { role: 'user', content: prompt },
         ],
@@ -1441,7 +1456,7 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
         messages: [
           {
             role: 'system',
-            content: 'You are Vindicta, an AI security reviewer. Return only the JSON requested by the user.',
+            content: 'You are Vindicter, an AI security reviewer. Return only the JSON requested by the user.',
           },
           { role: 'user', content: prompt },
         ],
@@ -1500,11 +1515,11 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
     }
     catch (e: any) {
       const ossFindings = await ossPromise.catch(() => [])
-      parseWarning.value = e?.message ?? `${toolLabel} returned a report, but Vindicta could not parse structured findings.`
+      parseWarning.value = e?.message ?? `${toolLabel} returned a report, but Vindicter could not parse structured findings.`
       const scan = await security.recordScan(props.project, {
         effort: effort.value,
         status: ossFindings.length ? 'warning' : 'warning',
-        summary: `${toolLabel} returned a report, but Vindicta could not parse it into structured findings.`,
+        summary: `${toolLabel} returned a report, but Vindicter could not parse it into structured findings.`,
         rawReport: responseText,
         findings: ossFindings,
         parseWarning: parseWarning.value,
@@ -1604,7 +1619,34 @@ function remediationFindingRoute(finding: SecurityFinding) {
 }
 
 function openExportModal() {
+  pendingExportType.value = null
   showExportModal.value = true
+}
+
+function selectExportType(type: 'review' | 'raw' | 'prompts') {
+  if (type === 'raw' && !activeScan.value?.rawReport) {
+    notify('No raw AI report available for the active scan.', 'warning')
+    return
+  }
+  if (type === 'prompts' && !currentDocxReport().findings.length) {
+    notify('No findings available to export fix prompts for.', 'warning')
+    return
+  }
+  if (type === 'prompts') {
+    // Fix Prompts is always MD — skip format step
+    showExportModal.value = false
+    void exportFixPrompts()
+    return
+  }
+  pendingExportType.value = type
+  showExportModal.value = false
+  showExportFormatModal.value = true
+}
+
+async function confirmExportFormat(format: 'docx' | 'md') {
+  showExportFormatModal.value = false
+  if (pendingExportType.value === 'review') await exportSecurityReview(format)
+  else if (pendingExportType.value === 'raw') await exportRawReport(format)
 }
 
 async function exportSecurityReview(format: 'docx' | 'md') {
@@ -1616,7 +1658,7 @@ async function exportSecurityReview(format: 'docx' | 'md') {
     const dialog = useTauriDialog()
     const date = new Date(report.scannedAt).toISOString().slice(0, 10)
     const ext = format === 'md' ? 'md' : 'docx'
-    const defaultName = sanitizeFileName(`Vindicta Security Review - ${report.projectCode || report.projectName} - ${date}.${ext}`)
+    const defaultName = sanitizeFileName(`Vindicter Security Review - ${report.projectCode || report.projectName} - ${date}.${ext}`)
     const selected = await dialog.saveFile({
       title: 'Export Security Review',
       defaultPath: defaultName,
@@ -1631,7 +1673,7 @@ async function exportSecurityReview(format: 'docx' | 'md') {
       notify('Security review exported as Markdown.', 'success')
     }
     else {
-      await fs.writeFile(ensureDocxExtension(selected), createVindictaSecurityDocx(report))
+      await fs.writeFile(ensureDocxExtension(selected), createVindicterSecurityDocx(report))
       notify('Security review exported as DOCX.', 'success')
     }
   }
@@ -1658,7 +1700,7 @@ async function exportRawReport(format: 'docx' | 'md') {
     const dialog = useTauriDialog()
     const date = new Date(report.scannedAt).toISOString().slice(0, 10)
     const ext = format === 'md' ? 'md' : 'docx'
-    const defaultName = sanitizeFileName(`Vindicta Raw AI Report - ${report.projectCode || report.projectName} - ${date}.${ext}`)
+    const defaultName = sanitizeFileName(`Vindicter Raw AI Report - ${report.projectCode || report.projectName} - ${date}.${ext}`)
     const selected = await dialog.saveFile({
       title: 'Export Raw AI Report',
       defaultPath: defaultName,
@@ -1673,7 +1715,7 @@ async function exportRawReport(format: 'docx' | 'md') {
       notify('Raw AI report exported as Markdown.', 'success')
     }
     else {
-      await fs.writeFile(ensureDocxExtension(selected), createVindictaRawReportDocx(report))
+      await fs.writeFile(ensureDocxExtension(selected), createVindicterRawReportDocx(report))
       notify('Raw AI report exported as DOCX.', 'success')
     }
   }
@@ -1699,7 +1741,7 @@ async function exportFixPrompts() {
   try {
     const dialog = useTauriDialog()
     const date = new Date(report.scannedAt).toISOString().slice(0, 10)
-    const defaultName = sanitizeFileName(`Vindicta Fix Prompts - ${report.projectCode || report.projectName} - ${date}.md`)
+    const defaultName = sanitizeFileName(`Vindicter Fix Prompts - ${report.projectCode || report.projectName} - ${date}.md`)
     const selected = await dialog.saveFile({
       title: 'Export Fix Prompts',
       defaultPath: defaultName,
@@ -2046,7 +2088,7 @@ async function clearScanHistory() {
 
 <template>
   <div class="mx-auto max-w-7xl space-y-5 pb-8">
-    <div class="flex justify-end">
+    <div v-if="tab === 'overview'" class="flex justify-end">
       <button
         class="grid size-6 place-items-center rounded text-[var(--text-faint)] transition-colors hover:bg-white/[0.06] hover:text-[var(--text-muted)]"
         :title="metricsCollapsed ? 'Show metrics' : 'Hide metrics'"
@@ -2065,7 +2107,7 @@ async function clearScanHistory() {
       leave-from-class="opacity-100 translate-y-0 max-h-96"
       leave-to-class="opacity-0 -translate-y-2 max-h-0"
     >
-      <section v-if="!metricsCollapsed" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section v-if="tab === 'overview' && !metricsCollapsed" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
           <div class="flex items-center justify-between">
             <p class="text-xs text-[var(--text-muted)]">Open Findings</p>
@@ -2768,47 +2810,83 @@ async function clearScanHistory() {
 
     <GlassModal v-model="showToolPicker" title="Run AI Scan" max-width="md">
       <div class="space-y-4">
-        <p class="text-sm text-[var(--text-muted)]">Choose the AI tool Vindicta should use for this security review.</p>
+        <p class="text-sm text-[var(--text-muted)]">Choose the AI tool Vindicter should use for this security review.</p>
         <div class="grid grid-cols-2 gap-2">
-          <button class="rounded-xl border p-3 text-left transition-colors" :class="selectedAITool === 'codex' ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="selectedAITool = 'codex'">
+          <button
+            class="rounded-xl border p-3 text-left transition-colors"
+            :class="[
+              selectedAITool === 'codex' ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]',
+              !toolAvailability.codex.available && !toolAvailability.codex.checking ? 'opacity-50 cursor-not-allowed' : '',
+            ]"
+            :disabled="!toolAvailability.codex.available && !toolAvailability.codex.checking"
+            @click="selectedAITool = 'codex'"
+          >
             <div class="flex items-center gap-2 mb-2">
               <div class="size-6 shrink-0 grid place-items-center rounded-md border border-emerald-500/30 bg-emerald-500/15 text-[11px] font-bold text-emerald-200">C</div>
               <p class="text-xs font-semibold text-[var(--text)]">Codex</p>
-              <span class="ml-auto rounded-full border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-px text-[8px] font-semibold text-emerald-300">CLI</span>
+              <span v-if="toolAvailability.codex.checking" class="ml-auto text-[8px] text-[var(--text-faint)]">…</span>
+              <span v-else-if="toolAvailability.codex.available" class="ml-auto rounded-full border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-px text-[8px] font-semibold text-emerald-300">CLI</span>
+              <span v-else class="ml-auto rounded-full border border-red-500/25 bg-red-500/10 px-1.5 py-px text-[8px] font-semibold text-red-300">Not found</span>
             </div>
             <p class="text-[10px] text-[var(--text-faint)] leading-relaxed">Read-only local code review via Codex CLI.</p>
           </button>
-          <button class="rounded-xl border p-3 text-left transition-colors" :class="selectedAITool === 'claude' ? 'border-violet-500/30 bg-violet-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="selectedAITool = 'claude'">
+          <button
+            class="rounded-xl border p-3 text-left transition-colors"
+            :class="[
+              selectedAITool === 'claude' ? 'border-violet-500/30 bg-violet-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]',
+              !toolAvailability.claude.available && !toolAvailability.claude.checking ? 'opacity-50 cursor-not-allowed' : '',
+            ]"
+            :disabled="!toolAvailability.claude.available && !toolAvailability.claude.checking"
+            @click="selectedAITool = 'claude'"
+          >
             <div class="flex items-center gap-2 mb-2">
               <div class="size-6 shrink-0 grid place-items-center rounded-md border border-violet-500/30 bg-violet-500/15 text-[11px] font-bold text-violet-200">Cl</div>
               <p class="text-xs font-semibold text-[var(--text)]">Claude</p>
-              <span class="ml-auto rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-px text-[8px] font-semibold text-violet-300">CLI</span>
+              <span v-if="toolAvailability.claude.checking" class="ml-auto text-[8px] text-[var(--text-faint)]">…</span>
+              <span v-else-if="toolAvailability.claude.available" class="ml-auto rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-px text-[8px] font-semibold text-violet-300">CLI</span>
+              <span v-else class="ml-auto rounded-full border border-red-500/25 bg-red-500/10 px-1.5 py-px text-[8px] font-semibold text-red-300">Not found</span>
             </div>
             <p class="text-[10px] text-[var(--text-faint)] leading-relaxed">Read-only local code review via Claude CLI.</p>
           </button>
-          <button class="rounded-xl border p-3 text-left transition-colors" :class="selectedAITool === 'openrouter' ? 'border-sky-500/30 bg-sky-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="selectedAITool = 'openrouter'">
+          <button
+            class="rounded-xl border p-3 text-left transition-colors"
+            :class="[
+              selectedAITool === 'openrouter' ? 'border-sky-500/30 bg-sky-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]',
+              !toolAvailability.openrouter.available ? 'opacity-50 cursor-not-allowed' : '',
+            ]"
+            :disabled="!toolAvailability.openrouter.available"
+            @click="selectedAITool = 'openrouter'"
+          >
             <div class="flex items-center gap-2 mb-2">
               <div class="size-6 shrink-0 grid place-items-center rounded-md border border-sky-500/30 bg-sky-500/15 text-[11px] font-bold text-sky-200">OR</div>
               <p class="text-xs font-semibold text-[var(--text)]">OpenRouter</p>
             </div>
-            <p class="text-[10px] leading-relaxed" :class="app.openRouter.enabled && app.openRouter.apiKey ? 'text-sky-300' : 'text-amber-300'">
-              {{ app.openRouter.enabled && app.openRouter.apiKey ? app.openRouter.model : 'Configure API key first' }}
+            <p class="text-[10px] leading-relaxed" :class="toolAvailability.openrouter.available ? 'text-sky-300' : 'text-amber-300'">
+              {{ toolAvailability.openrouter.available ? app.openRouter.model : 'Configure API key in AI Models' }}
             </p>
           </button>
-          <button class="rounded-xl border p-3 text-left transition-colors" :class="selectedAITool === 'ollama' ? 'border-orange-500/30 bg-orange-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="selectedAITool = 'ollama'">
+          <button
+            class="rounded-xl border p-3 text-left transition-colors"
+            :class="[
+              selectedAITool === 'ollama' ? 'border-orange-500/30 bg-orange-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]',
+              !toolAvailability.ollama.available ? 'opacity-50 cursor-not-allowed' : '',
+            ]"
+            :disabled="!toolAvailability.ollama.available"
+            @click="selectedAITool = 'ollama'"
+          >
             <div class="flex items-center gap-2 mb-2">
               <div class="size-6 shrink-0 grid place-items-center rounded-md border border-orange-500/30 bg-orange-500/15 text-[11px] font-bold text-orange-200">Ol</div>
               <p class="text-xs font-semibold text-[var(--text)]">Ollama</p>
             </div>
-            <p class="text-[10px] leading-relaxed" :class="app.ollama.url ? 'text-orange-300' : 'text-amber-300'">
-              {{ app.ollama.url ? app.ollama.model : 'Configure Ollama URL first' }}
+            <p class="text-[10px] leading-relaxed" :class="toolAvailability.ollama.available ? 'text-orange-300' : 'text-amber-300'">
+              {{ toolAvailability.ollama.available ? app.ollama.model : 'Configure Ollama URL in AI Models' }}
             </p>
           </button>
           <div class="col-span-2 flex cursor-not-allowed items-center gap-3 rounded-xl border border-[var(--border)] bg-black/10 p-3 opacity-50">
             <div class="size-6 shrink-0 grid place-items-center rounded-md border border-rose-500/30 bg-rose-500/15 text-[11px] font-bold text-rose-200">C</div>
             <p class="text-xs font-semibold text-[var(--text)]">DefendCore</p>
             <span class="rounded-full border border-rose-500/25 bg-rose-500/10 px-1.5 py-px text-[9px] font-semibold text-rose-300">Soon</span>
-            <p class="ml-1 text-[10px] text-[var(--text-faint)]">Vindicta's native model — in training.</p>
+            <p class="ml-1 text-[10px] text-[var(--text-faint)]">Vindicter's native model — in training.</p>
           </div>
         </div>
         <div class="space-y-2">
@@ -2911,32 +2989,36 @@ async function clearScanHistory() {
       </div>
     </GlassModal>
 
-    <!-- ── Export Modal ──────────────────────────────────────────────────────── -->
+    <!-- ── Export Modal — Step 1: choose type ────────────────────────────── -->
     <GlassModal v-model="showExportModal" title="Export Report" max-width="sm">
       <div class="space-y-3">
-        <p class="text-xs text-[var(--text-muted)]">Choose what to export. Each format is a separate file.</p>
+        <p class="text-xs text-[var(--text-muted)]">Choose what to export.</p>
 
         <!-- Security Review -->
-        <div class="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3 text-left">
+        <button
+          class="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3 text-left transition-colors hover:border-indigo-500/30 hover:bg-indigo-500/[0.04]"
+          @click="selectExportType('review')"
+        >
           <div class="grid size-9 shrink-0 place-items-center rounded-lg border border-indigo-500/20 bg-indigo-500/10">
             <FileText class="size-4 text-indigo-300" />
           </div>
           <div class="min-w-0 flex-1">
             <p class="text-xs font-semibold text-[var(--text)]">Security Review</p>
             <p class="mt-0.5 text-[11px] leading-relaxed text-[var(--text-muted)]">
-              Branded DOCX — cover page, executive summary, risk table, all findings with severity, evidence, and recommended fixes.
+              Executive summary, risk table, and all findings with evidence and recommended fixes.
             </p>
           </div>
-          <div class="flex shrink-0 gap-1.5">
-            <button class="rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-300 hover:bg-indigo-500/15" @click="exportSecurityReview('docx')">DOCX</button>
-            <button class="rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-300 hover:bg-indigo-500/15" @click="exportSecurityReview('md')">MD</button>
-          </div>
-        </div>
+          <span class="shrink-0 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2 py-0.5 text-[9px] font-semibold text-indigo-300">DOCX · MD</span>
+        </button>
 
         <!-- Raw AI Report -->
-        <div
-          class="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3 text-left"
-          :class="!activeScan?.rawReport ? 'opacity-50' : ''"
+        <button
+          class="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3 text-left transition-colors"
+          :class="activeScan?.rawReport
+            ? 'hover:border-sky-500/30 hover:bg-sky-500/[0.04]'
+            : 'opacity-50 cursor-not-allowed'"
+          :disabled="!activeScan?.rawReport"
+          @click="selectExportType('raw')"
         >
           <div class="grid size-9 shrink-0 place-items-center rounded-lg border border-sky-500/20 bg-sky-500/10">
             <FileJson class="size-4 text-sky-300" />
@@ -2944,21 +3026,21 @@ async function clearScanHistory() {
           <div class="min-w-0 flex-1">
             <p class="text-xs font-semibold text-[var(--text)]">Raw AI Report</p>
             <p class="mt-0.5 text-[11px] leading-relaxed text-[var(--text-muted)]">
-              Verbatim AI output before parsing — useful for audit, debugging, or manual review. Only available when a scan has a stored report.
+              Verbatim AI output before parsing — useful for audit and debugging.
+              <span v-if="!activeScan?.rawReport" class="text-amber-400/70"> No raw report for this scan.</span>
             </p>
           </div>
-          <div class="flex shrink-0 gap-1.5">
-            <button class="rounded-lg border border-sky-500/20 bg-sky-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-sky-300 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="!activeScan?.rawReport" @click="exportRawReport('docx')">DOCX</button>
-            <button class="rounded-lg border border-sky-500/20 bg-sky-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-sky-300 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="!activeScan?.rawReport" @click="exportRawReport('md')">MD</button>
-          </div>
-        </div>
+          <span class="shrink-0 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[9px] font-semibold text-sky-300">DOCX · MD</span>
+        </button>
 
-        <!-- Fix Prompts Markdown -->
+        <!-- Fix Prompts -->
         <button
-          class="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3 text-left transition-colors hover:border-emerald-500/30 hover:bg-emerald-500/[0.04]"
-          :class="!currentDocxReport().findings.length ? 'opacity-50 cursor-not-allowed' : ''"
+          class="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3 text-left transition-colors"
+          :class="currentDocxReport().findings.length
+            ? 'hover:border-emerald-500/30 hover:bg-emerald-500/[0.04]'
+            : 'opacity-50 cursor-not-allowed'"
           :disabled="!currentDocxReport().findings.length"
-          @click="exportFixPrompts"
+          @click="selectExportType('prompts')"
         >
           <div class="grid size-9 shrink-0 place-items-center rounded-lg border border-emerald-500/20 bg-emerald-500/10">
             <Clipboard class="size-4 text-emerald-300" />
@@ -2966,10 +3048,10 @@ async function clearScanHistory() {
           <div class="min-w-0 flex-1">
             <p class="text-xs font-semibold text-[var(--text)]">Fix Prompts</p>
             <p class="mt-0.5 text-[11px] leading-relaxed text-[var(--text-muted)]">
-              Consolidated Markdown file of ready-to-paste AI fix prompts — one per finding, same format as the "Copy Fix Prompt" button.
+              Ready-to-paste AI fix prompts — one per finding.
             </p>
           </div>
-          <span class="shrink-0 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-semibold text-emerald-300">.md</span>
+          <span class="shrink-0 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-semibold text-emerald-300">MD only</span>
         </button>
 
         <div class="flex justify-end border-t border-[var(--border)] pt-3">
@@ -2978,6 +3060,44 @@ async function clearScanHistory() {
             @click="showExportModal = false"
           >
             Cancel
+          </button>
+        </div>
+      </div>
+    </GlassModal>
+
+    <!-- ── Export Modal — Step 2: choose format ───────────────────────────── -->
+    <GlassModal v-model="showExportFormatModal" title="Choose Format" max-width="xs">
+      <div class="space-y-3">
+        <p class="text-xs text-[var(--text-muted)]">
+          Select the file format for the
+          <strong class="text-[var(--text)]">{{ pendingExportType === 'review' ? 'Security Review' : 'Raw AI Report' }}</strong>.
+        </p>
+
+        <div class="grid grid-cols-2 gap-3">
+          <button
+            class="flex flex-col items-center gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.06] px-4 py-5 transition-colors hover:bg-indigo-500/10"
+            @click="confirmExportFormat('docx')"
+          >
+            <FileText class="size-5 text-indigo-300" />
+            <span class="text-sm font-semibold text-[var(--text)]">DOCX</span>
+            <span class="text-[10px] text-center text-[var(--text-muted)]">Word document with cover page and branding</span>
+          </button>
+          <button
+            class="flex flex-col items-center gap-2 rounded-xl border border-[var(--border)] bg-white/[0.03] px-4 py-5 transition-colors hover:bg-white/[0.06]"
+            @click="confirmExportFormat('md')"
+          >
+            <FileJson class="size-5 text-[var(--text-muted)]" />
+            <span class="text-sm font-semibold text-[var(--text)]">Markdown</span>
+            <span class="text-[10px] text-center text-[var(--text-muted)]">Plain text, renders in GitHub and any editor</span>
+          </button>
+        </div>
+
+        <div class="flex justify-end border-t border-[var(--border)] pt-3">
+          <button
+            class="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+            @click="showExportFormatModal = false; showExportModal = true"
+          >
+            ← Back
           </button>
         </div>
       </div>
@@ -3191,7 +3311,7 @@ async function clearScanHistory() {
         </div>
 
         <p class="text-xs text-[var(--text-muted)]">
-          The issue will be created on the linked repository with the finding details and a "Created by Vindicta" attribution. It will appear under your GitHub account.
+          The issue will be created on the linked repository with the finding details and a "Created by Vindicter" attribution. It will appear under your GitHub account.
         </p>
 
         <div v-if="ghIssueCreatedUrl" class="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2.5">

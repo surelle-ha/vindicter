@@ -135,13 +135,13 @@ export const useUserStore = defineStore('user', {
 
       // Fallback: migrate from old localStorage key
       if (typeof localStorage !== 'undefined') {
-        const raw = localStorage.getItem('vindicta-user-profile')
+        const raw = localStorage.getItem('vindicter-user-profile')
         if (raw) {
           try {
             Object.assign(this.$state, normalizeProfile(JSON.parse(raw)))
             // Migrate to TauriStore
             await this._persist()
-            localStorage.removeItem('vindicta-user-profile')
+            localStorage.removeItem('vindicter-user-profile')
           }
           catch { /* corrupt */ }
         }
@@ -230,7 +230,7 @@ export const useUserStore = defineStore('user', {
       }
       catch {
         if (typeof localStorage !== 'undefined') {
-          localStorage.removeItem('vindicta-user-profile')
+          localStorage.removeItem('vindicter-user-profile')
         }
       }
     },
@@ -244,7 +244,7 @@ export const useUserStore = defineStore('user', {
       }
       catch {
         if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('vindicta-user-profile', JSON.stringify(this.$state))
+          localStorage.setItem('vindicter-user-profile', JSON.stringify(this.$state))
         }
       }
     },

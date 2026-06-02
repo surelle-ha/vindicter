@@ -57,16 +57,16 @@ const features = [
     color: 'text-orange-300',
     bg: 'bg-orange-500/10 border-orange-500/20',
     title: 'MCP Server',
-    description: 'Expose Vindicta as an MCP server so AI agents can run diagnostics, query findings, and trigger scans programmatically from external tools.',
+    description: 'Expose Vindicter as an MCP server so AI agents can run diagnostics, query findings, and trigger scans programmatically from external tools.',
   },
 ]
 </script>
 
 <template>
-  <GlassModal :model-value="show" title="Welcome to Vindicta" max-width="lg" @update:model-value="close">
+  <GlassModal :model-value="show" title="Welcome to Vindicter" max-width="lg" @update:model-value="close">
     <div class="space-y-5">
       <p class="text-sm leading-relaxed text-[var(--text-muted)]">
-        Vindicta is a local-first AI-powered security analysis tool. Here's everything you can do:
+        Vindicter is a local-first AI-powered security analysis tool. Here's everything you can do:
       </p>
 
       <div class="grid gap-3 sm:grid-cols-2">

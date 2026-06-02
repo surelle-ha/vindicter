@@ -156,15 +156,15 @@ export const useKanbanStore = defineStore('kanban', {
 
     async persist() {
       if (!this.projectPath) return
-      const { useVindictaJson } = await import('~/composables/useVindictaJson')
-      const { patchTickets } = useVindictaJson()
+      const { useVindicterJson } = await import('~/composables/useVindicterJson')
+      const { patchTickets } = useVindicterJson()
       await patchTickets(this.projectPath, this.tickets)
     },
 
     async recordHistory(action: string, actor: string, payload: Record<string, unknown>) {
       if (!this.projectPath) return
-      const { useVindictaJson } = await import('~/composables/useVindictaJson')
-      const { appendHistory } = useVindictaJson()
+      const { useVindicterJson } = await import('~/composables/useVindicterJson')
+      const { appendHistory } = useVindicterJson()
       await appendHistory(this.projectPath, { action, actor, payload }).catch(() => {})
     },
   },

@@ -156,7 +156,7 @@ async function runCommand() {
 function completeRun(code: number | null) {
   if (!lastWriteEndedWithNewline) write('\r\n')
   if (code !== null && code !== 0) {
-    writeLine(`\x1b[31m[vindicta] command exited with code ${code}\x1b[0m`)
+    writeLine(`\x1b[31m[vindicter] command exited with code ${code}\x1b[0m`)
   }
   running.value = false
   currentRunId = ''
@@ -198,7 +198,7 @@ function handleData(data: string) {
   if (running.value) {
     if (data === '\x03') {
       write('^C\r\n')
-      writeLine('\x1b[33m[vindicta] Detached from this command. Non-interactive commands auto-stop after 30s.\x1b[0m')
+      writeLine('\x1b[33m[vindicter] Detached from this command. Non-interactive commands auto-stop after 30s.\x1b[0m')
       running.value = false
       currentRunId = ''
       showPrompt()
@@ -309,7 +309,7 @@ onMounted(async () => {
   if (termEl.value) resizeObserver.observe(termEl.value)
 
   fitTerminal()
-  writeLine('\x1b[36m== Vindicta Academy Practice Sandbox ==\x1b[0m')
+  writeLine('\x1b[36m== Vindicter Academy Practice Sandbox ==\x1b[0m')
   writeLine('\x1b[90m  Dedicated WSL account: academy\x1b[0m')
   writeLine('\x1b[90m  Commands run in ~/vindicta/workspace and stream live output.\x1b[0m')
   await ensureBackend()

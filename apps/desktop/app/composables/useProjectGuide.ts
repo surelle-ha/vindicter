@@ -103,7 +103,7 @@ function buildMessages(project: ProjectMeta, readme: string, fileName: string) {
     messages.push(`README task signal: ${trimSentence(actionItem, 160)}. Consider whether it changes the scan scope, threat surface, or remediation queue.`)
   }
 
-  messages.push('Vindicta flow: review the overview, run Scanner, convert confirmed risks into Findings, then export Reports when the evidence is ready.')
+  messages.push('Vindicter flow: review the overview, run Scanner, convert confirmed risks into Findings, then export Reports when the evidence is ready.')
 
   return messages
 }
@@ -142,7 +142,7 @@ export function useProjectGuide(project: ComputedRef<ProjectMeta>) {
     else {
       messages.value = [
         `${toolName(project.value)} is ready for ${project.value.name}. Add README.md notes and they will start appearing here automatically.`,
-        'Vindicta flow: scan the project, review evidence, create remediation findings, and keep reports current.',
+        'Vindicter flow: scan the project, review evidence, create remediation findings, and keep reports current.',
       ]
     }
     messageIndex.value = 0
@@ -176,7 +176,7 @@ export function useProjectGuide(project: ComputedRef<ProjectMeta>) {
     catch {
       messages.value = [
         `${toolName(project.value)} tried to read README.md but could not access it yet. The security tabs still work while this refreshes.`,
-        'Vindicta flow: use Overview for context, Scanner for AI review, Findings for remediation, and Reports for audit output.',
+        'Vindicter flow: use Overview for context, Scanner for AI review, Findings for remediation, and Reports for audit output.',
       ]
       messageIndex.value = 0
     }

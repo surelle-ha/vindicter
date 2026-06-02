@@ -90,7 +90,7 @@ function scheduleWindowMaximizeCheck() {
 function dismissMaximizeLessonWarning() {
   maximizeWarningDismissed.value = true
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('vindicta:academy:maximize-warning-dismissed', 'true')
+    localStorage.setItem('vindicter:academy:maximize-warning-dismissed', 'true')
   }
 }
 
@@ -113,7 +113,7 @@ const ttsModelOptions: { id: TTSScriptModel; label: string; description: string;
   { id: 'codex',       label: 'Codex',       description: 'OpenAI Codex CLI' },
   { id: 'openrouter',  label: 'OpenRouter',  description: 'Configured OpenRouter model' },
   { id: 'ollama',      label: 'Ollama',      description: 'Local Ollama server' },
-  { id: 'core',        label: 'DefendCore',  description: "Vindicta's native AI model — currently in training", disabled: true, soon: true },
+  { id: 'core',        label: 'DefendCore',  description: "Vindicter's native AI model — currently in training", disabled: true, soon: true },
 ]
 
 function openCreateTTSModal(lesson: Lesson | CustomLesson) {
@@ -200,7 +200,7 @@ function stopBulkTTS() {
 function dismissTTSSuggestion(permanent = false) {
   showTTSSuggestionModal.value = false
   if (permanent) {
-    localStorage.setItem('vindicta:academy:tts:suggest-dismissed', 'true')
+    localStorage.setItem('vindicter:academy:tts:suggest-dismissed', 'true')
   }
 }
 
@@ -229,7 +229,7 @@ watch([view, currentLesson] as const, async ([v, lesson]) => {
 })
 
 onMounted(async () => {
-  maximizeWarningDismissed.value = localStorage.getItem('vindicta:academy:maximize-warning-dismissed') === 'true'
+  maximizeWarningDismissed.value = localStorage.getItem('vindicter:academy:maximize-warning-dismissed') === 'true'
   window.addEventListener('resize', scheduleWindowMaximizeCheck)
   await refreshWindowMaximized()
 
@@ -264,7 +264,7 @@ onMounted(async () => {
   }
 
   // Randomly suggest TTS narration if user hasn't dismissed it and has no audio yet
-  const suggestionDismissed = localStorage.getItem('vindicta:academy:tts:suggest-dismissed') === 'true'
+  const suggestionDismissed = localStorage.getItem('vindicter:academy:tts:suggest-dismissed') === 'true'
   if (!suggestionDismissed) {
     const delay = 20000 + Math.random() * 25000 // 20–45 seconds
     setTimeout(async () => {
@@ -305,7 +305,7 @@ const learnerPaceOptions = [
   { id: 'intensive', label: 'Focused sprint' },
 ]
 
-const certificateNamePlaceholder = computed(() => user.name?.trim() || 'Vindicta Learner')
+const certificateNamePlaceholder = computed(() => user.name?.trim() || 'Vindicter Learner')
 
 async function completeSetup() {
   const name = setupCertificateName.value.trim() || certificateNamePlaceholder.value
@@ -758,7 +758,7 @@ const certDate = computed(() => {
 })
 
 const certificateName = computed(() => {
-  return academy.certificateName || user.name || 'Vindicta Learner'
+  return academy.certificateName || user.name || 'Vindicter Learner'
 })
 
 const certificateId = computed(() => {
@@ -794,7 +794,7 @@ function sanitizeFileName(value: string) {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 120)
-    || 'Vindicta Academy Certificate'
+    || 'Vindicter Academy Certificate'
 }
 
 function pdfText(value: string) {
@@ -817,7 +817,7 @@ function buildCertificatePdf() {
     '0.96 0.68 0.22 rg 42 42 758 511 re S\n',
     '0.14 0.59 0.54 rg 58 58 726 479 re S\n',
     pdfLine('CERTIFICATE OF COMPLETION', 286, 470, 13, 'F2', '0.96 0.74 0.28'),
-    pdfLine('Vindicta Security Academy', 219, 421, 30, 'F2', '1 1 1'),
+    pdfLine('Vindicter Security Academy', 219, 421, 30, 'F2', '1 1 1'),
     pdfLine('Presented to', 382, 365, 12, 'F1', '0.65 0.68 0.76'),
     pdfLine(certificateName.value, 278, 323, 28, 'F2', '1 1 1'),
     pdfLine('For completing the full security engineering curriculum across foundations, application security,', 132, 273, 12, 'F1', '0.78 0.81 0.88'),
@@ -868,7 +868,7 @@ function browserDownload(bytes: Uint8Array, filename: string) {
 async function downloadCertificatePdf() {
   if (downloadingCertificate.value) return
   downloadingCertificate.value = true
-  const filename = sanitizeFileName(`Vindicta Academy Certificate - ${certificateName.value}.pdf`)
+  const filename = sanitizeFileName(`Vindicter Academy Certificate - ${certificateName.value}.pdf`)
   const bytes = buildCertificatePdf()
   try {
     const { save } = await import('@tauri-apps/plugin-dialog')
@@ -912,7 +912,7 @@ async function resetAcademy() {
           <div class="mx-auto mb-4 grid size-16 place-items-center rounded-2xl border border-indigo-500/20 bg-indigo-500/10">
             <GraduationCap class="size-8 text-indigo-300" />
           </div>
-          <h1 class="font-display text-3xl font-bold text-[var(--text)]">Vindicta Academy Enrollment</h1>
+          <h1 class="font-display text-3xl font-bold text-[var(--text)]">Vindicter Academy Enrollment</h1>
           <p class="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text-muted)]">
             Build your security path at your pace. Your professor unlocks lessons when you demonstrate understanding, so learning fits the time you actually have.
           </p>
@@ -1655,7 +1655,7 @@ async function resetAcademy() {
               <Award class="size-10 text-amber-300" />
             </div>
             <p class="relative mt-6 text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-300">Certificate of Completion</p>
-            <h1 class="relative mt-3 font-display text-4xl font-bold text-[var(--text)]">Vindicta Security Academy</h1>
+            <h1 class="relative mt-3 font-display text-4xl font-bold text-[var(--text)]">Vindicter Security Academy</h1>
             <p class="relative mt-5 text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">Presented to</p>
             <p class="relative mt-2 font-display text-3xl font-bold text-white">{{ certificateName }}</p>
             <p class="relative mx-auto mt-5 max-w-2xl text-sm leading-relaxed text-[var(--text-muted)]">
@@ -1734,7 +1734,7 @@ async function resetAcademy() {
           <PartyPopper class="size-10 text-amber-300" />
         </div>
         <p class="relative mt-5 text-[10px] font-semibold uppercase tracking-[0.24em] text-amber-200/80">Congratulations</p>
-        <h2 class="relative mt-2 font-display text-3xl font-bold text-[var(--text)]">You completed Vindicta Academy.</h2>
+        <h2 class="relative mt-2 font-display text-3xl font-bold text-[var(--text)]">You completed Vindicter Academy.</h2>
         <p class="relative mx-auto mt-3 max-w-xl text-sm leading-relaxed text-[var(--text-muted)]">
           Every lesson is complete and your certificate is ready. Nicely done, {{ certificateName }}.
         </p>
@@ -1983,7 +1983,7 @@ async function resetAcademy() {
             <p>
               <strong class="text-[var(--text)]">First time:</strong> Kokoro TTS model must load into memory - this can take 5-15 minutes. Subsequent narrations generate faster.
             </p>
-            <p>You can start audio for multiple lessons, including locked lessons. Vindicta tracks them separately and safely queues the shared speech engine.</p>
+            <p>You can start audio for multiple lessons, including locked lessons. Vindicter tracks them separately and safely queues the shared speech engine.</p>
           </div>
         </div>
 

@@ -6,7 +6,7 @@ import { generateId } from '~/utils/id'
 
 const props = defineProps<{ projectPath: string }>()
 
-const { read, patchSettings } = useVindictaJson()
+const { read, patchSettings } = useVindicterJson()
 
 const columns = ref<KanbanColumn[]>([])
 const roles = ref<Role[]>([])

@@ -19,7 +19,7 @@ export function friendlyClaudeExecError(message: string): string {
   if (lower.includes('permission denied') || lower.includes('access denied'))
     return 'Permission denied when trying to run Claude CLI. Check your system permissions.'
   if (lower.includes('not allowed') || lower.includes('scoped'))
-    return 'Claude CLI is not allowed in the configured shell scope. Check Vindicta shell permissions.'
+    return 'Claude CLI is not allowed in the configured shell scope. Check Vindicter shell permissions.'
   if (lower.includes('api key') || lower.includes('authentication') || lower.includes('unauthorized'))
     return 'Claude API key is missing or invalid. Run "claude" in a terminal and log in first.'
   if (lower.includes('rate limit') || lower.includes('quota'))

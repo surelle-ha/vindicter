@@ -18,10 +18,10 @@ const app = useAppStore()
 const security = useSecurityStore()
 const wizard = useWizardStore()
 const feed = useNotificationFeedStore()
-const { createProject } = useVindictaJson()
+const { createProject } = useVindicterJson()
 const { notify } = useNotifications()
 
-const RSS_NOTIF_KEY = 'vindicta:rss:last-notified-ids'
+const RSS_NOTIF_KEY = 'vindicter:rss:last-notified-ids'
 
 function notifyNewRssItems(freshItems: NewsItem[]) {
   try {
@@ -112,7 +112,7 @@ async function fetchRssXml(url: string) {
 }
 
 // ── RSS cache helpers ─────────────────────────────────────────────────────────
-const RSS_CACHE_KEY = 'vindicta:rss:cache'
+const RSS_CACHE_KEY = 'vindicter:rss:cache'
 const RSS_CACHE_TTL = 30 * 60 * 1000  // 30 minutes
 
 interface RssCache { items: NewsItem[]; fetchedAt: number; sourceIds: string[] }
@@ -145,7 +145,7 @@ async function fetchAndParseNews(): Promise<NewsItem[]> {
       ...Array.from(doc.querySelectorAll('item')),
       ...Array.from(doc.querySelectorAll('entry')),
     ]
-    return nodes.slice(0, 6).map((item, index) => {
+    const allItems = nodes.map((item, index) => {
       const title = childText(item, ['title']) || 'Untitled security story'
       const link = itemLink(item, source.url)
       const pubDate = childText(item, ['pubDate', 'published', 'updated', 'dc:date'])
@@ -159,6 +159,7 @@ async function fetchAndParseNews(): Promise<NewsItem[]> {
         timestamp: Number.isNaN(timestamp) ? Date.now() - index : timestamp,
       } satisfies NewsItem
     })
+    return allItems.sort((a, b) => b.timestamp - a.timestamp).slice(0, 6)
   }))
 
   const items = batches
@@ -230,6 +231,12 @@ async function handleFinish() {
   projects.setActive(data.meta.id)
   wizard.closeWizard()
   notify(`Project "${data.meta.name}" added`, 'success')
+  feed.push({
+    category: 'info',
+    title: `Project added: ${data.meta.name}`,
+    body: `New project registered at ${data.meta.absolutePath}`,
+    link: `/projects/${data.meta.id}`,
+  })
   await navigateTo(`/projects/${data.meta.id}`)
 }
 </script>
@@ -244,7 +251,7 @@ async function handleFinish() {
             <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-300/70">Home</p>
             <div class="mt-2 flex items-center gap-3">
               <ProjectGuideOrb accent="#67e8f9" />
-              <h1 class="font-display text-3xl font-bold text-[var(--text)]">Welcome back to Vindicta</h1>
+              <h1 class="font-display text-3xl font-bold text-[var(--text)]">Welcome back to Vindicter</h1>
             </div>
             <p class="mt-3 max-w-2xl text-sm leading-relaxed text-[var(--text-muted)]">
               Scan local projects for vulnerabilities, keep findings scoped to the selected codebase, and turn security review into a calmer command center.

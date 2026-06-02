@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+:root {
+  --accent: rgb(139, 92, 246);
+}
+
+html, body {
+  background: #111215;
+  color: white;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: 'Playfair Display', serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }

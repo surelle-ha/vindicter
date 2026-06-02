@@ -1,6 +1,6 @@
 import type { Ticket } from '~/types/vindicta'
 
-export interface VindictaDocxFinding {
+export interface VindicterDocxFinding {
   id: string
   title: string
   area: string
@@ -12,7 +12,7 @@ export interface VindictaDocxFinding {
   recommendation: string
 }
 
-export interface VindictaSecurityDocxReport {
+export interface VindicterSecurityDocxReport {
   projectName: string
   projectCode: string
   projectPath: string
@@ -21,7 +21,7 @@ export interface VindictaSecurityDocxReport {
   scannedAt: string
   summary: string
   rawReport: string
-  findings: VindictaDocxFinding[]
+  findings: VindicterDocxFinding[]
 }
 
 const encoder = new TextEncoder()
@@ -68,7 +68,7 @@ function sevPalette(severity: string) {
   return SEV[severity.toLowerCase()] ?? SEV.medium!
 }
 
-function severityCount(findings: VindictaDocxFinding[], severity: string) {
+function severityCount(findings: VindicterDocxFinding[], severity: string) {
   return findings.filter(f => f.severity.toLowerCase() === severity).length
 }
 
@@ -186,7 +186,7 @@ function riskTableRow(sev: string, count: number, impact: string, shaded: boolea
   </w:tr>`
 }
 
-function riskTable(findings: VindictaDocxFinding[]) {
+function riskTable(findings: VindicterDocxFinding[]) {
   const borders = `<w:tblBorders>
     <w:top    w:val="single" w:sz="4" w:color="E2E8F0"/>
     <w:left   w:val="single" w:sz="4" w:color="E2E8F0"/>
@@ -224,7 +224,7 @@ function riskTable(findings: VindictaDocxFinding[]) {
   </w:tbl>`
 }
 
-function findingBlock(finding: VindictaDocxFinding, index: number) {
+function findingBlock(finding: VindicterDocxFinding, index: number) {
   const p = sevPalette(finding.severity)
   const num = String(index + 1).padStart(2, '0')
   const banner = `<w:p>
@@ -345,7 +345,7 @@ function buildSecurityStylesXml() {
 </w:styles>`
 }
 
-function buildDocumentXml(report: VindictaSecurityDocxReport) {
+function buildDocumentXml(report: VindicterSecurityDocxReport) {
   const total = report.findings.length
   const critCount = severityCount(report.findings, 'critical')
   const highCount  = severityCount(report.findings, 'high')
@@ -592,7 +592,7 @@ function createZip(files: { name: string; content: string }[]) {
   return new Uint8Array(output)
 }
 
-export function createVindictaSecurityDocx(report: VindictaSecurityDocxReport) {
+export function createVindicterSecurityDocx(report: VindicterSecurityDocxReport) {
   return createZip(sharedDocZipFiles(
     report.projectName,
     buildDocumentXml(report),
@@ -600,13 +600,13 @@ export function createVindictaSecurityDocx(report: VindictaSecurityDocxReport) {
     buildHeaderXml(report.projectName),
     buildFooterXml(),
     report.generatedAt,
-    `Vindicta Security Review — ${report.projectName}`,
+    `Vindicter Security Review — ${report.projectName}`,
   ))
 }
 
 // ── Raw AI Report DOCX ────────────────────────────────────────────────────────
 
-function buildRawReportDocumentXml(report: VindictaSecurityDocxReport) {
+function buildRawReportDocumentXml(report: VindicterSecurityDocxReport) {
   const scanDate = new Date(report.scannedAt).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })
   const genDate  = new Date(report.generatedAt).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })
   const raw      = report.rawReport || 'No raw AI report was captured for this scan.'
@@ -681,7 +681,7 @@ function sharedDocZipFiles(
   titleOverride?: string,
 ) {
   const now = new Date(generatedAt).toISOString()
-  const title = xml(titleOverride ?? `Vindicta Security Report — ${projectName}`)
+  const title = xml(titleOverride ?? `Vindicter Security Report — ${projectName}`)
   return [
     {
       name: '[Content_Types].xml',
@@ -724,8 +724,8 @@ function sharedDocZipFiles(
       content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <dc:title>${title}</dc:title>
-  <dc:creator>Vindicta</dc:creator>
-  <cp:keywords>security,OWASP,Vindicta,AI scan</cp:keywords>
+  <dc:creator>Vindicter</dc:creator>
+  <cp:keywords>security,OWASP,Vindicter,AI scan</cp:keywords>
   <dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created>
   <dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified>
 </cp:coreProperties>`,
@@ -734,20 +734,20 @@ function sharedDocZipFiles(
       name: 'docProps/app.xml',
       content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">
-  <Application>Vindicta</Application>
-  <Company>Vindicta Security Platform</Company>
+  <Application>Vindicter</Application>
+  <Company>Vindicter Security Platform</Company>
 </Properties>`,
     },
   ]
 }
 
-export function buildSecurityReviewMarkdown(report: VindictaSecurityDocxReport): string {
+export function buildSecurityReviewMarkdown(report: VindicterSecurityDocxReport): string {
   const scanDate = new Date(report.scannedAt).toLocaleDateString(undefined, { dateStyle: 'long' })
   const genDate  = new Date(report.generatedAt).toLocaleDateString(undefined, { dateStyle: 'long' })
   const sevCount = (sev: string) => report.findings.filter(f => f.severity.toLowerCase() === sev).length
 
   const lines: string[] = [
-    `# Vindicta Security Assessment Report`,
+    `# Vindicter Security Assessment Report`,
     ``,
     `> **CONFIDENTIAL — for internal use only**`,
     ``,
@@ -825,14 +825,14 @@ export function buildSecurityReviewMarkdown(report: VindictaSecurityDocxReport):
     })
   }
 
-  lines.push(`_Generated by [Vindicta](https://github.com/surelle-ha/vindicta)_`)
+  lines.push(`_Generated by [Vindicter](https://github.com/surelle-ha/vindicter)_`)
   return lines.join('\n')
 }
 
-export function buildRawReportMarkdown(report: VindictaSecurityDocxReport): string {
+export function buildRawReportMarkdown(report: VindicterSecurityDocxReport): string {
   const scanDate = new Date(report.scannedAt).toLocaleDateString(undefined, { dateStyle: 'long' })
   return [
-    `# Vindicta Raw AI Report`,
+    `# Vindicter Raw AI Report`,
     ``,
     `**Project:** ${report.projectName || 'Unknown'}  **Scan Date:** ${scanDate}`,
     ``,
@@ -848,11 +848,11 @@ export function buildRawReportMarkdown(report: VindictaSecurityDocxReport): stri
     ``,
     `---`,
     ``,
-    `_Generated by [Vindicta](https://github.com/surelle-ha/vindicta)_`,
+    `_Generated by [Vindicter](https://github.com/surelle-ha/vindicter)_`,
   ].join('\n')
 }
 
-export function createVindictaRawReportDocx(report: VindictaSecurityDocxReport) {
+export function createVindicterRawReportDocx(report: VindicterSecurityDocxReport) {
   return createZip(sharedDocZipFiles(
     report.projectName,
     buildRawReportDocumentXml(report),
@@ -860,16 +860,16 @@ export function createVindictaRawReportDocx(report: VindictaSecurityDocxReport) 
     buildRawHeaderXml(report.projectName),
     buildFooterXml(),
     report.generatedAt,
-    `Vindicta Raw AI Report — ${report.projectName}`,
+    `Vindicter Raw AI Report — ${report.projectName}`,
   ))
 }
 
 // ── Fix Prompts Markdown ──────────────────────────────────────────────────────
 
-export function buildFixPromptsMarkdown(report: VindictaSecurityDocxReport): string {
+export function buildFixPromptsMarkdown(report: VindicterSecurityDocxReport): string {
   const scanDate = new Date(report.scannedAt).toLocaleDateString(undefined, { dateStyle: 'long' })
   const lines: string[] = [
-    `# Vindicta — AI Fix Prompts`,
+    `# Vindicter — AI Fix Prompts`,
     ``,
     `**Project:** ${report.projectName || 'Unknown'}`,
     `**Scan date:** ${scanDate}`,
@@ -928,11 +928,11 @@ export function buildFixPromptsMarkdown(report: VindictaSecurityDocxReport): str
     lines.push(``)
   })
 
-  lines.push(`_Generated by Vindicta — https://github.com/surelle-ha/vindicta_`)
+  lines.push(`_Generated by Vindicter — https://github.com/surelle-ha/vindicter_`)
   return lines.join('\n')
 }
 
-export interface VindictaSprintDocReport {
+export interface VindicterSprintDocReport {
   projectName: string
   projectCode: string
   sprintName: string
@@ -943,9 +943,9 @@ export interface VindictaSprintDocReport {
   incompleteTickets: Ticket[]
 }
 
-function buildSprintDocumentXml(report: VindictaSprintDocReport) {
+function buildSprintDocumentXml(report: VindicterSprintDocReport) {
   const body = [
-    para('Vindicta Sprint Report', 'Title'),
+    para('Vindicter Sprint Report', 'Title'),
     para(report.sprintName, 'Subtitle'),
     para(`Project: ${report.projectName || 'Unknown project'}`, 'Heading1'),
     para(`Project code: ${report.projectCode || 'N/A'}`),
@@ -985,7 +985,7 @@ function buildSprintDocumentXml(report: VindictaSprintDocReport) {
 </w:document>`
 }
 
-export function createVindictaSprintDocx(report: VindictaSprintDocReport) {
+export function createVindicterSprintDocx(report: VindicterSprintDocReport) {
   const now = new Date(report.generatedAt).toISOString()
   return createZip([
     {
@@ -1022,10 +1022,10 @@ export function createVindictaSprintDocx(report: VindictaSprintDocReport) {
       name: 'docProps/core.xml',
       content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>${xml(`Vindicta Sprint Report - ${report.sprintName}`)}</dc:title>
+  <dc:title>${xml(`Vindicter Sprint Report - ${report.sprintName}`)}</dc:title>
   <dc:subject>Sprint Report</dc:subject>
-  <dc:creator>Vindicta</dc:creator>
-  <cp:keywords>sprint,Vindicta,report</cp:keywords>
+  <dc:creator>Vindicter</dc:creator>
+  <cp:keywords>sprint,Vindicter,report</cp:keywords>
   <dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created>
   <dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified>
 </cp:coreProperties>`,
@@ -1034,8 +1034,8 @@ export function createVindictaSprintDocx(report: VindictaSprintDocReport) {
       name: 'docProps/app.xml',
       content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-  <Application>Vindicta</Application>
-  <Company>Vindicta</Company>
+  <Application>Vindicter</Application>
+  <Company>Vindicter</Company>
 </Properties>`,
     },
   ])
@@ -1060,7 +1060,7 @@ function wrapText(value: string, width = 86) {
   return lines
 }
 
-export function createVindictaSprintPdf(report: VindictaSprintDocReport) {
+export function createVindicterSprintPdf(report: VindicterSprintDocReport) {
   const contentLines = wrapText(report.markdown || `${report.sprintName}\nNo report content generated.`).slice(0, 180)
   const pages: string[][] = []
   for (let i = 0; i < contentLines.length; i += 42) pages.push(contentLines.slice(i, i + 42))
@@ -1078,7 +1078,7 @@ export function createVindictaSprintPdf(report: VindictaSprintDocReport) {
       'BT',
       '/F2 16 Tf',
       '72 740 Td',
-      `(${pdfText(index === 0 ? `Vindicta Sprint Report - ${report.sprintName}` : `${report.sprintName} continued`)}) Tj`,
+      `(${pdfText(index === 0 ? `Vindicter Sprint Report - ${report.sprintName}` : `${report.sprintName} continued`)}) Tj`,
       '/F1 10 Tf',
       '0 -24 Td',
       ...lines.map(line => `(${pdfText(line)}) Tj 0 -15 Td`),

@@ -99,7 +99,7 @@ async function deleteFiles() {
   <GlassModal v-model="showDeleteModal" title="Remove project" max-width="sm">
     <div class="space-y-4">
       <p class="text-sm text-[var(--text-muted)]">
-        This will remove <span class="text-[var(--text)] font-semibold">{{ project.name }}</span> from Vindicta.
+        This will remove <span class="text-[var(--text)] font-semibold">{{ project.name }}</span> from Vindicter.
       </p>
 
       <div>
@@ -125,7 +125,7 @@ async function deleteFiles() {
           :disabled="!nameMatches || deleting"
           @click="removeOnly"
         >
-          Remove from Vindicta only
+          Remove from Vindicter only
           <span class="ml-auto text-[var(--text-faint)] text-[10px]">keeps your files</span>
         </GlassButton>
         <GlassButton

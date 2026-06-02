@@ -46,7 +46,7 @@ async function setAutoStartPreference(value: boolean) {
   try {
     const { invoke } = await import('@tauri-apps/api/core')
     autoStart.value = await invoke<boolean>('set_auto_start', { enabled: value })
-    notify(autoStart.value ? 'Vindicta will start after boot.' : 'Boot startup disabled.', 'success')
+    notify(autoStart.value ? 'Vindicter will start after boot.' : 'Boot startup disabled.', 'success')
   }
   catch (e: any) {
     autoStart.value = !value
@@ -190,18 +190,18 @@ async function preparePentestWslAccount() {
   }
 }
 
-async function cleanVindictaProfiles() {
+async function cleanVindicterProfiles() {
   if (!cleanProfilesDistro.value || !confirmCleanProfiles.value) return
   wslCleaningProfiles.value = true
   try {
     const { invoke } = await import('@tauri-apps/api/core')
     const result = await invoke<string>('wsl_purge_vindicta_profiles', { distro: cleanProfilesDistro.value })
-    notify(result || 'Vindicta profiles removed from WSL.', 'success')
+    notify(result || 'Vindicter profiles removed from WSL.', 'success')
     confirmCleanProfiles.value = false
     await refreshWslInfo()
   }
   catch (e: any) {
-    notify(e?.message ?? 'Could not clean Vindicta profiles.', 'error')
+    notify(e?.message ?? 'Could not clean Vindicter profiles.', 'error')
   }
   finally {
     wslCleaningProfiles.value = false
@@ -274,14 +274,14 @@ async function checkForUpdates() {
   }
 
   try {
-    const response = await fetch('https://api.github.com/repos/surelle-ha/vindicta/releases/latest', {
+    const response = await fetch('https://api.github.com/repos/surelle-ha/vindicter/releases/latest', {
       headers: { Accept: 'application/vnd.github+json' },
     })
     if (!response.ok) throw new Error(`GitHub returned HTTP ${response.status}`)
     const release = await response.json()
     latestRelease.value = {
       tagName: String(release.tag_name ?? ''),
-      htmlUrl: String(release.html_url ?? 'https://github.com/surelle-ha/vindicta/releases'),
+      htmlUrl: String(release.html_url ?? 'https://github.com/surelle-ha/vindicter/releases'),
       name: String(release.name ?? release.tag_name ?? 'Latest release'),
     }
   }
@@ -295,7 +295,7 @@ async function checkForUpdates() {
 
 async function openLatestRelease() {
   const { open } = await import('@tauri-apps/plugin-shell')
-  await open(latestRelease.value?.htmlUrl || 'https://github.com/surelle-ha/vindicta/releases')
+  await open(latestRelease.value?.htmlUrl || 'https://github.com/surelle-ha/vindicter/releases')
 }
 
 async function openDataFolder() {
@@ -349,6 +349,9 @@ const doctorRunning = ref(false)
 const doctorFixing = ref(false)
 const codexInstalling = ref(false)
 const codexInstallLog = ref('')
+const claudeInstalling = ref(false)
+const claudeInstallLog = ref('')
+const ollamaInstalling = ref(false)
 
 const doctorSummary = computed(() => {
   const errors = doctorChecks.value.filter(c => c.status === 'error').length
@@ -361,7 +364,11 @@ const doctorSummary = computed(() => {
 
 const canDoctorFix = computed(() => doctorChecks.value.some(c => c.fixable))
 const codexCheck = computed(() => doctorChecks.value.find(c => c.id === 'codex'))
+const claudeCheck = computed(() => doctorChecks.value.find(c => c.id === 'claude'))
+const ollamaCheck = computed(() => doctorChecks.value.find(c => c.id === 'ollama'))
 const shouldShowCodexInstaller = computed(() => !codexCheck.value || codexCheck.value.status !== 'ok')
+const shouldShowClaudeInstaller = computed(() => !claudeCheck.value || claudeCheck.value.status !== 'ok')
+const shouldShowOllamaInstaller = computed(() => !ollamaCheck.value || ollamaCheck.value.status !== 'ok')
 
 function firstLine(value: string | undefined) {
   return (value ?? '').split('\n').map(line => line.trim()).find(Boolean) ?? ''
@@ -432,7 +439,7 @@ async function checkNpmHealth(): Promise<DoctorCheck> {
       label: 'npm',
       detail: e?.message
         ? `npm check failed: ${e.message}. Install Node.js/npm before using the Codex installer.`
-        : 'npm is not available to Vindicta. Install Node.js/npm before using the Codex installer.',
+        : 'npm is not available to Vindicter. Install Node.js/npm before using the Codex installer.',
       status: 'error',
       fixable: false,
     }
@@ -473,21 +480,57 @@ async function checkCodexHealth(): Promise<DoctorCheck> {
       label: 'Codex',
       detail: e?.message
         ? `Codex health check failed: ${codexHealthDetail(e.message) || e.message}. Use Install/Repair Codex, or install @openai/codex@latest with npm and rerun Doctor.`
-        : 'Codex CLI is not available to Vindicta. Use Install/Repair Codex, or install @openai/codex@latest with npm and rerun Doctor.',
+        : 'Codex CLI is not available to Vindicter. Use Install/Repair Codex, or install @openai/codex@latest with npm and rerun Doctor.',
       status: 'error',
       fixable: false,
     }
   }
 }
 
+async function tryInstallWithPackageManager(
+  pkgName: string,
+  candidates: { pnpmExec: string; npmExec: string },
+): Promise<{ success: boolean; log: string }> {
+  const isWin = isWindowsRuntime()
+  const pnpmCandidates = isWin ? [candidates.pnpmExec + '.cmd', candidates.pnpmExec] : [candidates.pnpmExec]
+  const npmCandidates = isWin ? [candidates.npmExec + '.cmd', candidates.npmExec] : [candidates.npmExec]
+
+  // Try pnpm first, fall back to npm
+  for (const name of [...pnpmCandidates, ...npmCandidates]) {
+    try {
+      const output = await runShellCommand([name], [])
+      const log = [output.stdout, output.stderr].filter(Boolean).join('\n').trim()
+      if (output.code === 0) return { success: true, log }
+      return { success: false, log }
+    }
+    catch { /* try next */ }
+  }
+  return { success: false, log: `No package manager (pnpm/npm) found. Install Node.js first to get npm.` }
+}
+
 async function installCodexCli() {
   codexInstalling.value = true
   codexInstallLog.value = ''
+  const isWin = isWindowsRuntime()
   try {
-    const output = await runShellCommand(
-      isWindowsRuntime() ? ['npm-cmd-install-codex', 'npm-install-codex'] : ['npm-install-codex'],
-      ['install', '-g', '@openai/codex@latest'],
-    )
+    // Try pnpm first, then npm
+    const pnpmNames = isWin ? ['pnpm-cmd-install-codex', 'pnpm-install-codex'] : ['pnpm-install-codex']
+    const npmNames = isWin ? ['npm-cmd-install-codex', 'npm-install-codex'] : ['npm-install-codex']
+
+    let output: Awaited<ReturnType<typeof runShellCommand>> | null = null
+    for (const name of [...pnpmNames, ...npmNames]) {
+      try {
+        output = await runShellCommand([name], [])
+        break
+      }
+      catch { /* try next */ }
+    }
+
+    if (!output) {
+      codexInstallLog.value = 'No package manager found (pnpm or npm). Install Node.js from https://nodejs.org to get npm, then retry.'
+      notify('No package manager available. Install Node.js first.', 'error')
+      return
+    }
 
     codexInstallLog.value = [output.stdout, output.stderr].filter(Boolean).join('\n').trim()
     if (output.code === 0) {
@@ -504,6 +547,59 @@ async function installCodexCli() {
   }
   finally {
     codexInstalling.value = false
+  }
+}
+
+async function installClaudeCli() {
+  claudeInstalling.value = true
+  claudeInstallLog.value = ''
+  const isWin = isWindowsRuntime()
+  try {
+    const pnpmNames = isWin ? ['pnpm-cmd-install-claude-code', 'pnpm-install-claude-code'] : ['pnpm-install-claude-code']
+    const npmNames = isWin ? ['npm-cmd-install-claude-code', 'npm-install-claude-code'] : ['npm-install-claude-code']
+
+    let output: Awaited<ReturnType<typeof runShellCommand>> | null = null
+    for (const name of [...pnpmNames, ...npmNames]) {
+      try {
+        output = await runShellCommand([name], [])
+        break
+      }
+      catch { /* try next */ }
+    }
+
+    if (!output) {
+      claudeInstallLog.value = 'No package manager found. Install Node.js from https://nodejs.org or download Claude Code from https://claude.ai/download'
+      notify('No package manager available. Download Claude Code from claude.ai/download.', 'error')
+      return
+    }
+
+    claudeInstallLog.value = [output.stdout, output.stderr].filter(Boolean).join('\n').trim()
+    if (output.code === 0) {
+      notify('Claude Code installed. Checking...', 'success')
+      await runDoctor()
+    }
+    else {
+      notify('Claude Code install failed. Try downloading from claude.ai/download.', 'error')
+    }
+  }
+  catch (e: any) {
+    claudeInstallLog.value = e?.message ?? String(e)
+    notify('Claude Code install could not start', 'error')
+  }
+  finally {
+    claudeInstalling.value = false
+  }
+}
+
+async function openOllamaDownload() {
+  ollamaInstalling.value = true
+  try {
+    const { open } = await import('@tauri-apps/plugin-shell')
+    await open('https://ollama.com/download')
+  }
+  catch { /* browser dev mode */ }
+  finally {
+    ollamaInstalling.value = false
   }
 }
 
@@ -743,7 +839,7 @@ onMounted(() => {
             </div>
             <div>
               <p class="text-sm text-[var(--text)]">Start after boot</p>
-              <p class="text-xs text-[var(--text-muted)] mt-0.5">Launch Vindicta automatically when Windows starts</p>
+              <p class="text-xs text-[var(--text-muted)] mt-0.5">Launch Vindicter automatically when Windows starts</p>
             </div>
           </div>
           <label class="relative inline-flex items-center cursor-pointer shrink-0 ml-4">
@@ -1027,10 +1123,10 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- Clean Vindicta profiles only -->
+          <!-- Clean Vindicter profiles only -->
           <div class="space-y-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] p-3">
             <div>
-              <p class="text-xs font-semibold text-amber-200">Clean Vindicta Profiles</p>
+              <p class="text-xs font-semibold text-amber-200">Clean Vindicter Profiles</p>
               <p class="mt-0.5 text-[11px] leading-relaxed text-[var(--text-muted)]">Removes only the <span class="font-mono">pentest</span> and <span class="font-mono">academy</span> user accounts and their home directories from the selected distribution. The distribution itself is kept.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
@@ -1045,7 +1141,7 @@ onMounted(() => {
                 size="sm"
                 class="bg-amber-600/20 text-amber-300 border-amber-500/30 hover:bg-amber-600/30"
                 :disabled="!cleanProfilesDistro || !confirmCleanProfiles || wslCleaningProfiles"
-                @click="cleanVindictaProfiles"
+                @click="cleanVindicterProfiles"
               >
                 <Loader2 v-if="wslCleaningProfiles" class="size-3.5 animate-spin" />
                 <XCircle v-else class="size-3.5" />
@@ -1096,7 +1192,7 @@ onMounted(() => {
       <div class="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] space-y-4">
         <div class="flex items-start justify-between gap-4">
           <div>
-            <p class="text-sm font-semibold text-[var(--text)]">Vindicta Desktop</p>
+            <p class="text-sm font-semibold text-[var(--text)]">Vindicter Desktop</p>
             <p class="mt-1 text-xs text-[var(--text-muted)]">
               Current {{ appVersion ? `v${appVersion}` : 'version unknown' }}
               <span v-if="latestRelease"> · Latest {{ latestRelease.tagName }}</span>
@@ -1117,7 +1213,7 @@ onMounted(() => {
         >
           <span>
             <span class="block text-xs font-semibold text-emerald-200">Update available: {{ latestRelease?.name }}</span>
-            <span class="mt-0.5 block text-[11px] text-[var(--text-muted)]">Open surelle-ha/vindicta releases to download it.</span>
+            <span class="mt-0.5 block text-[11px] text-[var(--text-muted)]">Open surelle-ha/vindicter releases to download it.</span>
           </span>
           <Download class="size-4 shrink-0 text-emerald-300" />
         </button>
@@ -1136,7 +1232,7 @@ onMounted(() => {
           <div class="min-w-0">
             <p class="text-sm font-semibold text-[var(--text)]">Made by Harold Eustaquio</p>
             <p class="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-              Vindicta is a local-first security workspace for scanning projects, tracking remediation, and keeping AI-assisted review grounded in the files you actually ship.
+              Vindicter is a local-first security workspace for scanning projects, tracking remediation, and keeping AI-assisted review grounded in the files you actually ship.
             </p>
           </div>
         </div>
@@ -1198,13 +1294,33 @@ onMounted(() => {
             </div>
             <button
               v-if="check.id === 'codex' && shouldShowCodexInstaller"
-              class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-2.5 py-1.5 text-[10px] font-medium text-indigo-300 hover:bg-indigo-500/20 transition-colors disabled:opacity-60"
+              class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-medium text-emerald-300 hover:bg-emerald-500/20 transition-colors disabled:opacity-60"
               :disabled="doctorRunning || doctorFixing || codexInstalling"
               @click="installCodexCli"
             >
               <Loader2 v-if="codexInstalling" class="size-3 animate-spin" />
               <Download v-else class="size-3" />
-              {{ codexInstalling ? 'Installing' : 'Install/Repair Codex' }}
+              {{ codexInstalling ? 'Installing…' : 'Install/Repair Codex' }}
+            </button>
+            <button
+              v-if="check.id === 'claude' && shouldShowClaudeInstaller"
+              class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/10 px-2.5 py-1.5 text-[10px] font-medium text-violet-300 hover:bg-violet-500/20 transition-colors disabled:opacity-60"
+              :disabled="doctorRunning || doctorFixing || claudeInstalling"
+              @click="installClaudeCli"
+            >
+              <Loader2 v-if="claudeInstalling" class="size-3 animate-spin" />
+              <Download v-else class="size-3" />
+              {{ claudeInstalling ? 'Installing…' : 'Install Claude Code' }}
+            </button>
+            <button
+              v-if="check.id === 'ollama' && shouldShowOllamaInstaller"
+              class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-orange-500/20 bg-orange-500/10 px-2.5 py-1.5 text-[10px] font-medium text-orange-300 hover:bg-orange-500/20 transition-colors disabled:opacity-60"
+              :disabled="ollamaInstalling"
+              @click="openOllamaDownload"
+            >
+              <Loader2 v-if="ollamaInstalling" class="size-3 animate-spin" />
+              <Download v-else class="size-3" />
+              Download Ollama
             </button>
             <span v-if="check.fixable" class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 shrink-0">fixable</span>
           </div>
@@ -1216,6 +1332,13 @@ onMounted(() => {
             <p class="text-xs font-medium text-[var(--text-muted)]">Codex installer output</p>
           </div>
           <pre class="max-h-40 overflow-auto whitespace-pre-wrap text-[10px] leading-relaxed text-[var(--text-muted)] scrollbar-glass">{{ codexInstallLog }}</pre>
+        </div>
+        <div v-if="claudeInstallLog" class="rounded-lg border border-[var(--border)] bg-black/20 p-3">
+          <div class="flex items-center gap-2 mb-2">
+            <Terminal class="size-3.5 text-[var(--text-muted)]" />
+            <p class="text-xs font-medium text-[var(--text-muted)]">Claude Code installer output</p>
+          </div>
+          <pre class="max-h-40 overflow-auto whitespace-pre-wrap text-[10px] leading-relaxed text-[var(--text-muted)] scrollbar-glass">{{ claudeInstallLog }}</pre>
         </div>
       </div>
     </div>
@@ -1250,7 +1373,7 @@ onMounted(() => {
       <h3 class="text-[10px] font-semibold text-red-400/70 uppercase tracking-[0.12em]">Danger Zone</h3>
       <div class="danger-zone space-y-3">
         <p class="text-xs text-[var(--text-muted)]">
-          These actions affect only data stored within Vindicta. Your project files (vindicta.json) are <strong class="text-[var(--text)]">never deleted</strong> by any of these actions.
+          These actions affect only data stored within Vindicter. Your project files (vindicta.json) are <strong class="text-[var(--text)]">never deleted</strong> by any of these actions.
         </p>
 
         <!-- Reset profile -->

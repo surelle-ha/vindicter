@@ -1,28 +1,28 @@
-import type { VindictaJson, ProjectMeta, ProjectSettings, Ticket, Sprint, HistoryEntry, Member, SecurityData } from '~/types/vindicta'
+import type { VindicterJson, ProjectMeta, ProjectSettings, Ticket, Sprint, HistoryEntry, Member, SecurityData } from '~/types/vindicta'
 import { VINDICTA_SCHEMA_VERSION, DEFAULT_KANBAN_COLUMNS, DEFAULT_ROLES, DEFAULT_SECURITY_DATA } from '~/types/vindicta'
 import { deriveProjectCode } from '~/utils/ticket'
-import { migrateVindictaJson } from '~/utils/migration'
+import { migrateVindicterJson } from '~/utils/migration'
 import { generateId } from '~/utils/id'
 import { nowISO } from '~/utils/date'
 
 const FILENAME = 'vindicta.json'
-const SCHEMA_URL = 'https://raw.githubusercontent.com/surelle-ha/vindicta/main/schema/v8.json'
+const SCHEMA_URL = 'https://raw.githubusercontent.com/surelle-ha/vindicter/main/schema/v8.json'
 
-export function useVindictaJson() {
+export function useVindicterJson() {
   const fs = useTauriFs()
 
   function vindictaPath(projectPath: string): string {
     return `${projectPath}/${FILENAME}`
   }
 
-  async function read(projectPath: string): Promise<VindictaJson> {
+  async function read(projectPath: string): Promise<VindicterJson> {
     const path = vindictaPath(projectPath)
     const raw = await fs.readTextFile(path)
     const parsed = JSON.parse(raw)
-    return migrateVindictaJson(parsed)
+    return migrateVindicterJson(parsed)
   }
 
-  async function write(projectPath: string, data: VindictaJson): Promise<void> {
+  async function write(projectPath: string, data: VindicterJson): Promise<void> {
     const path = vindictaPath(projectPath)
     await fs.writeTextFile(path, JSON.stringify(data, null, 2))
   }
@@ -30,9 +30,9 @@ export function useVindictaJson() {
   async function createProject(
     projectPath: string,
     meta: Omit<ProjectMeta, 'id' | 'createdAt' | 'updatedAt' | 'ticketCounter'>,
-  ): Promise<VindictaJson> {
+  ): Promise<VindicterJson> {
     const now = nowISO()
-    const data: VindictaJson = {
+    const data: VindicterJson = {
       $schema: SCHEMA_URL,
       version: VINDICTA_SCHEMA_VERSION,
       meta: {

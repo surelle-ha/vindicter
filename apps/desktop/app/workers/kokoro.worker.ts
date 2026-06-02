@@ -1,4 +1,4 @@
-// Kokoro TTS inference worker — adapted from Varg (Vindicta sibling project)
+// Kokoro TTS inference worker — adapted from Varg (Vindicter sibling project)
 // Runs KokoroTTS ONNX inference in a background thread to avoid blocking the UI.
 // Communicates via postMessage. Model files must be cached in the browser Cache API
 // (use the Kokoro download section in AI Models to populate the cache first).
@@ -69,7 +69,7 @@ async function populateCache(
       if (!res.ok) continue
       await cache.put(cacheKey, res)
     } catch (e) {
-      console.warn(`[Vindicta] Failed to cache ${hfPath}:`, e)
+      console.warn(`[Vindicter] Failed to cache ${hfPath}:`, e)
     }
   }
 }

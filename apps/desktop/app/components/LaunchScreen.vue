@@ -85,11 +85,11 @@ function onKey(e: KeyboardEvent) {
               <div class="text-center">
                 <img
                   src="/icon.png"
-                  alt="Vindicta"
+                  alt="Vindicter"
                   class="mx-auto size-24 select-none rounded-2xl object-cover drop-shadow-2xl"
                   draggable="false"
                 >
-                <h1 class="mt-4 text-2xl font-bold tracking-tight text-white/90">Vindicta</h1>
+                <h1 class="mt-4 text-2xl font-bold tracking-tight text-white/90">Vindicter</h1>
                 <div class="mt-3">
                   <p class="text-sm text-white/30 tracking-wide">Your local security companion</p>
                   <TextType :text="launchMessages" class-name="mt-3 min-h-5 text-sm font-medium text-indigo-100/55"
@@ -104,10 +104,10 @@ function onKey(e: KeyboardEvent) {
               <button
                 class="pointer-events-auto cursor-pointer rounded-lg border border-indigo-300/35 bg-white/[0.03] px-8 py-2.5 text-sm font-semibold text-indigo-100 shadow-lg shadow-indigo-950/30 transition-colors hover:border-indigo-200/60 hover:bg-indigo-500/10 hover:text-white"
                 @click="enter">
-                Enter Vindicta
+                Enter Vindicter
               </button>
               <p class="max-w-lg text-center text-[10px] leading-relaxed text-white/25">
-                By entering and using Vindicta, you accept responsibility for your actions. The developers of Vindicta and the bundled or integrated tools are not liable for damage, misuse, or unauthorized activity.
+                By entering and using Vindicter, you accept responsibility for your actions. The developers of Vindicter and the bundled or integrated tools are not liable for damage, misuse, or unauthorized activity.
               </p>
             </div>
           </div>

@@ -20,8 +20,8 @@ export async function runOpenRouterChat(opts: OpenRouterChatOptions): Promise<st
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://github.com/surelle-ha/vindicta',
-      'X-Title': 'Vindicta',
+      'HTTP-Referer': 'https://github.com/surelle-ha/vindicter',
+      'X-Title': 'Vindicter',
     },
     body: JSON.stringify({
       model: opts.model || 'openai/gpt-4.1-mini',

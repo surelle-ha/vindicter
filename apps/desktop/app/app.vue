@@ -17,6 +17,8 @@ useHead({
   },
 })
 
+const showDoctorModal = ref(false)
+
 onMounted(() => {
   document.addEventListener('contextmenu', (e) => e.preventDefault())
   if (app.wslAutoStart) {
@@ -31,6 +33,10 @@ async function onLaunched() {
     await router.push('/onboarding')
   } else {
     await router.push('/')
+    if (!app.doctorModalSeen) {
+      // Brief delay to let the home page render first
+      setTimeout(() => { showDoctorModal.value = true }, 800)
+    }
   }
 }
 
@@ -53,5 +59,6 @@ async function startConfiguredWslBackends() {
       <NuxtPage />
     </NuxtLayout>
     <ContextMenu />
+    <DoctorModal v-if="showDoctorModal" @close="showDoctorModal = false" />
   </template>
 </template>

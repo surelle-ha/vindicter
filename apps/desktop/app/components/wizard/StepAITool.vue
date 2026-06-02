@@ -65,7 +65,7 @@ function toggleTool(slug: AIToolSlug) {
     <div>
       <h3 class="text-base font-semibold text-white mb-1">Your AI tools</h3>
       <p class="text-sm text-white/40">
-        Select one or more AI tools for this project. Vindicta can track the tools you plan to use and ask which one should drive the project workflow.
+        Select one or more AI tools for this project. Vindicter can track the tools you plan to use and ask which one should drive the project workflow.
       </p>
     </div>
 
@@ -111,7 +111,7 @@ function toggleTool(slug: AIToolSlug) {
 
     <div class="glass-sm p-4 rounded-xl border-indigo-500/20 bg-indigo-500/5">
       <p class="text-xs text-white/50 leading-relaxed">
-        You can select multiple tools now. The first time you open the project, Vindicta will ask which tool should be active for the project workspace.
+        You can select multiple tools now. The first time you open the project, Vindicter will ask which tool should be active for the project workspace.
       </p>
     </div>
   </div>

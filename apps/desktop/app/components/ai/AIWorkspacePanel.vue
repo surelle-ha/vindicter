@@ -69,7 +69,7 @@ const selectedJobReason = computed(() => {
   return job.error
     || job.summary
     || job.events.find(event => event.status === job.status)?.detail
-    || 'The AI job stopped before Vindicta received a complete report.'
+    || 'The AI job stopped before Vindicter received a complete report.'
 })
 const workspaceTabs = computed(() => [
   { id: 'tickets' as const, label: 'Ticket Steps', icon: Bot, count: selectedSprintTickets.value.length },
@@ -212,7 +212,7 @@ function buildSprintHandoverPrompt(s: Sprint, tickets: Ticket[], effort: string)
     description: ticket.description,
   }))
 
-  return `You are Codex working inside Vindicta. The user is resuming an interrupted AI handover for an entire sprint.
+  return `You are Codex working inside Vindicter. The user is resuming an interrupted AI handover for an entire sprint.
 
 Project: ${project.value?.name ?? 'Unknown project'}
 Sprint: ${s.name}
@@ -348,9 +348,9 @@ async function applyHandoverArtifacts(jobId: string, rawText: string, sprintTick
 
   for (const update of ticketUpdates) {
     const ticket = kanban.tickets.find(item => item.id === update.ticketId)
-    if (ticket?.comments?.some(comment => comment.text.startsWith('AI handover completed, but Vindicta could not parse structured ticket updates.'))) {
+    if (ticket?.comments?.some(comment => comment.text.startsWith('AI handover completed, but Vindicter could not parse structured ticket updates.'))) {
       await kanban.updateTicket(update.ticketId, {
-        comments: ticket.comments.filter(comment => !comment.text.startsWith('AI handover completed, but Vindicta could not parse structured ticket updates.')),
+        comments: ticket.comments.filter(comment => !comment.text.startsWith('AI handover completed, but Vindicter could not parse structured ticket updates.')),
       })
     }
     await kanban.moveTicket(update.ticketId, update.status)
@@ -504,7 +504,7 @@ async function resumeSelectedHandover() {
       reasoningEffort: effort,
       sandbox: 'workspace-write',
     })
-    aiActivity.addEvent(jobId, 'Reading Codex report', 'Codex returned control to Vindicta. Parsing the resumed handover report and status.', 'running')
+    aiActivity.addEvent(jobId, 'Reading Codex report', 'Codex returned control to Vindicter. Parsing the resumed handover report and status.', 'running')
     const responseText = [result.stdout, result.stderr].filter(Boolean).join('\n').trim()
     if (result.code !== 0) throw new Error(responseText || 'Codex handover failed.')
     if (!responseText) throw new Error('Codex completed without returning a handover report.')
@@ -761,7 +761,7 @@ async function resumeSelectedHandover() {
               <h2 class="text-sm font-semibold text-[var(--text)]">Observable Activity</h2>
             </div>
             <p class="mt-2 text-xs leading-relaxed text-[var(--text-muted)]">
-              Codex private thoughts are not exposed. Vindicta shows observable activity, file mentions, comments, and returned reports.
+              Codex private thoughts are not exposed. Vindicter shows observable activity, file mentions, comments, and returned reports.
             </p>
           </div>
           <div v-if="activityEvents.length > eventPageSize" class="flex items-center gap-2">

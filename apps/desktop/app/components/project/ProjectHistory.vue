@@ -11,7 +11,7 @@ const loading = ref(true)
 async function loadHistory() {
   loading.value = true
   try {
-    const { read } = useVindictaJson()
+    const { read } = useVindicterJson()
     const data = await read(props.projectPath)
     history.value = data.history
   }

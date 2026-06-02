@@ -53,7 +53,7 @@ export function friendlyCodexExecError(error: unknown) {
   }
 
   if (/sep is not defined/i.test(message)) {
-    return 'Vindicta could not prepare the Codex run because of a local path handling error. Please update Vindicta and try again.'
+    return 'Vindicter could not prepare the Codex run because of a local path handling error. Please update Vindicter and try again.'
   }
 
   return message || 'Codex could not run. Check Settings > Doctor, then try again.'

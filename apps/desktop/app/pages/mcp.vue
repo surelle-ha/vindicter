@@ -16,7 +16,7 @@ const activeProject = computed(() => projects.activeProject)
 const tools = [
   {
     name: 'list_projects',
-    description: 'Returns all projects registered in Vindicta.',
+    description: 'Returns all projects registered in Vindicter.',
     params: 'none',
   },
   {
@@ -49,9 +49,9 @@ const tools = [
 const claudeDesktopConfig = computed(() => {
   const config = {
     mcpServers: {
-      vindicta: {
+      vindicter: {
         command: 'node',
-        args: ['<path-to-vindicta-mcp-server.js>'],
+        args: ['<path-to-vindicter-mcp-server.js>'],
         env: {
           VINDICTA_PORT: String(serverPort.value),
         },
@@ -142,7 +142,7 @@ const path = require('path');
 const port = ${serverPort.value};
 const projectPath = ${JSON.stringify(projectPath)};
 
-function readVindictaJson(p) {
+function readVindicterJson(p) {
   try {
     const file = path.join(p, 'vindicta.json');
     return JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -151,7 +151,7 @@ function readVindictaJson(p) {
 
 function loadProjects() {
   try {
-    const store = path.join(process.env.APPDATA || process.env.HOME, '.vindicta', 'vindicta-app.bin');
+    const store = path.join(process.env.APPDATA || process.env.HOME, '.vindicta', 'vindicter-app.bin');
     if (fs.existsSync(store)) {
       const data = JSON.parse(fs.readFileSync(store, 'utf8'));
       return data.projects || [];
@@ -169,7 +169,7 @@ const tools = [
 ];
 
 function handleTool(name, args) {
-  const vj = readVindictaJson(projectPath);
+  const vj = readVindicterJson(projectPath);
   if (!vj) return { error: 'Could not read vindicta.json from ' + projectPath };
   const sec = vj.security || {};
   if (name === 'list_projects') return [{ id: vj.meta?.id, name: vj.meta?.name, path: projectPath }];
@@ -206,7 +206,7 @@ const server = http.createServer((req, res) => {
     try {
       const rpc = JSON.parse(body);
       let result;
-      if (rpc.method === 'initialize') result = { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'vindicta-mcp', version: '1.0.0' } };
+      if (rpc.method === 'initialize') result = { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'vindicter-mcp', version: '1.0.0' } };
       else if (rpc.method === 'tools/list') result = { tools };
       else if (rpc.method === 'tools/call') result = { content: [{ type: 'text', text: JSON.stringify(handleTool(rpc.params?.name, rpc.params?.arguments), null, 2) }] };
       else result = { error: { code: -32601, message: 'Method not found' } };
@@ -217,7 +217,7 @@ const server = http.createServer((req, res) => {
     }
   });
 });
-server.listen(port, '127.0.0.1', () => console.log('Vindicta MCP server listening on http://127.0.0.1:' + port));
+server.listen(port, '127.0.0.1', () => console.log('Vindicter MCP server listening on http://127.0.0.1:' + port));
 process.on('SIGTERM', () => { server.close(); process.exit(0); });
 `
 }
@@ -231,7 +231,7 @@ process.on('SIGTERM', () => { server.close(); process.exit(0); });
       </div>
       <div>
         <h1 class="font-display text-lg font-bold text-[var(--text)]">MCP Server</h1>
-        <p class="text-xs text-[var(--text-muted)]">Expose Vindicta to AI agents via the Model Context Protocol.</p>
+        <p class="text-xs text-[var(--text-muted)]">Expose Vindicter to AI agents via the Model Context Protocol.</p>
       </div>
     </div>
 
@@ -330,7 +330,7 @@ process.on('SIGTERM', () => { server.close(); process.exit(0); });
           </div>
           <p class="mt-2 text-xs leading-relaxed text-[var(--text-muted)]">
             The Model Context Protocol (MCP) lets AI agents like Claude connect to external tools and data sources.
-            Starting this server exposes Vindicta's security findings, scan history, and diagnostics to any MCP-compatible agent.
+            Starting this server exposes Vindicter's security findings, scan history, and diagnostics to any MCP-compatible agent.
           </p>
         </section>
 

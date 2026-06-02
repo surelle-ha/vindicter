@@ -204,7 +204,7 @@ export const DEFAULT_ROLES: Role[] = [
   { id: 'role_lead', name: 'Tech Lead',  color: '#f59e0b' },
 ]
 
-export interface VindictaJson {
+export interface VindicterJson {
   $schema: string
   version: number
   meta: ProjectMeta

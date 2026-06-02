@@ -30,9 +30,9 @@ type CacheMeta = Record<string, { voice: string; generatedAt: string; charCount:
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const PREFS_KEY       = 'vindicta:academy:tts:prefs'
-const CACHE_META_KEY  = 'vindicta:academy:tts:cache'
-const AUDIO_CACHE     = 'vindicta-academy-tts'
+const PREFS_KEY       = 'vindicter:academy:tts:prefs'
+const CACHE_META_KEY  = 'vindicter:academy:tts:cache'
+const AUDIO_CACHE     = 'vindicter-academy-tts'
 const KOKORO_CACHE    = 'transformers-cache'
 const KOKORO_CONFIG_URL = 'https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/config.json'
 

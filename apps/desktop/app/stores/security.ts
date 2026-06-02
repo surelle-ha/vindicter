@@ -213,7 +213,7 @@ export const useSecurityStore = defineStore('security', {
       try {
         let projectSecurity: SecurityData | null = null
         try {
-          const { read } = useVindictaJson()
+          const { read } = useVindicterJson()
           const data = await read(projectPath)
           this.projectId = projectId ?? data.meta.id
           projectSecurity = normalizeSecurityData(data.security)
@@ -254,7 +254,7 @@ export const useSecurityStore = defineStore('security', {
       catch {
         if (typeof localStorage === 'undefined') return null
         for (const key of keys) {
-          const raw = localStorage.getItem(`vindicta-${key}`)
+          const raw = localStorage.getItem(`vindicter-${key}`)
           if (raw) return normalizeSecurityData(JSON.parse(raw))
         }
         return null
@@ -275,7 +275,7 @@ export const useSecurityStore = defineStore('security', {
       catch {
         if (typeof localStorage !== 'undefined') {
           for (const key of keys.slice(0, 2)) {
-            localStorage.setItem(`vindicta-${key}`, JSON.stringify(snapshot))
+            localStorage.setItem(`vindicter-${key}`, JSON.stringify(snapshot))
           }
         }
       }
@@ -287,7 +287,7 @@ export const useSecurityStore = defineStore('security', {
       const snapshot = JSON.parse(JSON.stringify(this.data)) as SecurityData
       const projectPath = this.projectPath
       const run = async () => {
-        const { patchSecurity } = useVindictaJson()
+        const { patchSecurity } = useVindicterJson()
         const errors: unknown[] = []
         await patchSecurity(projectPath, snapshot).catch(error => errors.push(error))
         await this.persistBackup().catch(error => errors.push(error))
@@ -331,7 +331,7 @@ export const useSecurityStore = defineStore('security', {
       }
       this.data.scans = [scan, ...this.data.scans].slice(0, 30)
       await this.persist()
-      const { appendHistory } = useVindictaJson()
+      const { appendHistory } = useVindicterJson()
       await appendHistory(project.absolutePath, {
         action: 'security:scan_completed',
         actor: 'Codex',

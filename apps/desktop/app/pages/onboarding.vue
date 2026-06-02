@@ -142,7 +142,7 @@ function skip() {
 
         <div class="rounded-lg border border-indigo-500/15 bg-indigo-500/[0.06] px-3 py-2.5">
           <p class="text-xs leading-relaxed text-white/45">
-            Vindicta uses this local profile to tune academy guidance, scan depth, pentest workflows, and vulnerability review detail.
+            Vindicter uses this local profile to tune academy guidance, scan depth, pentest workflows, and vulnerability review detail.
           </p>
         </div>
 

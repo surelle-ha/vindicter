@@ -1,4 +1,4 @@
-// Kokoro TTS composable — adapted from Varg (Vindicta sibling project)
+// Kokoro TTS composable — adapted from Varg (Vindicter sibling project)
 // Singleton module-level state so the worker and model are shared across the app.
 // Call init() once (e.g. when TTS is first activated), then generate() for each lesson.
 

@@ -1,11 +1,11 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "identifier": "com.vindicta.app",
-  "productName": "Vindicta",
+  "productName": "Vindicter",
   "version": "0.4.0",
   "build": {
-    "beforeDevCommand": "pnpm --filter @vindicta/desktop dev",
-    "beforeBuildCommand": "pnpm --filter @vindicta/desktop generate",
+    "beforeDevCommand": "pnpm --filter @vindicter/desktop dev",
+    "beforeBuildCommand": "pnpm --filter @vindicter/desktop generate",
     "devUrl": "http://localhost:3000",
     "frontendDist": "../.output/public"
   },
@@ -13,7 +13,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
-        "title": "Vindicta",
+        "title": "Vindicter",
         "width": 1280,
         "height": 800,
         "minWidth": 960,

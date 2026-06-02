@@ -58,6 +58,7 @@ interface AppSettings {
   featuresModalDismissed: boolean
   vigilanteEnabled: boolean
   mcpInSidebar: boolean
+  doctorModalSeen: boolean
 }
 
 const DEFAULT_SMTP: SmtpSettings = {
@@ -72,7 +73,7 @@ const DEFAULT_SMTP: SmtpSettings = {
 }
 
 const DEFAULT_CONTACT: ContactSettings = {
-  githubRepo: 'Surelle-ha/vindicta',
+  githubRepo: 'Surelle-ha/vindicter',
   githubToken: '',
 }
 
@@ -142,6 +143,7 @@ export const useAppStore = defineStore('app', {
     featuresModalDismissed: false,
     vigilanteEnabled: false,
     mcpInSidebar: true,
+    doctorModalSeen: false,
   }),
 
   actions: {
@@ -163,10 +165,11 @@ export const useAppStore = defineStore('app', {
           this.featuresModalDismissed = saved.featuresModalDismissed ?? false
           this.vigilanteEnabled = saved.vigilanteEnabled ?? false
           this.mcpInSidebar = saved.mcpInSidebar ?? true
+          this.doctorModalSeen = (saved as any).doctorModalSeen ?? false
         }
       }
       catch {
-        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('vindicta-app-settings') : null
+        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('vindicter-app-settings') : null
         if (raw) {
           try {
             const saved = JSON.parse(raw) as Partial<AppSettings>
@@ -182,6 +185,7 @@ export const useAppStore = defineStore('app', {
             this.featuresModalDismissed = saved.featuresModalDismissed ?? false
             this.vigilanteEnabled = saved.vigilanteEnabled ?? false
             this.mcpInSidebar = saved.mcpInSidebar ?? true
+            this.doctorModalSeen = (saved as any).doctorModalSeen ?? false
           }
           catch { /* ignore */ }
         }
@@ -254,6 +258,11 @@ export const useAppStore = defineStore('app', {
       await this._persist()
     },
 
+    async dismissDoctorModal() {
+      this.doctorModalSeen = true
+      await this._persist()
+    },
+
     async setVigilante(value: boolean) {
       this.vigilanteEnabled = value
       await this._persist()
@@ -278,6 +287,7 @@ export const useAppStore = defineStore('app', {
         featuresModalDismissed: this.featuresModalDismissed,
         vigilanteEnabled: this.vigilanteEnabled,
         mcpInSidebar: this.mcpInSidebar,
+        doctorModalSeen: this.doctorModalSeen,
       }
       try {
         const { useTauriStore } = await import('~/composables/useTauriStore')
@@ -287,7 +297,7 @@ export const useAppStore = defineStore('app', {
       }
       catch {
         if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('vindicta-app-settings', JSON.stringify(settings))
+          localStorage.setItem('vindicter-app-settings', JSON.stringify(settings))
         }
       }
     },

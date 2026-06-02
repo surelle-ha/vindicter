@@ -13,7 +13,7 @@ export interface FeedItem {
   meta?: Record<string, string>
 }
 
-const STORAGE_KEY = 'vindicta:notif-feed:v1'
+const STORAGE_KEY = 'vindicter:notif-feed:v1'
 const MAX_ITEMS = 100
 
 export const useNotificationFeedStore = defineStore('notificationFeed', {
