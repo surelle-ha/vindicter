@@ -5,6 +5,10 @@
     "desktop:dev": "pnpm --filter @vindicter/desktop tauri:dev",
     "desktop:build": "pnpm --filter @vindicter/desktop tauri:build",
     "web-landing:dev": "pnpm --filter @vindicter/web-landing dev",
-    "web-dashboard:dev": "pnpm --filter @vindicter/web-dashboard dev"
+    "web-dashboard:dev": "pnpm --filter @vindicter/web-dashboard dev",
+    "api:dev": "pnpm --filter @vindicter/api start:dev",
+    "api:build": "pnpm --filter @vindicter/api build",
+    "api:migrate": "pnpm --filter @vindicter/api migration:run",
+    "api:seed": "pnpm --filter @vindicter/api seed"
   }
 }
