@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/surelle-ha/vindicter/main/schema/v8.json",
+  "$schema": "https://raw.githubusercontent.com/Vindicter/vindicter/main/schema/v8.json",
   "version": 8,
   "meta": {
     "name": "vindicter",
@@ -18,7 +18,7 @@
     "id": "DINC4-ybmY7JA0o6bcD1b",
     "ticketCounter": 0,
     "createdAt": "2026-06-02T15:00:34.109Z",
-    "updatedAt": "2026-06-02T15:17:45.102Z",
+    "updatedAt": "2026-06-02T17:53:31.440Z",
     "pentestPromptDismissed": true
   },
   "settings": {
@@ -91,11 +91,11 @@
   "tickets": [],
   "sprints": [],
   "security": {
-    "findingCounter": 3,
+    "findingCounter": 5,
     "findings": [
       {
-        "id": "UHZ4CgE-ZZTJWzEIS7ZFt",
-        "number": 3,
+        "id": "qfqHFu7TSxxM_o3Q3fMsO",
+        "number": 5,
         "title": "Floating dependency versions detected",
         "severity": "low",
         "status": "open",
@@ -105,8 +105,8 @@
         "detail": "One or more dependencies use latest or wildcard versions, increasing supply-chain drift risk.",
         "evidence": "@pinia/nuxt@latest in D:\\Workspace\\vindicta\\apps\\desktop\\package.json\n@vueuse/core@latest in D:\\Workspace\\vindicta\\apps\\desktop\\package.json\n@vueuse/nuxt@latest in D:\\Workspace\\vindicta\\apps\\desktop\\package.json\nlucide-vue-next@latest in D:\\Workspace\\vindicta\\apps\\desktop\\package.json\nlucide-vue-next@latest in D:\\Workspace\\vindicta\\apps\\web-dashboard\\package.json\nlucide-vue-next@latest in D:\\Workspace\\vindicta\\apps\\web-landing\\package.json\nnanoid@latest in D:\\Workspace\\vindicta\\apps\\desktop\\package.json\npinia@latest in D:\\Workspace\\vindicta\\apps\\desktop\\package.json\ntailwindcss@latest in D:\\Workspace\\vindicta\\apps\\desktop\\package.json\ntailwindcss@latest in D:\\Workspace\\vindicta\\apps\\web-dashboard\\package.json\ntailwindcss@latest in D:\\Workspace\\vindicta\\apps\\web-landing\\package.json\ntypescript@latest in D:\\Workspace\\vindicta\\apps\\desktop\\package.json\ntypescript@latest in D:\\Workspace\\vindicta\\apps\\web-dashboard\\package.json\ntypescript@latest in D:\\Workspace\\vindicta\\apps\\web-landing\\package.json\nvue@latest in D:\\Workspace\\vindicta\\apps\\desktop\\package.json\nvue@latest in D:\\Workspace\\vindicta\\apps\\web-dashboard\\package.json\nvue@latest in D:\\Workspace\\vindicta\\apps\\web-landing\\package.json\nvue-router@latest in D:\\Workspace\\vindicta\\apps\\desktop\\package.json",
         "recommendation": "Pin package ranges intentionally and rely on reviewed dependency update workflows.",
-        "createdAt": "2026-06-02T15:12:14.420Z",
-        "updatedAt": "2026-06-02T15:12:14.420Z",
+        "createdAt": "2026-06-02T17:53:30.194Z",
+        "updatedAt": "2026-06-02T17:53:30.194Z",
         "resolvedAt": null,
         "scanId": null
       }
@@ -128,74 +128,80 @@
           {
             "id": "AI-SEC-001",
             "title": "Unauthenticated local MCP server exposes project security data",
-            "area": "apps/desktop/app/pages/mcp.vue",
             "severity": "high",
             "category": "Broken Access Control",
             "source": "ai_review",
+            "area": "apps/desktop/app/pages/mcp.vue",
             "detail": "The MCP server binds to 127.0.0.1 and sets Access-Control-Allow-Origin to *, with no authentication token or origin check. Any malicious website visited in the user's browser can send POST requests to the local port while the server is running and read active project paths, findings, scan history, and security summaries.",
-            "recommendation": "Require a random per-session bearer token for all MCP requests, remove wildcard CORS, reject browser origins by default, and display/copy the token only to the intended MCP client. Consider a named pipe or stdio MCP transport instead of an unauthenticated HTTP listener.",
             "evidence": "buildInlineServer() in apps/desktop/app/pages/mcp.vue creates an HTTP server on 127.0.0.1:${serverPort}, sets Access-Control-Allow-Origin: *, and exposes tools/list and tools/call for get_findings, get_scans, get_security_summary, and run_diagnostics.",
-            "selected": true
+            "recommendation": "Require a random per-session bearer token for all MCP requests, remove wildcard CORS, reject browser origins by default, and display/copy the token only to the intended MCP client. Consider a named pipe or stdio MCP transport instead of an unauthenticated HTTP listener.",
+            "selected": true,
+            "whitelisted": false
           },
           {
             "id": "AI-SEC-002",
             "title": "Renderer can invoke arbitrary local execution primitives",
-            "area": "apps/desktop/tauri/capabilities/default.json",
             "severity": "high",
             "category": "Insecure Desktop Capability Configuration",
             "source": "ai_review",
+            "area": "apps/desktop/tauri/capabilities/default.json",
             "detail": "The Tauri shell capability exposes arbitrary execution surfaces to the main renderer, including node -e with any script and wsl bash -c with any command. If any renderer dependency, markdown rendering path, AI output path, or future XSS bug is compromised, the attacker can escalate directly to local Node or WSL command execution.",
-            "recommendation": "Remove generic node -e and wsl bash -c capabilities. Move needed behavior into narrow Rust commands with fixed operations, strict input schemas, and fixed working directories. Split capabilities per window/feature and grant shell execution only when the UI actually needs it.",
             "evidence": "apps/desktop/tauri/capabilities/default.json allows shell:allow-spawn node-mcp-server with args ['-e', '(?s).*'] and shell:allow-execute wsl-exec with args ['bash', '-c', '(?s).*']; codex execution also allows workspace-write and arbitrary prompt content.",
-            "selected": true
+            "recommendation": "Remove generic node -e and wsl bash -c capabilities. Move needed behavior into narrow Rust commands with fixed operations, strict input schemas, and fixed working directories. Split capabilities per window/feature and grant shell execution only when the UI actually needs it.",
+            "selected": true,
+            "whitelisted": false
           },
           {
             "id": "AI-SEC-003",
             "title": "Tauri filesystem scope permits whole-disk read, write, and delete",
-            "area": "apps/desktop/tauri/capabilities/default.json",
             "severity": "high",
             "category": "Insecure Filesystem Permissions",
             "source": "ai_review",
+            "area": "apps/desktop/tauri/capabilities/default.json",
             "detail": "The renderer is granted filesystem read, write, mkdir, and remove permissions over effectively the entire filesystem. A renderer compromise could read local secrets, overwrite project files, or delete arbitrary user-accessible files outside the selected project.",
-            "recommendation": "Restrict fs:scope to app data, temporary download locations, and explicitly selected project directories. Use dialog-scoped permissions or Rust-side file operations that validate paths stay under the active project root before reading, writing, or removing files.",
             "evidence": "apps/desktop/tauri/capabilities/default.json grants fs:allow-read-file, fs:allow-write-file, fs:allow-remove, fs:allow-mkdir, and fs:scope allow entries for **, $HOME/**, and ?:/**.",
-            "selected": true
+            "recommendation": "Restrict fs:scope to app data, temporary download locations, and explicitly selected project directories. Use dialog-scoped permissions or Rust-side file operations that validate paths stay under the active project root before reading, writing, or removing files.",
+            "selected": true,
+            "whitelisted": false
           },
           {
             "id": "AI-SEC-004",
             "title": "Long-lived API tokens are stored without OS-backed protection",
-            "area": "apps/desktop/app/stores/app.ts, apps/desktop/app/stores/auth.ts, apps/desktop/app/composables/useTauriStore.ts",
             "severity": "medium",
             "category": "Secrets Handling",
             "source": "ai_review",
+            "area": "apps/desktop/app/stores/app.ts, apps/desktop/app/stores/auth.ts, apps/desktop/app/composables/useTauriStore.ts",
             "detail": "OpenRouter API keys, SMTP passwords, contact GitHub tokens, and GitHub OAuth access tokens are persisted to a Tauri Store file, with a localStorage fallback for app settings. The GitHub login requests the broad repo scope, so theft of this local token can expose or modify private repositories depending on granted permissions.",
-            "recommendation": "Store secrets in the OS credential vault or an encrypted Tauri secret store, remove localStorage secret fallback, request the minimum GitHub scopes needed, and provide token revocation/rotation on logout or credential changes.",
             "evidence": "useTauriStore.ts loads vindicter-app.bin; app.ts persists smtp.password, contact.githubToken, and openRouter.apiKey under app-settings and falls back to localStorage; auth.ts persists github.accessToken under auth-state; login.vue requests scope 'read:user user:email repo'.",
-            "selected": true
+            "recommendation": "Store secrets in the OS credential vault or an encrypted Tauri secret store, remove localStorage secret fallback, request the minimum GitHub scopes needed, and provide token revocation/rotation on logout or credential changes.",
+            "selected": true,
+            "whitelisted": false
           },
           {
             "id": "AI-SEC-005",
             "title": "GitHub OAuth client secret is present in local environment config",
-            "area": ".env and .env.example",
             "severity": "medium",
             "category": "Secrets Handling",
             "source": "ai_review",
+            "area": ".env and .env.example",
             "detail": "The workspace contains a real-looking GITHUB_CLIENT_SECRET in .env, and the example file encourages configuring a client secret for a desktop OAuth flow. Desktop clients cannot keep OAuth client secrets confidential; accidental disclosure through logs, support bundles, local compromise, or misconfigured commits would compromise the OAuth app secret.",
-            "recommendation": "Revoke and rotate the exposed OAuth client secret, remove client-secret requirements from desktop configuration, and use a public-client device flow with only the client ID. Keep any true OAuth secrets exclusively in a backend service.",
             "evidence": ".env contains VITE_GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET; .env.example documents GITHUB_CLIENT_SECRET; the release workflow writes only GH_CLIENT_ID into apps/desktop/tauri/.env, indicating the secret is not needed for the device flow.",
-            "selected": true
+            "recommendation": "Revoke and rotate the exposed OAuth client secret, remove client-secret requirements from desktop configuration, and use a public-client device flow with only the client ID. Keep any true OAuth secrets exclusively in a backend service.",
+            "selected": true,
+            "whitelisted": false
           },
           {
             "id": "AI-SEC-006",
             "title": "Anonymous Supabase insert policies allow unauthenticated data flooding",
-            "area": "apps/web-landing/supabase/migrations/001_initial.sql",
             "severity": "medium",
             "category": "Insecure Design / Resource Abuse",
             "source": "ai_review",
+            "area": "apps/web-landing/supabase/migrations/001_initial.sql",
             "detail": "Public RLS policies allow anonymous users to insert arbitrary newsletter signups, special beta applications, and support tickets with WITH CHECK true. Attackers can automate direct Supabase API calls with the public anon key to flood storage, consume quota, and poison admin workflows.",
-            "recommendation": "Route public submissions through a server-side endpoint or Supabase Edge Function with CAPTCHA/turnstile, IP and email rate limits, field length limits, and abuse monitoring. Keep RLS inserts constrained to validated server-side writes where possible.",
             "evidence": "001_initial.sql defines anon_insert_newsletter, anon_insert_special_beta, and anon_insert_support_ticket policies FOR INSERT TO anon WITH CHECK (true); support.vue, special-beta.vue, and standard-beta.vue insert directly from the client.",
-            "selected": true
+            "recommendation": "Route public submissions through a server-side endpoint or Supabase Edge Function with CAPTCHA/turnstile, IP and email rate limits, field length limits, and abuse monitoring. Keep RLS inserts constrained to validated server-side writes where possible.",
+            "selected": true,
+            "whitelisted": false
           }
         ],
         "parseWarning": null

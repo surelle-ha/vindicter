@@ -10,15 +10,26 @@ import { SpecialBetaApplication } from '../modules/beta/entities/special-beta-ap
 import { SupportTicket } from '../modules/support/entities/support-ticket.entity'
 import { ApiToken } from '../modules/api-tokens/entities/api-token.entity'
 
-export const databaseConfig = (): TypeOrmModuleOptions => ({
-  type: 'postgres',
-  url: process.env.DATABASE_URL,
-  entities: [
-    User, Role, Access, RoleAccess, UserRole,
-    NewsletterSignup, NewsletterUpdate,
-    SpecialBetaApplication, SupportTicket, ApiToken,
-  ],
-  migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
-  synchronize: false,
-  logging: process.env.NODE_ENV === 'development',
-})
+export const databaseConfig = (): TypeOrmModuleOptions => {
+  const url = process.env.DATABASE_URL ?? ''
+  if (!url.startsWith('postgres://') && !url.startsWith('postgresql://')) {
+    throw new Error(
+      'DATABASE_URL must be a PostgreSQL connection string (postgres:// or postgresql://). ' +
+      'Only PostgreSQL is supported.',
+    )
+  }
+
+  return {
+    type: 'postgres',
+    url,
+    entities: [
+      User, Role, Access, RoleAccess, UserRole,
+      NewsletterSignup, NewsletterUpdate,
+      SpecialBetaApplication, SupportTicket, ApiToken,
+    ],
+    migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
+    synchronize: false,
+    logging: process.env.NODE_ENV === 'development',
+    ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  }
+}
