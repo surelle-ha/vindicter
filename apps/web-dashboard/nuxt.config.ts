@@ -9,6 +9,9 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-05-12',
   ssr: true,
   modules: [],
+  nitro: {
+    preset: 'vercel',
+  },
   runtimeConfig: {
     public: {
       supabaseUrl:      process.env.SUPABASE_URL                   ?? '',
