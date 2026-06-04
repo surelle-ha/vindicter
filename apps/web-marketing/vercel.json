@@ -1,7 +1,7 @@
 {
   "framework": null,
-  "buildCommand": "cd ../.. && pnpm --filter @vindicter/web-marketing build",
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "buildCommand": "nuxt build",
   "outputDirectory": ".output/public",
   "rewrites": [
     { "source": "/((?!_nuxt|favicon|icon).*)", "destination": "/index.html" }
