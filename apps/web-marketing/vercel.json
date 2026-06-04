@@ -1,7 +1,8 @@
 {
-  "framework": "nuxtjs",
   "buildCommand": "cd ../.. && pnpm --filter @vindicter/web-marketing build",
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
-  "outputDirectory": ".vercel/output",
-  "devCommand": "nuxt dev"
+  "outputDirectory": ".output/public",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/200.html" }
+  ]
 }

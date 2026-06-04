@@ -9,7 +9,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-05-12',
   buildDir: process.env.NUXT_BUILD_DIR ?? 'node_modules/.cache/nuxt/.nuxt',
   ssr: true,
-  nitro: { preset: 'vercel' },
+  nitro: { preset: 'static' },
   modules: ['@pinia/nuxt'],
   runtimeConfig: {
     public: {
