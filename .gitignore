@@ -4,6 +4,8 @@ node_modules/
 # Nuxt build
 .nuxt/
 .output/
+.vercel/
+dist/
 apps/desktop/dist/
 
 # Tauri
