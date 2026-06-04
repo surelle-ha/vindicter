@@ -61,11 +61,25 @@ const claudeDesktopConfig = computed(() => {
   return JSON.stringify(config, null, 2)
 })
 
+async function isPortInUse(port: number): Promise<boolean> {
+  try {
+    const resp = await fetch(`http://localhost:${port}`, { signal: AbortSignal.timeout(1000) })
+    return resp.ok || resp.status >= 400
+  }
+  catch { return false }
+}
+
 async function startServer() {
   if (serverRunning.value || serverStarting.value) return
   serverStarting.value = true
   serverLog.value = []
   try {
+    if (await isPortInUse(serverPort.value)) {
+      const alt = serverPort.value + 1
+      serverLog.value.push(`[warn] Port ${serverPort.value} is already in use. Try port ${alt} or stop the other process first.`)
+      notify(`Port ${serverPort.value} is in use. Change the port or stop the conflicting process.`, 'error')
+      return
+    }
     const { Command } = await import('@tauri-apps/plugin-shell')
     const projectPath = activeProject.value?.absolutePath ?? ''
 
@@ -84,10 +98,12 @@ async function startServer() {
     })
     cmd.on('close', () => {
       serverRunning.value = false
+      serverProcess = null
       serverLog.value.push('[server stopped]')
     })
     cmd.on('error', (err: string) => {
       serverRunning.value = false
+      serverProcess = null
       serverLog.value.push(`[error] ${err}`)
     })
 
@@ -113,18 +129,13 @@ async function startServer() {
 }
 
 async function stopServer() {
-  try {
-    if (serverProcess) {
-      await serverProcess.kill()
-      serverProcess = null
-    }
-    serverRunning.value = false
-    serverLog.value.push('[server stopped by user]')
-    notify('MCP server stopped.', 'success')
+  if (serverProcess) {
+    try { await serverProcess.kill() } catch { /* process may have already exited */ }
+    serverProcess = null
   }
-  catch (e: any) {
-    notify(e?.message ?? 'Could not stop the MCP server.', 'error')
-  }
+  serverRunning.value = false
+  serverLog.value.push('[server stopped by user]')
+  notify('MCP server stopped.', 'success')
 }
 
 function copyConfig() {

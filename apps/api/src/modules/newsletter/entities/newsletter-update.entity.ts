@@ -2,7 +2,7 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateCol
 
 export type NewsletterUpdateStatus = 'draft' | 'published' | 'archived'
 
-@Entity('api_newsletter_updates')
+@Entity('newsletter_updates')
 export class NewsletterUpdate {
   @PrimaryGeneratedColumn('uuid')
   id: string
@@ -19,7 +19,7 @@ export class NewsletterUpdate {
   @Column({ type: 'varchar', length: 20, default: 'draft' })
   status: NewsletterUpdateStatus
 
-  @Column({ name: 'published_at', nullable: true })
+  @Column({ name: 'published_at', type: 'timestamptz', nullable: true })
   publishedAt: Date | null
 
   @CreateDateColumn({ name: 'created_at' })

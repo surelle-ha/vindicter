@@ -59,8 +59,10 @@ async function bootstrap() {
   const allowedOrigins = [
     'http://localhost:3002',
     'http://localhost:3003',
+    'http://localhost:3004',
     'https://vindicter.xyz',
     'https://dashboard.vindicter.xyz',
+    'https://marketing.vindicta.xyz',
     ...(process.env.CORS_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean) ?? []),
   ]
 

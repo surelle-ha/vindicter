@@ -5,8 +5,10 @@ definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'User Management — Vindicter' })
 
 const supabase = useSupabase()
-const { isAdmin } = useAuth()
+const { isAdmin, user } = useAuth()
 const router = useRouter()
+
+const currentUserId = computed(() => (user.value as any)?.id ?? '')
 
 onMounted(() => {
   if (!isAdmin.value) router.push('/news')
@@ -183,7 +185,7 @@ function fmt(iso?: string) {
             ? 'background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.22);color:rgba(167,139,250,0.85);'
             : 'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);color:rgba(255,255,255,0.40);'"
         >
-          {{ u.role ?? 'member' }}
+          {{ u.role ?? 'user' }}
         </span>
 
         <!-- Joined -->
@@ -191,17 +193,22 @@ function fmt(iso?: string) {
 
         <!-- Role select -->
         <div class="flex items-center gap-2">
-          <select
-            :value="u.role"
-            :disabled="saving === u.id"
-            class="rounded-lg px-2.5 py-1 text-[11px] outline-none transition-colors cursor-pointer disabled:opacity-50"
-            style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);color:rgba(255,255,255,0.60);"
-            @change="(e) => updateRole(u.id, (e.target as HTMLSelectElement).value)"
-          >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-          </select>
-          <Loader2 v-if="saving === u.id" class="h-3 w-3 animate-spin" style="color:rgba(255,255,255,0.30);" />
+          <template v-if="u.id === currentUserId">
+            <span class="text-[10px]" style="color:rgba(255,255,255,0.20);">—</span>
+          </template>
+          <template v-else>
+            <select
+              :value="u.role"
+              :disabled="saving === u.id"
+              class="rounded-lg px-2.5 py-1 text-[11px] outline-none transition-colors cursor-pointer disabled:opacity-50"
+              style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);color:rgba(255,255,255,0.60);"
+              @change="(e) => updateRole(u.id, (e.target as HTMLSelectElement).value)"
+            >
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+            <Loader2 v-if="saving === u.id" class="h-3 w-3 animate-spin" style="color:rgba(255,255,255,0.30);" />
+          </template>
         </div>
       </div>
 

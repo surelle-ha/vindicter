@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AlertTriangle, Clock3, FileText, Github, KeyRound, PackageSearch, PanelBottomOpen, Radar, Settings, ShieldCheck, ShieldMinus } from 'lucide-vue-next'
+import { AlertTriangle, Clock3, FileText, FolderSearch, Github, KeyRound, PackageSearch, PanelBottomOpen, Radar, Settings, ShieldCheck, ShieldMinus, Trash2 } from 'lucide-vue-next'
 import type { Component } from 'vue'
 
 type SecurityWorkspaceTab = 'overview' | 'scanner' | 'findings' | 'whitelist' | 'dependencies' | 'secrets' | 'reports' | 'settings' | 'github_issues'
@@ -9,12 +9,52 @@ const router = useRouter()
 const projectsStore = useProjectsStore()
 const aiActivity = useAIActivityStore()
 const auth = useAuthStore()
+const { notify } = useNotifications()
 
 const activeTab = ref<SecurityWorkspaceTab>('overview')
 const headerCollapsed = ref(false)
 const showPentestModal = ref(false)
+const folderMissing = ref(false)
+const removingProject = ref(false)
+
 const projectId = computed(() => route.params.id as string)
 const project = computed(() => projectsStore.projects.find((p) => p.id === projectId.value))
+
+async function checkFolderExists() {
+  if (!project.value?.absolutePath) return
+  try {
+    const fs = useTauriFs()
+    folderMissing.value = !(await fs.exists(project.value.absolutePath))
+  }
+  catch { folderMissing.value = false }
+}
+
+async function removeProject() {
+  if (!project.value || removingProject.value) return
+  removingProject.value = true
+  try {
+    await projectsStore.removeProject(project.value.id)
+    notify('Project removed from Vindicter.', 'success')
+    await router.push('/')
+  }
+  catch (e: any) {
+    notify(e?.message ?? 'Could not remove project.', 'error')
+  }
+  finally { removingProject.value = false }
+}
+
+async function locateProject() {
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const selected = await open({ directory: true, multiple: false, title: 'Locate project folder' })
+    if (selected && typeof selected === 'string' && project.value) {
+      await projectsStore.updateProjectMeta(project.value.id, { absolutePath: selected })
+      folderMissing.value = false
+      notify('Project path updated.', 'success')
+    }
+  }
+  catch { /* dialog cancelled */ }
+}
 
 const staticTabs: { id: SecurityWorkspaceTab; label: string; icon: Component }[] = [
   { id: 'overview', label: 'Overview', icon: ShieldCheck },
@@ -43,7 +83,7 @@ onMounted(async () => {
   }
   if (project.value) {
     projectsStore.setActive(project.value.id)
-    // Show pentest opt-in modal once per project if never prompted
+    await checkFolderExists()
     if (!project.value.pentestEnabled && !project.value.pentestPromptDismissed) {
       setTimeout(() => { showPentestModal.value = true }, 800)
     }
@@ -124,6 +164,30 @@ watch(() => route.query.tab, (tab) => {
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- Missing folder warning banner -->
+      <div v-if="folderMissing" class="mx-5 mt-1 mb-3 flex items-center gap-3 rounded-xl border border-amber-500/25 bg-amber-500/8 px-4 py-3">
+        <AlertTriangle class="size-4 shrink-0 text-amber-300" />
+        <div class="flex-1 min-w-0">
+          <p class="text-xs font-semibold text-amber-200">Project folder not found</p>
+          <p class="text-[10px] text-amber-200/50 truncate mt-0.5">{{ project.absolutePath }}</p>
+        </div>
+        <button
+          class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 px-3 py-1.5 text-[11px] font-medium text-amber-200 hover:bg-amber-500/10 transition-colors cursor-pointer"
+          @click="locateProject"
+        >
+          <FolderSearch class="size-3.5" />
+          Locate
+        </button>
+        <button
+          class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-red-500/25 px-3 py-1.5 text-[11px] font-medium text-red-300 hover:bg-red-500/8 transition-colors cursor-pointer"
+          :disabled="removingProject"
+          @click="removeProject"
+        >
+          <Trash2 class="size-3.5" />
+          Remove
+        </button>
       </div>
 
       <div class="flex-1 overflow-auto">

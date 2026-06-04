@@ -2,7 +2,6 @@
 import { Loader2, Eye, EyeOff, Mail, Lock } from 'lucide-vue-next'
 
 definePageMeta({ layout: 'auth' })
-
 useHead({ title: 'Login — Vindicter' })
 
 const route = useRoute()
@@ -13,18 +12,26 @@ const errorMessage = ref('')
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
+const tsToken = ref('')
+
+function onTsToken(token: string) { tsToken.value = token }
+function onTsError() { tsToken.value = ''; errorMessage.value = 'Security verification failed. Please try again.' }
 
 async function login() {
   errorMessage.value = ''
+  if (!tsToken.value) {
+    errorMessage.value = 'Please complete the security verification.'
+    return
+  }
   loading.value = true
   try {
-    const supabase = useSupabase()
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.value.trim(),
-      password: password.value,
-    })
-    if (error) throw error
-    await router.push(String(route.query.redirect ?? '/news'))
+    const { signIn } = useAuth()
+    const { needsOnboarding } = await signIn(email.value.trim(), password.value)
+    if (needsOnboarding) {
+      await router.push('/onboarding')
+    } else {
+      await router.push(String(route.query.redirect ?? '/news'))
+    }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Unable to login right now.'
   } finally {
@@ -82,7 +89,7 @@ async function login() {
             />
             <button
               type="button"
-              class="absolute right-3 top-1/2 -translate-y-1/2 transition-colors hover:text-white/50"
+              class="absolute right-3 top-1/2 -translate-y-1/2 transition-colors hover:text-white/50 cursor-pointer"
               style="color:rgba(255,255,255,0.22);"
               @click="showPassword = !showPassword"
             >
@@ -90,6 +97,13 @@ async function login() {
               <EyeOff v-else class="h-3.5 w-3.5" />
             </button>
           </div>
+        </div>
+
+        <!-- Turnstile -->
+        <div class="flex justify-center pt-1">
+          <ClientOnly>
+            <Turnstile @token="onTsToken" @error="onTsError" />
+          </ClientOnly>
         </div>
 
         <!-- Error -->

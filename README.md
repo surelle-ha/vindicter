@@ -1,16 +1,16 @@
-# Vindicta
+# Vindicter
 
-Vindicta is a local-first security workspace for scanning projects, tracking vulnerability findings, and exporting security review reports. The desktop app stores project state in each project folder, reads the local codebase, and uses the Codex CLI for read-only security analysis.
+Vindicter is a local-first AI-powered security platform for scanning projects, tracking vulnerability findings, and exporting security review reports. The desktop app stores all state in its own data store, reads the local codebase, and uses Claude or Codex CLI for security analysis.
 
 ## Screenshots
 
 <table>
   <tr>
     <td><img src="docs/snapshots/0_1_0_001.png" alt="Academy — Security Bootcamp lesson grid" width="400"/><br/><sub><b>Academy</b> — Security Bootcamp with weekly lesson tracks</sub></td>
-    <td><img src="docs/snapshots/0_1_0_002.png" alt="Home dashboard" width="400"/><br/><sub><b>Home</b> — Project overview, quick actions, and start guide</sub></td>
+    <td><img src="docs/snapshots/0_1_0_002.png" alt="Home dashboard" width="400"/><br/><sub><b>Home</b> — Project overview, quick actions, and news feed</sub></td>
   </tr>
   <tr>
-    <td><img src="docs/snapshots/0_1_0_003.png" alt="MCP Server" width="400"/><br/><sub><b>MCP Server</b> — Expose Vindicta tools to AI agents via Model Context Protocol</sub></td>
+    <td><img src="docs/snapshots/0_1_0_003.png" alt="MCP Server" width="400"/><br/><sub><b>MCP Server</b> — Expose Vindicter tools to AI agents via Model Context Protocol</sub></td>
     <td><img src="docs/snapshots/0_1_0_004.png" alt="Security Findings workspace" width="400"/><br/><sub><b>Workspace</b> — Security findings with severity triage and evidence</sub></td>
   </tr>
   <tr>
@@ -21,54 +21,50 @@ Vindicta is a local-first security workspace for scanning projects, tracking vul
 
 ## What It Does
 
-- Registers local projects and keeps per-project state in `vindicta.json`.
+- Registers local projects and keeps all security state in the app's own data store (never in the project directory).
 - Runs AI vulnerability scans with structured findings, evidence, severity, and recommendations.
-- Automatically runs a quick scan when a project has no recent security scan.
 - Tracks remediation items as first-class security findings.
 - Inspects dependency manifests, likely secret patterns, and security-relevant configuration signals.
 - Exports professional DOCX security review reports.
+- Provides a built-in Security Academy for learning penetration testing and web security.
+- Exposes an MCP server for AI agent integration.
 - Provides a local Settings page for configuring AI tools, WSL profiles, and app preferences.
 
 ## Monorepo Layout
 
 ```text
 apps/
-  desktop/   Nuxt 4 + Tauri 2 desktop app
-  landing/   Nuxt landing page
-  web-admin/ Nuxt admin dashboard for beta, newsletter, and support operations
-schema/
-  v8.json    JSON schema for per-project vindicta.json files
+  desktop/       Nuxt 4 + Tauri 2 desktop app
+  web-landing/   Nuxt landing page (vindicter.xyz)
+  web-dashboard/ Nuxt dashboard app (dashboard.vindicter.xyz)
+  web-marketing/ Nuxt internal comms app (marketing.vindicta.xyz, firewall/API-backed)
+  api/           NestJS + Fastify REST API
 ```
 
 ## Desktop App
 
 The desktop app is built with Nuxt 4, Vue 3, Pinia, Tailwind CSS, lucide icons, and Tauri 2. It is intentionally local-first:
 
-- app preferences are stored through the Tauri Store plugin with localStorage fallback
-- project data lives in the selected project folder as `vindicta.json`
-- filesystem, dialog, shell, and store access are controlled by Tauri capabilities
-- Codex CLI is launched through Tauri shell allowlisted commands
+- All app preferences and security data are stored through the Tauri Store plugin with localStorage fallback.
+- No project-directory files are created or modified by Vindicter — your project files remain untouched.
+- Filesystem, dialog, shell, and store access are controlled by Tauri capabilities.
+- Claude and Codex CLIs are launched through Tauri shell allowlisted commands.
 
 Primary project tabs are Overview, Scanner, Findings, Dependencies, Secrets, Reports, History, and Settings.
 
 ## AI Workflow
 
-Vindicta calls Codex through `apps/desktop/app/composables/useCodexShell.ts`.
+Vindicter calls Claude or Codex through composables in `apps/desktop/app/composables/`.
 
-The app runs Codex in a `read-only` sandbox for security analysis. Codex private chain-of-thought is not exposed; Vindicta shows user-facing activity logs, structured reports, findings, evidence, and recommendations returned by Codex.
+The app runs AI tools in read-only mode for security analysis. Chain-of-thought is not exposed; Vindicter shows user-facing activity logs, structured reports, findings, evidence, and recommendations.
 
-## Project Data
+## Data Storage
 
-Each managed project uses `vindicta.json` schema version 8. It stores:
+All Vindicter data is stored exclusively within the app:
 
-- project metadata and active AI tool
-- legacy project data for compatibility
-- security findings
-- scan history
-- security workspace settings
-- history events
-
-The source TypeScript shape is in `apps/desktop/app/types/vindicta.ts`; the JSON Schema is in `schema/v8.json`.
+- App preferences and project registry: Tauri Store plugin (`.bin` files in the system app data directory)
+- Security findings, scans, and remediation items: Tauri Store plugin, keyed by project ID
+- No JSON files are written to your project directories
 
 ## Development
 
@@ -81,7 +77,7 @@ pnpm install
 Run the desktop app in a browser shell:
 
 ```bash
-pnpm --filter @vindicta/desktop dev
+pnpm --filter @vindicter/desktop dev
 ```
 
 Run the Tauri desktop app:
@@ -90,29 +86,30 @@ Run the Tauri desktop app:
 pnpm desktop:dev
 ```
 
-Run the landing or admin apps:
+Run the web apps:
 
 ```bash
-pnpm landing:dev
-pnpm admin:dev
+pnpm web-landing:dev
+pnpm web-dashboard:dev
+pnpm web-marketing:dev
 ```
 
 Build the desktop frontend:
 
 ```bash
-pnpm --filter @vindicta/desktop build
+pnpm --filter @vindicter/desktop build
 ```
 
 Build the Tauri desktop app:
 
 ```bash
-pnpm --filter @vindicta/desktop tauri:build
+pnpm --filter @vindicter/desktop tauri:build
 ```
 
-## Notes For Contributors
+## Notes
 
 - Prefer local project data and existing stores/composables over new global state.
 - Keep Tauri shell commands allowlisted and narrow.
 - Do not embed production secrets in source or bundled app assets.
 - Generated artifacts such as Nuxt output and Tauri targets should not be hand-edited.
-- When changing Codex prompts, keep outputs structured and user-facing; do not ask for private chain-of-thought.
+- When changing AI prompts, keep outputs structured and user-facing.

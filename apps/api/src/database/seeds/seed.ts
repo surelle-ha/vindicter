@@ -46,6 +46,12 @@ const DEFAULT_ACCESSES: { resource: string; action: string; description: string 
   { resource: 'api-tokens',  action: 'create',  description: 'Create API tokens' },
   { resource: 'api-tokens',  action: 'read',    description: 'Read own API tokens' },
   { resource: 'api-tokens',  action: 'delete',  description: 'Revoke API tokens' },
+  // marketing
+  { resource: 'marketing',   action: 'create',  description: 'Create internal marketing records' },
+  { resource: 'marketing',   action: 'read',    description: 'Read internal marketing records' },
+  { resource: 'marketing',   action: 'update',  description: 'Update internal marketing records' },
+  { resource: 'marketing',   action: 'delete',  description: 'Delete internal marketing records' },
+  { resource: 'marketing',   action: 'send',    description: 'Send internal marketing email' },
 ]
 
 // ── Default roles ────────────────────────────────────────────────────────────

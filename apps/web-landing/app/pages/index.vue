@@ -73,7 +73,7 @@ const features = [
   },
   {
     title: 'Security Academy',
-    badge: '30 Lessons',
+    badge: 'Growing',
     badgeColor: 'accent',
     desc: 'A structured bootcamp from security fundamentals to penetration testing. AI-guided by Professor Vindicter with a completion certificate.',
     icon: 'M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z',
@@ -365,7 +365,7 @@ const badgeClass: Record<string, string> = {
               { name: 'Claude',      sub: 'Anthropic',      badge: 'Live', badgeCls: 'bg-ok/15 text-ok',         link: null, icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z', glow: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.20)' },
               { name: 'OpenRouter',  sub: 'Multi-model',    badge: 'Live', badgeCls: 'bg-ok/15 text-ok',         link: null, icon: 'M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z', glow: 'rgba(14,165,233,0.10)', border: 'rgba(14,165,233,0.20)' },
               { name: 'Ollama',      sub: 'Local / Offline', badge: 'Live', badgeCls: 'bg-ok/15 text-ok',        link: null, icon: 'M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 15V5.25m19.5 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 7.409a2.25 2.25 0 01-1.07-1.916V5.25', glow: 'rgba(249,115,22,0.10)', border: 'rgba(249,115,22,0.20)' },
-              { name: 'DefendCore',  sub: 'Vindicter AI',    badge: 'Soon', badgeCls: 'bg-white/8 text-white/40', link: '/defendcore', icon: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z', glow: 'rgba(139,92,246,0.07)', border: 'rgba(139,92,246,0.12)' },
+              { name: 'DefendCore',  sub: 'Security Engine', badge: 'Soon', badgeCls: 'bg-white/8 text-white/40', link: '/defendcore', icon: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z', glow: 'rgba(139,92,246,0.07)', border: 'rgba(139,92,246,0.12)' },
             ]"
             :key="provider.name"
             :data-reveal="`provider-${i}`"
@@ -479,22 +479,18 @@ const badgeClass: Record<string, string> = {
                 A structured 30-lesson security bootcamp built right into the app. Learn security fundamentals, web attack vectors, penetration testing, and defensive tactics — guided by an AI professor.
               </p>
             </div>
-            <!-- Stats -->
-            <div class="flex items-center gap-6 shrink-0">
-              <div class="text-center">
-                <p class="text-[32px] font-black text-white leading-none">30</p>
-                <p class="text-[10px] font-semibold uppercase tracking-wider text-white/30 mt-1">Lessons</p>
-              </div>
-              <div class="w-px h-10 bg-white/10" />
-              <div class="text-center">
-                <p class="text-[32px] font-black text-white leading-none">~45h</p>
-                <p class="text-[10px] font-semibold uppercase tracking-wider text-white/30 mt-1">Content</p>
-              </div>
-              <div class="w-px h-10 bg-white/10" />
-              <div class="text-center">
-                <p class="text-[32px] font-black text-white leading-none">1</p>
-                <p class="text-[10px] font-semibold uppercase tracking-wider text-white/30 mt-1">Certificate</p>
-              </div>
+            <!-- CTA -->
+            <div class="flex flex-col items-start lg:items-end gap-3 shrink-0">
+              <a
+                href="https://dashboard.vindicter.xyz/academy"
+                class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-[13px] font-bold text-white transition hover:bg-accent/90 active:scale-[0.98]"
+              >
+                Start learning
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </a>
+              <p class="text-[11px] text-white/30">Free account required</p>
             </div>
           </div>
         </div>
@@ -524,7 +520,7 @@ const badgeClass: Record<string, string> = {
                 >
                   {{ phase.label }}
                 </span>
-                <span class="text-[10px] text-white/25 font-mono">{{ phase.lessons }} lessons</span>
+                <span class="text-[10px] text-white/25 font-mono">{{ phase.label }}</span>
               </div>
 
               <h3 class="text-[15px] font-bold text-white mb-3">{{ phase.theme }}</h3>
@@ -563,12 +559,12 @@ const badgeClass: Record<string, string> = {
               <div>
                 <p class="text-[13px] font-bold text-white">Professor Vindicter — AI Tutor</p>
                 <p class="mt-1.5 text-[12px] leading-relaxed text-white/50">
-                  An AI professor powered by Claude, Codex, or OpenRouter sits alongside every lesson. It teaches interactively, asks quiz questions, and only unlocks the next lesson once you demonstrate real understanding — not just reading.
+                  An AI professor powered by OpenRouter or Ollama sits alongside every lesson. It teaches interactively, asks quiz questions, and only unlocks the next lesson once you demonstrate real understanding — not just reading.
                 </p>
                 <div class="mt-3 flex flex-wrap gap-2">
-                  <span class="rounded-full bg-accent/10 border border-accent/20 px-2.5 py-0.5 text-[10px] font-semibold text-accent">Claude</span>
-                  <span class="rounded-full bg-white/5 border border-white/10 px-2.5 py-0.5 text-[10px] font-semibold text-white/40">Codex</span>
-                  <span class="rounded-full bg-white/5 border border-white/10 px-2.5 py-0.5 text-[10px] font-semibold text-white/40">OpenRouter</span>
+                  <span class="rounded-full bg-accent/10 border border-accent/20 px-2.5 py-0.5 text-[10px] font-semibold text-accent">OpenRouter</span>
+                  <span class="rounded-full bg-white/5 border border-white/10 px-2.5 py-0.5 text-[10px] font-semibold text-white/40">Ollama</span>
+                  <span class="rounded-full bg-white/5 border border-white/10 px-2.5 py-0.5 text-[10px] font-semibold text-white/40 opacity-50">DefendCore <span class="text-[8px]">Soon</span></span>
                   <span class="rounded-full bg-ok/10 border border-ok/20 px-2.5 py-0.5 text-[10px] font-semibold text-ok">Professor-gated completion</span>
                 </div>
               </div>

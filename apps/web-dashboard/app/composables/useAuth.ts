@@ -25,17 +25,19 @@ export const useAuth = () => {
     }
   }
 
-  async function signIn(email: string, password: string) {
+  async function signIn(email: string, password: string): Promise<{ needsOnboarding: boolean }> {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
-    // Use the returned user directly — avoids a second getSession() round-trip
+    let needsOnboarding = false
     if (data.user) {
       user.value = data.user as unknown as Record<string, unknown>
       const { data: profile } = await supabase
-        .from('user_profiles').select('role').eq('id', data.user.id).single()
+        .from('user_profiles').select('role, onboarding_complete').eq('id', data.user.id).single()
       isAdmin.value = profile?.role === 'admin'
+      needsOnboarding = !profile?.onboarding_complete
     }
     authReady.value = true
+    return { needsOnboarding }
   }
 
   async function signOut() {

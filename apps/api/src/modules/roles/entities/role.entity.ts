@@ -2,7 +2,7 @@ import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } f
 import { RoleAccess } from './role-access.entity'
 import { UserRole } from './user-role.entity'
 
-@Entity('api_roles')
+@Entity('roles')
 export class Role {
   @PrimaryGeneratedColumn('uuid')
   id: string
@@ -10,7 +10,7 @@ export class Role {
   @Column({ unique: true, length: 50 })
   name: string
 
-  @Column({ nullable: true, length: 255 })
+  @Column({ type: 'varchar', nullable: true, length: 255 })
   description: string | null
 
   @CreateDateColumn({ name: 'created_at' })

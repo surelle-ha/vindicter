@@ -2,6 +2,7 @@ interface CodexExecResult {
   code: number | null
   stdout: string
   stderr: string
+  aborted?: boolean
   tokenUsage: {
     inputTokens: number
     outputTokens: number
@@ -39,19 +40,15 @@ export function friendlyCodexExecError(error: unknown) {
   if (/usage limit|usage_limit|usage.*exhausted|usage.*remaining|quota|billing|insufficient_quota|rate limit|limit.*reached|429|0 usage|out of credits|insufficient balance|credit/i.test(message)) {
     return 'Codex could not start because your AI usage limit appears to be exhausted. Check your plan, billing, or usage limits, then try again.'
   }
-
   if (/unauthorized|forbidden|authentication|api key|401|403|not logged in/i.test(message)) {
     return 'Codex is not authenticated. Sign in to Codex or update your API key in Settings, then try again.'
   }
-
   if (/codex.*not.*found|not recognized|ENOENT/i.test(message)) {
     return 'Codex CLI is not available. Open Settings > Doctor and install or repair Codex.'
   }
-
   if (/@openai\/codex-win32-x64|Missing optional dependency/i.test(message)) {
     return 'Codex CLI is installed but its Windows runtime dependency is missing. Open Settings > Doctor and use Install/Repair Codex, or run npm install -g @openai/codex@latest.'
   }
-
   if (/sep is not defined/i.test(message)) {
     return 'Vindicter could not prepare the Codex run because of a local path handling error. Please update Vindicter and try again.'
   }
@@ -61,41 +58,74 @@ export function friendlyCodexExecError(error: unknown) {
 
 export async function runCodexExec(opts: CodexExecOptions): Promise<CodexExecResult> {
   const { Command } = await import('@tauri-apps/plugin-shell')
+  const { registerScanKillHandler } = await import('~/composables/useScanAbort')
   const fs = useTauriFs()
+
   const isWin = isWindowsPath(opts.projectPath)
   const basePath = isWin ? opts.projectPath.replace(/\//g, '\\') : opts.projectPath
   const sep = isWin ? '\\' : '/'
   const stamp = Date.now()
   const outputFile = `${basePath}${sep}.vindicta_codex_output_${stamp}.txt`
   const sandbox = opts.sandbox ?? 'read-only'
+  const reasoningEffort = opts.reasoningEffort ?? 'medium'
+
+  const codexArgs = [
+    'exec',
+    '-c', `model_reasoning_effort="${reasoningEffort}"`,
+    '-C', basePath,
+    '--skip-git-repo-check',
+    '--sandbox', sandbox,
+    '--color', 'never',
+    '-o', outputFile,
+    opts.prompt,
+  ]
+
+  const commandName = isWin ? 'node-codex-exec' : 'codex-exec'
+  const commandArgs = isWin ? [await windowsCodexEntrypoint(), ...codexArgs] : codexArgs
+
+  const stdoutLines: string[] = []
+  const stderrLines: string[] = []
+  let aborted = false
+  let childProcess: any = null
+
+  // Create command and attach ALL listeners before spawning —
+  // Tauri requires this; listeners registered after spawn() may miss the close event.
+  const cmd = Command.create(commandName, commandArgs, { cwd: basePath })
+
+  const closePromise = new Promise<{ code: number | null }>((resolve) => {
+    cmd.on('close', (data: { code: number | null }) => resolve(data))
+    cmd.on('error', () => resolve({ code: null }))
+  })
+  cmd.stdout.on('data', (line: string) => stdoutLines.push(line))
+  cmd.stderr.on('data', (line: string) => stderrLines.push(line))
+
+  // Register kill handler for scan cancellation
+  const unregister = registerScanKillHandler(() => {
+    aborted = true
+    try { childProcess?.kill() } catch { /* ignore */ }
+  })
 
   try {
-    const reasoningEffort = opts.reasoningEffort ?? 'medium'
-    const effortArgs = ['-c', `model_reasoning_effort="${reasoningEffort}"`]
-    const codexArgs = [
-      'exec',
-      ...effortArgs,
-      '-C',
-      basePath,
-      '--skip-git-repo-check',
-      '--sandbox',
-      sandbox,
-      '--color',
-      'never',
-      '-o',
-      outputFile,
-      opts.prompt,
-    ]
+    childProcess = await cmd.spawn()
+    const closeData = await closePromise
 
-    const commandName = isWin ? 'node-codex-exec' : 'codex-exec'
-    const commandArgs = isWin ? [await windowsCodexEntrypoint(), ...codexArgs] : codexArgs
-    const output = await Command.create(commandName, commandArgs, { cwd: basePath }).execute()
-    const commandText = [output.stderr, output.stdout].filter(Boolean).join('\n')
-    if (output.code !== 0 && commandText) {
+    if (aborted) {
+      return {
+        code: null, stdout: '', stderr: 'Scan was cancelled by the user.',
+        aborted: true,
+        tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      }
+    }
+
+    const stdout = stdoutLines.join('\n')
+    const stderr = stderrLines.join('\n')
+    const commandText = [stderr, stdout].filter(Boolean).join('\n')
+
+    if (closeData.code !== 0 && commandText) {
       const friendlyError = friendlyCodexExecError(commandText)
       return {
-        code: output.code,
-        stdout: output.stdout,
+        code: closeData.code,
+        stdout,
         stderr: friendlyError,
         tokenUsage: {
           inputTokens: estimateTokens(opts.prompt),
@@ -106,7 +136,7 @@ export async function runCodexExec(opts: CodexExecOptions): Promise<CodexExecRes
     }
 
     const finalMessage = await fs.readTextFile(outputFile).catch(() => '')
-    const responseText = finalMessage || output.stdout || output.stderr
+    const responseText = finalMessage || stdout || stderr
     const tokenUsage = {
       inputTokens: estimateTokens(opts.prompt),
       outputTokens: estimateTokens(responseText),
@@ -117,23 +147,26 @@ export async function runCodexExec(opts: CodexExecOptions): Promise<CodexExecRes
       await useUserStore().recordTokenUsage({
         ...tokenUsage,
         tool: 'Codex',
-        model: opts.model || (opts.reasoningEffort ? `Codex CLI default (${opts.reasoningEffort} effort)` : 'Codex CLI default'),
+        model: opts.model || `Codex CLI default (${reasoningEffort} effort)`,
         prompt: opts.prompt,
       })
     }
-    catch { /* token usage tracking should never block Codex work */ }
+    catch { /* token tracking must never block Codex */ }
 
-    return {
-      code: output.code,
-      stdout: finalMessage || output.stdout,
-      stderr: output.stderr,
-      tokenUsage,
-    }
+    return { code: closeData.code, stdout: finalMessage || stdout, stderr, tokenUsage }
   }
   catch (error) {
+    if (aborted) {
+      return {
+        code: null, stdout: '', stderr: 'Scan was cancelled by the user.',
+        aborted: true,
+        tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      }
+    }
     throw new Error(friendlyCodexExecError(error))
   }
   finally {
+    unregister()
     fs.removeFile(outputFile).catch(() => {})
   }
 }

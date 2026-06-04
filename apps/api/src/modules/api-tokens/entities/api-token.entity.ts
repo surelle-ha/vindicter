@@ -1,7 +1,7 @@
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm'
 import { User } from '../../users/entities/user.entity'
 
-@Entity('api_api_tokens')
+@Entity('tokens')
 export class ApiToken {
   @PrimaryGeneratedColumn('uuid')
   id: string
@@ -19,10 +19,10 @@ export class ApiToken {
   @Column({ name: 'token_prefix', length: 20 })
   tokenPrefix: string
 
-  @Column({ name: 'expires_at', nullable: true })
+  @Column({ name: 'expires_at', type: 'timestamptz', nullable: true })
   expiresAt: Date | null
 
-  @Column({ name: 'last_used_at', nullable: true })
+  @Column({ name: 'last_used_at', type: 'timestamptz', nullable: true })
   lastUsedAt: Date | null
 
   @CreateDateColumn({ name: 'created_at' })

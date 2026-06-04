@@ -177,6 +177,67 @@
             { "validator": "(?s).*" }
           ],
           "sidecar": false
+        },
+        {
+          "name": "codex-exec",
+          "cmd": "codex",
+          "args": [
+            "exec",
+            "-c",
+            { "validator": "model_reasoning_effort=\"(low|medium|high|xhigh)\"" },
+            "-C",
+            { "validator": "[^\\u0000-\\u001f\\u007f]+" },
+            "--skip-git-repo-check",
+            "--sandbox",
+            { "validator": "(read-only|workspace-write)" },
+            "--color",
+            "never",
+            "-o",
+            { "validator": "[^\\u0000-\\u001f\\u007f]+" },
+            { "validator": "(?s).*" }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "codex-cmd-exec",
+          "cmd": "codex.cmd",
+          "args": [
+            "exec",
+            "-c",
+            { "validator": "model_reasoning_effort=\"(low|medium|high|xhigh)\"" },
+            "-C",
+            { "validator": "[^\\u0000-\\u001f\\u007f]+" },
+            "--skip-git-repo-check",
+            "--sandbox",
+            { "validator": "(read-only|workspace-write)" },
+            "--color",
+            "never",
+            "-o",
+            { "validator": "[^\\u0000-\\u001f\\u007f]+" },
+            { "validator": "(?s).*" }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "node-codex-exec",
+          "cmd": "node",
+          "args": [
+            { "validator": "[^\\u0000-\\u001f\\u007f]+\\\\AppData\\\\Roaming\\\\npm\\\\node_modules\\\\@openai\\\\codex\\\\bin\\\\codex\\.js" },
+            "exec",
+            "-c",
+            { "validator": "model_reasoning_effort=\"(low|medium|high|xhigh)\"" },
+            "-C",
+            { "validator": "[^\\u0000-\\u001f\\u007f]+" },
+            "--skip-git-repo-check",
+            "--sandbox",
+            { "validator": "(read-only|workspace-write)" },
+            "--color",
+            "never",
+            "-o",
+            { "validator": "[^\\u0000-\\u001f\\u007f]+" },
+            { "validator": "(?s).*" }
+          ],
+          "sidecar": false
         }
       ]
     },

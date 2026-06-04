@@ -2,6 +2,11 @@
 const isLoggedIn = ref(false)
 let unsubscribe: (() => void) | undefined
 
+const dashboardUrl = computed(() => {
+  if (import.meta.client && window.location.hostname === 'localhost') return 'http://localhost:3003'
+  return 'https://dashboard.vindicter.xyz'
+})
+
 onMounted(async () => {
   try {
     const supabase = useSupabase()
@@ -33,7 +38,7 @@ onUnmounted(() => unsubscribe?.())
       <NuxtLink to="/#academy" class="hidden transition-colors hover:text-white sm:inline">Academy</NuxtLink>
       <NuxtLink to="/defendcore" class="hidden transition-colors hover:text-white sm:inline">DefendCore</NuxtLink>
       <a
-        href="https://dashboard.vindicter.xyz"
+        :href="dashboardUrl"
         class="inline-flex items-center rounded-lg border border-white/10 px-4 py-1.5 text-[12px] font-semibold text-white/70 transition hover:border-accent/40 hover:bg-white/[0.04] hover:text-white"
       >
         {{ isLoggedIn ? 'Dashboard' : 'Login' }}

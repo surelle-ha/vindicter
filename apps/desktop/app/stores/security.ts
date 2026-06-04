@@ -180,7 +180,7 @@ function mergeSecurityData(projectData: SecurityData, backupData: SecurityData |
   }
 }
 
-// Serializes all patchSecurity writes so concurrent scans don't race on the file.
+// Serializes all Tauri-store writes so concurrent scans don't race each other.
 let _persistQueue: Promise<void> = Promise.resolve()
 
 export const useSecurityStore = defineStore('security', {
@@ -205,11 +205,11 @@ export const useSecurityStore = defineStore('security', {
 
   actions: {
     async load(projectPath: string, projectId?: string | null) {
-      // Reset the write queue when loading a new project.
       if (projectPath !== this.projectPath) _persistQueue = Promise.resolve()
       this.loading = true
       this.projectPath = projectPath
       this.projectId = projectId ?? null
+      let hadCorruption = false
       try {
         let projectSecurity: SecurityData | null = null
         try {
@@ -221,12 +221,31 @@ export const useSecurityStore = defineStore('security', {
         catch {
           projectSecurity = null
         }
-        const backupSecurity = await this.loadBackup().catch(() => null)
+
+        let backupSecurity: SecurityData | null = null
+        try {
+          backupSecurity = await this.loadBackup()
+        }
+        catch {
+          backupSecurity = null
+          hadCorruption = true
+        }
+
         this.data = mergeSecurityData(projectSecurity ?? cloneDefaultSecurity(), backupSecurity)
         if (backupSecurity && projectSecurity) await this.persist()
       }
       finally {
         this.loading = false
+        if (hadCorruption) {
+          try {
+            const { useNotifications } = await import('~/composables/useNotifications')
+            useNotifications().notify(
+              'Security data could not be fully loaded — some entries may have been reset. The store has been rebuilt from available data.',
+              'warning',
+            )
+          }
+          catch { /* non-critical */ }
+        }
       }
     },
 
@@ -283,17 +302,7 @@ export const useSecurityStore = defineStore('security', {
 
     persist(): Promise<void> {
       if (!this.projectPath) return Promise.resolve()
-      // Serialize all file writes: each persist waits for the previous one to finish.
-      const snapshot = JSON.parse(JSON.stringify(this.data)) as SecurityData
-      const projectPath = this.projectPath
-      const run = async () => {
-        const { patchSecurity } = useVindicterJson()
-        const errors: unknown[] = []
-        await patchSecurity(projectPath, snapshot).catch(error => errors.push(error))
-        await this.persistBackup().catch(error => errors.push(error))
-        if (errors.length >= 2) throw errors[0]
-      }
-      _persistQueue = _persistQueue.then(run, run)
+      _persistQueue = _persistQueue.then(() => this.persistBackup(), () => this.persistBackup())
       return _persistQueue
     },
 
@@ -331,16 +340,20 @@ export const useSecurityStore = defineStore('security', {
       }
       this.data.scans = [scan, ...this.data.scans].slice(0, 30)
       await this.persist()
-      const { appendHistory } = useVindicterJson()
-      await appendHistory(project.absolutePath, {
-        action: 'security:scan_completed',
-        actor: 'Codex',
-        payload: {
-          name: `Security scan - ${new Date(scan.scannedAt).toLocaleString()}`,
-          findings: scan.findings.length,
-          parseWarning: scan.parseWarning,
-        },
-      }).catch(() => {})
+      // Log to Tauri-backed history store
+      try {
+        const { useHistoryStore } = await import('~/stores/history')
+        await useHistoryStore().append(project.id, {
+          action: 'security:scan_completed',
+          actor: 'AI',
+          payload: {
+            name: `Security scan — ${new Date(scan.scannedAt).toLocaleString()}`,
+            findings: scan.findings.length,
+            effort: input.effort,
+          },
+        })
+      }
+      catch { /* non-critical */ }
       return scan
     },
 

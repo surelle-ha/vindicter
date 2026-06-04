@@ -6,6 +6,8 @@
     "desktop:build": "pnpm --filter @vindicter/desktop tauri:build",
     "web-landing:dev": "pnpm --filter @vindicter/web-landing dev",
     "web-dashboard:dev": "pnpm --filter @vindicter/web-dashboard dev",
+    "web-marketing:dev": "pnpm --filter @vindicter/web-marketing dev",
+    "web-marketing:build": "pnpm --filter @vindicter/web-marketing build",
     "api:dev": "pnpm --filter @vindicter/api start:dev",
     "api:build": "pnpm --filter @vindicter/api build",
     "api:migrate": "pnpm --filter @vindicter/api migration:run",

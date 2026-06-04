@@ -1,15 +1,26 @@
 <script setup lang="ts">
-import { Sun, Moon, Database, ChevronDown, ChevronUp, FolderOpen, Stethoscope, CheckCircle2, AlertTriangle, XCircle, Wrench, Loader2, Terminal, Download, Github, Heart, Eye, Plug, Zap, Rss, Plus, Trash2 } from 'lucide-vue-next'
+import { Sun, Moon, Database, ChevronDown, ChevronUp, FolderOpen, Stethoscope, CheckCircle2, AlertTriangle, XCircle, Wrench, Loader2, Terminal, Download, Github, Heart, Eye, Plug, Square, Zap, Rss, Plus, Trash2 } from 'lucide-vue-next'
 
 const app = useAppStore()
 const user = useUserStore()
 const projects = useProjectsStore()
 const academy = useAcademyStore()
 const router = useRouter()
+const route = useRoute()
 const { notify } = useNotifications()
 
 type SettingsTab = 'general' | 'news' | 'wsl' | 'updates' | 'diagnostics' | 'data'
-const activeSettingsTab = ref<SettingsTab>('general')
+
+const VALID_TABS: SettingsTab[] = ['general', 'news', 'wsl', 'updates', 'diagnostics', 'data']
+const activeSettingsTab = computed<SettingsTab>({
+  get() {
+    const q = route.query.tab as string
+    return (VALID_TABS.includes(q as SettingsTab) ? q : 'general') as SettingsTab
+  },
+  set(tab: SettingsTab) {
+    void router.replace({ query: { ...route.query, tab } })
+  },
+})
 const settingsTabs: { id: SettingsTab; label: string; description: string }[] = [
   { id: 'general',     label: 'General',     description: 'Theme, startup, navigation, and notifications' },
   { id: 'news',        label: 'News',        description: 'Security RSS sources for Home' },
@@ -120,6 +131,9 @@ const confirmWslPurge = ref(false)
 const cleanProfilesDistro = ref('')
 const confirmCleanProfiles = ref(false)
 const wslAutoStart = ref(app.wslAutoStart)
+
+// Academy WSL Daemon
+const { state: daemonState, start: daemonStart, stop: daemonStop } = useAcademyDaemon()
 
 watch(wslAutoStart, (value) => app.setWslAutoStart(value))
 
@@ -274,19 +288,19 @@ async function checkForUpdates() {
   }
 
   try {
-    const response = await fetch('https://api.github.com/repos/Vindicter/vindicter/releases/latest', {
-      headers: { Accept: 'application/vnd.github+json' },
-    })
-    if (!response.ok) throw new Error(`GitHub returned HTTP ${response.status}`)
+    const response = await fetch('https://pub-1dcbd264e42f475e9f95858cc16ab6b7.r2.dev/releases/latest/update.json')
+    if (!response.ok) throw new Error(`Update server returned HTTP ${response.status}`)
     const release = await response.json()
+    const version = String(release.version ?? '')
+    const changelogUrl = `https://github.com/Vindicter/vindicter/releases/tag/v${version}`
     latestRelease.value = {
-      tagName: String(release.tag_name ?? ''),
-      htmlUrl: String(release.html_url ?? 'https://github.com/Vindicter/vindicter/releases'),
-      name: String(release.name ?? release.tag_name ?? 'Latest release'),
+      tagName: `v${version}`,
+      htmlUrl: changelogUrl,
+      name: `Vindicter v${version}`,
     }
   }
   catch (e: any) {
-    updateError.value = e?.message ?? 'Could not check GitHub releases.'
+    updateError.value = e?.message ?? 'Could not reach the update server.'
   }
   finally {
     updateChecking.value = false
@@ -705,8 +719,29 @@ async function runDoctor() {
 
 async function fixDoctorIssues() {
   doctorFixing.value = true
+  const errChecks = doctorChecks.value.filter(c => c.status === 'error' || c.status === 'warning')
+  let fixed = 0
   try {
-    notify('Doctor fixes applied', 'success')
+    for (const check of errChecks) {
+      if (check.id === 'codex' && shouldShowCodexInstaller.value) {
+        await installCodexCli()
+        fixed++
+      }
+      if (check.id === 'claude' && shouldShowClaudeInstaller.value) {
+        await installClaudeCli()
+        fixed++
+      }
+      if (check.id === 'ollama' && shouldShowOllamaInstaller.value) {
+        await openOllamaDownload()
+        fixed++
+      }
+    }
+    if (fixed) {
+      notify(`Ran ${fixed} fix action${fixed !== 1 ? 's' : ''}. Re-running Doctor…`, 'success')
+    }
+    else {
+      notify('No automatic fixes available for the current issues.', 'warning')
+    }
     await runDoctor()
   }
   finally {
@@ -1067,6 +1102,31 @@ onMounted(() => {
                 Prepare pentest account
               </GlassButton>
             </div>
+
+            <!-- Academy WSL Daemon -->
+            <div class="mt-2 rounded-xl border border-[var(--border)] bg-black/10 p-3 space-y-2">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-xs font-semibold text-[var(--text)]">Academy WSL Bridge</p>
+                  <p class="text-[10px] text-[var(--text-faint)]">Expose the academy sandbox over local port {{ daemonState.port }} so the web dashboard can relay terminal sessions.</p>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span class="size-1.5 rounded-full" :class="daemonState.running ? 'bg-emerald-400' : 'bg-white/20'" />
+                  <span class="text-[10px] text-[var(--text-faint)]">{{ daemonState.running ? `Port ${daemonState.port}` : 'Stopped' }}</span>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <GlassButton v-if="!daemonState.running" variant="ghost" size="sm" :disabled="daemonState.starting" @click="daemonStart(wslInfo?.defaultDistro ?? '')">
+                  <Loader2 v-if="daemonState.starting" class="size-3.5 animate-spin" />
+                  <Plug v-else class="size-3.5" />
+                  Start bridge
+                </GlassButton>
+                <GlassButton v-else variant="ghost" size="sm" @click="daemonStop">
+                  <Square class="size-3.5" />
+                  Stop bridge
+                </GlassButton>
+              </div>
+            </div>
           </div>
 
           <div class="grid gap-2">
@@ -1217,7 +1277,7 @@ onMounted(() => {
           </span>
           <Download class="size-4 shrink-0 text-emerald-300" />
         </button>
-        <p v-else-if="latestRelease && !updateChecking" class="text-xs text-[var(--text-muted)]">You are on the latest GitHub release.</p>
+        <p v-else-if="latestRelease && !updateChecking" class="text-xs text-[var(--text-muted)]">You are on the latest release.</p>
       </div>
     </div>
 

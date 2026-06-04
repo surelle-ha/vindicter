@@ -138,11 +138,11 @@ const specs = [
           </h1>
 
           <p class="text-[13px] sm:text-[15px] font-semibold uppercase tracking-[0.4em] text-white/35 mb-6">
-            Security Intelligence Model · by Vindicter
+            Security Intelligence Engine · by Vindicter
           </p>
 
           <p class="text-[15px] sm:text-[17px] leading-relaxed text-white/55 max-w-xl mb-10">
-            A dedicated AI model built from the ground up for security engineering — deep vulnerability analysis, real exploit intelligence, and working code fixes, all running locally inside Vindicter.
+            A purpose-built AI security engine — a specialised RAG and intelligence layer delivering deep vulnerability analysis, real exploit intelligence, and context-aware code remediation inside Vindicter.
           </p>
 
           <!-- Spec pills -->
@@ -173,7 +173,7 @@ const specs = [
       <section class="border-t border-white/5 px-6 py-24">
         <div class="max-w-6xl mx-auto">
           <div class="text-center mb-14">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.3em] text-accent/70 mb-3">Model capabilities</p>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.3em] text-accent/70 mb-3">Engine capabilities</p>
             <h2 class="text-[36px] sm:text-[44px] font-display font-black uppercase leading-tight">
               Built for the entire<br/>
               <span class="text-white/30">security lifecycle.</span>

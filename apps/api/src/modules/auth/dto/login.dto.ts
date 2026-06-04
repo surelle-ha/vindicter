@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength } from 'class-validator'
+import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator'
 
 export class LoginDto {
   @IsEmail()
@@ -7,4 +7,12 @@ export class LoginDto {
   @IsString()
   @MinLength(6)
   password: string
+
+  @IsOptional()
+  @IsString()
+  turnstileToken?: string
+
+  @IsOptional()
+  @IsString()
+  clientApp?: string
 }

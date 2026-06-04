@@ -1,0 +1,24 @@
+{
+  "name": "@vindicter/web-marketing",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev --port 3004",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview"
+  },
+  "dependencies": {
+    "@pinia/nuxt": "latest",
+    "lucide-vue-next": "latest",
+    "ogl": "^1.0.11",
+    "pinia": "latest"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "nuxt": "^4",
+    "tailwindcss": "latest",
+    "typescript": "latest",
+    "vue": "latest"
+  }
+}

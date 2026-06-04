@@ -3,7 +3,7 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeor
 export type TicketCategory = 'setup' | 'scan' | 'billing' | 'bug' | 'other'
 export type TicketStatus = 'open' | 'reviewing' | 'closed'
 
-@Entity('api_support_tickets')
+@Entity('support_tickets')
 export class SupportTicket {
   @PrimaryGeneratedColumn('uuid')
   id: string
@@ -29,7 +29,7 @@ export class SupportTicket {
   @Column({ name: 'faq_checked', default: false })
   faqChecked: boolean
 
-  @Column({ name: 'source_url', nullable: true, length: 500 })
+  @Column({ name: 'source_url', type: 'varchar', nullable: true, length: 500 })
   sourceUrl: string | null
 
   @Column({ type: 'varchar', length: 20, default: 'open' })

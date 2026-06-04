@@ -2,13 +2,11 @@
 import {
   AlertTriangle,
   Bot,
-  BookOpen,
   Check,
   ChevronDown,
   FileText,
   Files,
   Github,
-  GraduationCap,
   House,
   KeyRound,
   Moon,
@@ -37,9 +35,8 @@ const pentestExpanded = useState('sidebar-pentest-expanded', () => true)
 const projectSelectorOpen = ref(false)
 
 const navItems = [
-  { icon: House,          label: 'Home',     to: '/',         exact: true },
-  { icon: UserCircle2,    label: 'Profile',  to: '/profile',  exact: true },
-  { icon: GraduationCap,  label: 'Academy',  to: '/academy',  exact: true },
+  { icon: House,       label: 'Home',    to: '/',        exact: true },
+  { icon: UserCircle2, label: 'Profile', to: '/profile', exact: true },
 ]
 
 // Workspace sub-tabs matching the SecurityWorkspace tabs
@@ -331,25 +328,7 @@ watch(() => route.fullPath, () => {
 
     </nav>
 
-    <!-- Developer section (dev builds only) -->
-    <div v-if="isDev" class="border-t border-[var(--border)] pt-3 pb-1 px-2">
-      <p v-if="!collapsed" class="px-1 mb-1 text-[10px] font-semibold text-amber-500/70 uppercase tracking-[0.12em]">Developer</p>
-      <div v-else class="h-px bg-amber-500/20 mx-1 mb-2" />
-      <NuxtLink
-        to="/academy-studio"
-        class="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors"
-        :class="[
-          collapsed ? 'justify-center' : '',
-          route.path === '/academy-studio'
-            ? 'bg-fuchsia-600/15 text-fuchsia-400'
-            : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-white/[0.05]',
-        ]"
-        :title="collapsed ? 'Academy Builder' : undefined"
-      >
-        <BookOpen class="size-3.5 shrink-0 text-fuchsia-400/70" />
-        <span v-if="!collapsed">Academy Builder</span>
-      </NuxtLink>
-    </div>
+    <!-- Developer section removed: Academy Builder moved to web-dashboard admin -->
 
     <!-- Project selector -->
     <div v-if="projects.hasProjects" class="border-t border-[var(--border)] p-2">

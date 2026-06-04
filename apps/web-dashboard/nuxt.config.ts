@@ -8,12 +8,12 @@ const LOGIN_DESC = 'Sign in to your Vindicter account to manage your security wo
 export default defineNuxtConfig({
   compatibilityDate: '2025-05-12',
   ssr: true,
-  nitro: { preset: 'static' },
   modules: [],
   runtimeConfig: {
     public: {
-      supabaseUrl:     process.env.SUPABASE_URL      ?? '',
-      supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? '',
+      supabaseUrl:      process.env.SUPABASE_URL                   ?? '',
+      supabaseAnonKey:  process.env.SUPABASE_ANON_KEY              ?? '',
+      turnstileSiteKey: process.env.NUXT_PUBLIC_TURNSTILE_SITE_KEY ?? '1x00000000000000000000AA',
     },
   },
   css: ['~/assets/css/main.css'],

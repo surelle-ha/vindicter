@@ -27,6 +27,14 @@ export interface AcademyChatQuiz {
 export interface LessonProgress {
   completedAt: string | null
   startedAt: string | null
+  quizAttempts: number
+  quizCorrect: number
+  lastQuizAt: string | null
+}
+
+export interface QuizResult {
+  correct: boolean
+  questionType: 'mc' | 'text' | 'number'
 }
 
 export interface AcademyState {
@@ -182,10 +190,26 @@ export const useAcademyStore = defineStore('academy', () => {
     return chatSessions.value[lessonId] ?? []
   }
 
+  // Keep at most 80 messages per session (40 exchanges).
+  // Always retain the first message (lesson initialization) and any message
+  // with a quiz so the professor doesn't re-ask questions the student answered.
+  function _pruneChatSession(messages: AcademyChatMessage[]): AcademyChatMessage[] {
+    const MAX = 80
+    if (messages.length <= MAX) return messages
+    const first = messages[0]
+    const rest = messages.slice(1)
+    const quizMessages = rest.filter(m => m.quiz)
+    const nonQuiz = rest.filter(m => !m.quiz)
+    const keep = quizMessages.length + 1  // first + all quiz messages
+    const spare = Math.max(0, MAX - keep)
+    const tail = nonQuiz.slice(-spare)
+    return first ? [first, ...quizMessages, ...tail] : [...quizMessages, ...tail]
+  }
+
   async function setChatSession(lessonId: string, messages: AcademyChatMessage[]) {
     chatSessions.value = {
       ...chatSessions.value,
-      [lessonId]: messages,
+      [lessonId]: _pruneChatSession(messages),
     }
     await _save()
   }
@@ -197,11 +221,31 @@ export const useAcademyStore = defineStore('academy', () => {
     await _save()
   }
 
+  async function recordQuizAttempt(lessonId: string, result: QuizResult) {
+    const existing = completedLessons.value[lessonId] ?? {
+      completedAt: null,
+      startedAt: new Date().toISOString(),
+      quizAttempts: 0,
+      quizCorrect: 0,
+      lastQuizAt: null,
+    }
+    completedLessons.value = {
+      ...completedLessons.value,
+      [lessonId]: {
+        ...existing,
+        quizAttempts: (existing.quizAttempts ?? 0) + 1,
+        quizCorrect: (existing.quizCorrect ?? 0) + (result.correct ? 1 : 0),
+        lastQuizAt: new Date().toISOString(),
+      },
+    }
+    await _save()
+  }
+
   async function startLesson(lessonId: string) {
     if (!completedLessons.value[lessonId]) {
       completedLessons.value = {
         ...completedLessons.value,
-        [lessonId]: { completedAt: null, startedAt: new Date().toISOString() },
+        [lessonId]: { completedAt: null, startedAt: new Date().toISOString(), quizAttempts: 0, quizCorrect: 0, lastQuizAt: null },
       }
       await _save()
     }
@@ -265,6 +309,7 @@ export const useAcademyStore = defineStore('academy', () => {
     resetProgress,
     startLesson,
     completeLesson,
+    recordQuizAttempt,
     setLastVisited,
     getChatSession,
     setChatSession,

@@ -2,7 +2,7 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeor
 
 export type BetaStatus = 'pending' | 'approved' | 'rejected'
 
-@Entity('api_special_beta_applications')
+@Entity('special_beta_applications')
 export class SpecialBetaApplication {
   @PrimaryGeneratedColumn('uuid')
   id: string

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import {
   Newspaper, Key, User, Users, MessageCircle, Star,
-  PanelLeftClose, LogOut, Loader2, ChevronRight, ChevronDown, Settings,
+  PanelLeftClose, LogOut, Loader2, ChevronRight, ChevronDown,
+  LifeBuoy, CreditCard, Rss, GraduationCap,
 } from 'lucide-vue-next'
 
 const route  = useRoute()
@@ -44,14 +45,20 @@ async function handleSignOut() {
 
 const nav = [
   { label: 'News',    to: '/news',    icon: Newspaper },
+  { label: 'Academy', to: '/academy', icon: GraduationCap },
+  { label: 'Support', to: '/support', icon: LifeBuoy },
+]
+
+const developerNav = [
   { label: 'API',     to: '/api',     icon: Key },
-  { label: 'Updates', to: '/updates', icon: Newspaper },
 ]
 
 const adminNav = [
-  { label: 'Users',         to: '/admin/users',   icon: Users },
-  { label: 'Tickets',       to: '/admin/tickets', icon: MessageCircle },
-  { label: 'Beta Requests', to: '/admin/beta',    icon: Star },
+  { label: 'Users',           to: '/admin/users',   icon: Users },
+  { label: 'News Management', to: '/admin/news',    icon: Rss },
+  { label: 'Pricing',         to: '/admin/pricing', icon: CreditCard },
+  { label: 'Tickets',         to: '/admin/tickets', icon: MessageCircle },
+  { label: 'Beta Requests',   to: '/admin/beta',    icon: Star },
 ]
 
 function active(to: string) {
@@ -76,17 +83,25 @@ const initials = computed(() =>
 
 const pageTitle = computed(() => {
   const p = route.path
-  if (p === '/news')        return 'News'
-  if (p === '/api')         return 'API & Keys'
-  if (p === '/updates')     return 'Updates'
-  if (p === '/profile')     return 'Profile'
+  if (p === '/news')               return 'News'
+  if (p === '/academy' || p.startsWith('/academy/')) return 'Academy'
+  if (p === '/api')           return 'API & Keys'
+  if (p === '/support')       return 'Support'
+  if (p === '/profile')       return 'Profile'
   if (p.startsWith('/admin/users'))   return 'User Management'
+  if (p.startsWith('/admin/news'))    return 'News Management'
+  if (p.startsWith('/admin/pricing')) return 'Pricing'
   if (p.startsWith('/admin/tickets')) return 'Support Tickets'
   if (p.startsWith('/admin/beta'))    return 'Beta Requests'
   return 'Dashboard'
 })
 
 const currentYear = new Date().getFullYear()
+
+const landingUrl = computed(() => {
+  if (import.meta.client && window.location.hostname === 'localhost') return 'http://localhost:3002'
+  return 'https://vindicter.xyz'
+})
 </script>
 
 <template>
@@ -99,13 +114,23 @@ const currentYear = new Date().getFullYear()
       <div style="position:absolute;width:400px;height:400px;border-radius:50%;filter:blur(130px);background:radial-gradient(circle,#4c1d95 0%,transparent 70%);bottom:-120px;right:-80px;opacity:0.06;" />
     </div>
 
-    <!-- Auth checking spinner -->
-    <div v-if="dashState === 'checking'" class="flex flex-1 items-center justify-center">
-      <div class="flex flex-col items-center gap-3">
-        <img src="/icon.png" alt="" class="h-10 w-10 opacity-40" />
-        <div class="flex items-center gap-2 text-[12px]" style="color:rgba(255,255,255,0.30);">
-          <Loader2 class="h-3.5 w-3.5 animate-spin" />
-          Loading…
+    <!-- Auth checking -->
+    <div v-if="dashState === 'checking'" class="flex flex-1 flex-col items-center justify-center gap-8">
+      <!-- Progress bar at top -->
+      <div class="fixed inset-x-0 top-0 h-0.5 overflow-hidden" style="background:rgba(255,255,255,0.06);">
+        <div class="h-full animate-loading-bar" style="background:rgba(139,92,246,0.75);width:60%;" />
+      </div>
+      <div class="flex flex-col items-center gap-4">
+        <img src="/icon.png" alt="" class="h-12 w-12 opacity-50" style="animation:pulse 2s ease-in-out infinite;" />
+        <div class="flex flex-col items-center gap-2">
+          <p class="text-[13px] font-medium" style="color:rgba(255,255,255,0.60);">Vindicter</p>
+          <p class="text-[11px]" style="color:rgba(255,255,255,0.25);">Verifying your session…</p>
+        </div>
+        <!-- Dot progress -->
+        <div class="flex items-center gap-1.5 mt-2">
+          <div class="h-1 w-1 rounded-full animate-bounce" style="background:rgba(139,92,246,0.60);animation-delay:0ms;" />
+          <div class="h-1 w-1 rounded-full animate-bounce" style="background:rgba(139,92,246,0.60);animation-delay:150ms;" />
+          <div class="h-1 w-1 rounded-full animate-bounce" style="background:rgba(139,92,246,0.60);animation-delay:300ms;" />
         </div>
       </div>
     </div>
@@ -147,6 +172,24 @@ const currentYear = new Date().getFullYear()
 
           <NuxtLink
             v-for="item in nav"
+            :key="item.to"
+            :to="item.to"
+            class="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer"
+            :class="[
+              collapsed ? 'justify-center' : '',
+              active(item.to) ? 'bg-indigo-600/15 text-indigo-400' : 'text-white/45 hover:text-white/80 hover:bg-white/[0.05]',
+            ]"
+            :title="collapsed ? item.label : undefined"
+          >
+            <component :is="item.icon" class="size-3.5 shrink-0" />
+            <span v-if="!collapsed">{{ item.label }}</span>
+          </NuxtLink>
+
+          <!-- Developer section -->
+          <div class="h-px mx-1 my-2" style="background:rgba(255,255,255,0.07);" />
+          <p v-if="!collapsed" class="px-2 mb-1 text-[10px] font-semibold uppercase tracking-[0.12em]" style="color:rgba(99,102,241,0.50);">Developer</p>
+          <NuxtLink
+            v-for="item in developerNav"
             :key="item.to"
             :to="item.to"
             class="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer"
@@ -213,10 +256,8 @@ const currentYear = new Date().getFullYear()
                 {{ initials }}
               </div>
               <div class="hidden sm:block text-left">
-                <p class="text-[12px] font-semibold leading-none truncate max-w-[120px]" style="color:rgba(255,255,255,0.75);">{{ displayName }}</p>
-                <p class="text-[9px] mt-0.5 font-semibold uppercase tracking-wider" :style="isAdmin ? 'color:rgba(139,92,246,0.60);' : 'color:rgba(255,255,255,0.25);'">
-                  {{ isAdmin ? 'Admin' : 'Member' }}
-                </p>
+                <p class="text-[11px] leading-none truncate max-w-[140px]" style="color:rgba(255,255,255,0.80);">{{ displayName }}</p>
+                <p class="text-[9px] mt-0.5 tracking-wide" style="color:rgba(255,255,255,0.22);">You're logged in</p>
               </div>
               <ChevronDown class="size-3 shrink-0 transition-transform" :class="userMenuOpen ? 'rotate-180' : ''" style="color:rgba(255,255,255,0.22);" />
             </button>
@@ -282,11 +323,11 @@ const currentYear = new Date().getFullYear()
 
         <!-- Footer -->
         <footer class="shrink-0 flex items-center justify-between px-5 py-2" style="border-top:1px solid rgba(255,255,255,0.05);">
-          <p class="text-[10px]" style="color:rgba(255,255,255,0.15);">&copy; {{ currentYear }} Vindicter — local-first security review.</p>
+          <p class="text-[10px]" style="color:rgba(255,255,255,0.15);">&copy; {{ currentYear }} Vindicter — local-first security platform.</p>
           <div class="flex items-center gap-4">
-            <a href="https://vindicter.xyz/docs" target="_blank" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Docs</a>
-            <a href="https://vindicter.xyz/support" target="_blank" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Support</a>
-            <a href="https://vindicter.xyz/privacy" target="_blank" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Privacy</a>
+            <a :href="`${landingUrl}/docs`" target="_blank" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Docs</a>
+            <a :href="`${landingUrl}/support`" target="_blank" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Support</a>
+            <a :href="`${landingUrl}/privacy`" target="_blank" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Privacy</a>
           </div>
         </footer>
       </div>

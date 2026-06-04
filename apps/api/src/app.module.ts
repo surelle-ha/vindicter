@@ -11,6 +11,9 @@ import { NewsletterModule } from './modules/newsletter/newsletter.module'
 import { BetaModule } from './modules/beta/beta.module'
 import { SupportModule } from './modules/support/support.module'
 import { ApiTokensModule } from './modules/api-tokens/api-tokens.module'
+import { NewsModule } from './modules/news/news.module'
+import { PricingModule } from './modules/pricing/pricing.module'
+import { MarketingModule } from './modules/marketing/marketing.module'
 
 @Module({
   imports: [
@@ -29,6 +32,9 @@ import { ApiTokensModule } from './modules/api-tokens/api-tokens.module'
     BetaModule,
     SupportModule,
     ApiTokensModule,
+    NewsModule,
+    PricingModule,
+    MarketingModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -9,6 +9,11 @@ import { NewsletterUpdate } from '../modules/newsletter/entities/newsletter-upda
 import { SpecialBetaApplication } from '../modules/beta/entities/special-beta-application.entity'
 import { SupportTicket } from '../modules/support/entities/support-ticket.entity'
 import { ApiToken } from '../modules/api-tokens/entities/api-token.entity'
+import { MarketingSegment } from '../modules/marketing/entities/marketing-segment.entity'
+import { MarketingContact } from '../modules/marketing/entities/marketing-contact.entity'
+import { MarketingCampaign } from '../modules/marketing/entities/marketing-campaign.entity'
+import { MarketingTemplate } from '../modules/marketing/entities/marketing-template.entity'
+import { MarketingSendEvent } from '../modules/marketing/entities/marketing-send-event.entity'
 
 export const databaseConfig = (): TypeOrmModuleOptions => {
   const url = process.env.DATABASE_URL ?? ''
@@ -26,6 +31,8 @@ export const databaseConfig = (): TypeOrmModuleOptions => {
       User, Role, Access, RoleAccess, UserRole,
       NewsletterSignup, NewsletterUpdate,
       SpecialBetaApplication, SupportTicket, ApiToken,
+      MarketingSegment, MarketingContact, MarketingCampaign,
+      MarketingTemplate, MarketingSendEvent,
     ],
     migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
     synchronize: false,

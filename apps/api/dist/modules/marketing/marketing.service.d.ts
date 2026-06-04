@@ -1,0 +1,65 @@
+import { Repository } from 'typeorm';
+import { MarketingCampaign } from './entities/marketing-campaign.entity';
+import { MarketingContact } from './entities/marketing-contact.entity';
+import { MarketingSegment } from './entities/marketing-segment.entity';
+import { MarketingSendEvent } from './entities/marketing-send-event.entity';
+import { MarketingTemplate } from './entities/marketing-template.entity';
+import { CreateCampaignDto } from './dto/create-campaign.dto';
+import { CreateContactDto } from './dto/create-contact.dto';
+import { CreateSegmentDto } from './dto/create-segment.dto';
+import { CreateTemplateDto } from './dto/create-template.dto';
+import { SendCampaignDto } from './dto/send-campaign.dto';
+import { SmtpService } from './smtp.service';
+import type { MarketingCampaignKind } from './entities/marketing-campaign.entity';
+export declare class MarketingService {
+    private segmentRepo;
+    private contactRepo;
+    private campaignRepo;
+    private templateRepo;
+    private sendEventRepo;
+    private smtp;
+    constructor(segmentRepo: Repository<MarketingSegment>, contactRepo: Repository<MarketingContact>, campaignRepo: Repository<MarketingCampaign>, templateRepo: Repository<MarketingTemplate>, sendEventRepo: Repository<MarketingSendEvent>, smtp: SmtpService);
+    summary(): Promise<{
+        segments: number;
+        contacts: number;
+        campaigns: number;
+        templates: number;
+        sentEvents: number;
+        smtp: {
+            configured: boolean;
+            host: string | null;
+            port: number | null;
+            secure: boolean;
+            fromEmail: string | null;
+            fromName: string | null;
+        };
+    }>;
+    findSegments(): Promise<MarketingSegment[]>;
+    createSegment(dto: CreateSegmentDto): Promise<MarketingSegment>;
+    updateSegment(id: string, dto: Partial<CreateSegmentDto>): Promise<MarketingSegment>;
+    removeSegment(id: string): Promise<void>;
+    findContacts(): Promise<MarketingContact[]>;
+    createContact(dto: CreateContactDto): Promise<MarketingContact>;
+    updateContact(id: string, dto: Partial<CreateContactDto>): Promise<MarketingContact>;
+    removeContact(id: string): Promise<void>;
+    findTemplates(kind?: MarketingCampaignKind): Promise<MarketingTemplate[]>;
+    createTemplate(dto: CreateTemplateDto): Promise<MarketingTemplate>;
+    updateTemplate(id: string, dto: Partial<CreateTemplateDto>): Promise<MarketingTemplate>;
+    removeTemplate(id: string): Promise<void>;
+    findCampaigns(): Promise<MarketingCampaign[]>;
+    findSendHistory(): Promise<MarketingSendEvent[]>;
+    createCampaign(dto: CreateCampaignDto): Promise<MarketingCampaign>;
+    updateCampaign(id: string, dto: Partial<CreateCampaignDto>): Promise<MarketingCampaign>;
+    sendCampaign(id: string, dto: SendCampaignDto): Promise<{
+        recipients: number;
+        messageId: string;
+        testOnly: boolean;
+    }>;
+    private resolveRecipients;
+    private findRecipientEmails;
+    private renderText;
+    private renderHtml;
+    private resolveTemplateTokens;
+    private recordSendEvent;
+    private escapeHtml;
+}

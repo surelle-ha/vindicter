@@ -29,8 +29,9 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  me(@CurrentUser() user: any) {
-    return this.auth.me(user.id)
+  async me(@CurrentUser() user: any) {
+    const profile = await this.auth.me(user.id)
+    return { ...profile, roles: user.roles ?? [], accesses: user.accesses ?? [] }
   }
 
   @Patch('me')

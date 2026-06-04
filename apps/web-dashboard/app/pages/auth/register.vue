@@ -2,7 +2,6 @@
 import { Loader2, Eye, EyeOff, Mail, Lock, User } from 'lucide-vue-next'
 
 definePageMeta({ layout: 'auth' })
-
 useHead({ title: 'Register — Vindicter' })
 
 const router = useRouter()
@@ -13,11 +12,31 @@ const notice = ref('')
 const displayName = ref('')
 const email = ref('')
 const password = ref('')
+const confirmPassword = ref('')
 const showPassword = ref(false)
+const showConfirm = ref(false)
+const tsToken = ref('')
+
+function onTsToken(token: string) { tsToken.value = token }
+function onTsError() { tsToken.value = ''; errorMessage.value = 'Security verification failed. Please try again.' }
 
 async function register() {
   errorMessage.value = ''
   notice.value = ''
+
+  if (!tsToken.value) {
+    errorMessage.value = 'Please complete the security verification.'
+    return
+  }
+  if (password.value !== confirmPassword.value) {
+    errorMessage.value = 'Passwords do not match.'
+    return
+  }
+  if (password.value.length < 6) {
+    errorMessage.value = 'Password must be at least 6 characters.'
+    return
+  }
+
   loading.value = true
   try {
     const supabase = useSupabase()
@@ -104,7 +123,7 @@ async function register() {
             />
             <button
               type="button"
-              class="absolute right-3 top-1/2 -translate-y-1/2 transition-colors hover:text-white/50"
+              class="absolute right-3 top-1/2 -translate-y-1/2 transition-colors hover:text-white/50 cursor-pointer"
               style="color:rgba(255,255,255,0.22);"
               @click="showPassword = !showPassword"
             >
@@ -112,6 +131,40 @@ async function register() {
               <EyeOff v-else class="h-3.5 w-3.5" />
             </button>
           </div>
+        </div>
+
+        <!-- Confirm Password -->
+        <div>
+          <label class="block mb-2 text-[10px] font-semibold uppercase tracking-wider" style="color:rgba(255,255,255,0.35);">Confirm password</label>
+          <div class="relative">
+            <Lock class="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none" style="color:rgba(255,255,255,0.22);" />
+            <input
+              v-model="confirmPassword"
+              :type="showConfirm ? 'text' : 'password'"
+              required
+              autocomplete="new-password"
+              placeholder="Repeat your password"
+              class="w-full rounded-xl pl-9 pr-10 py-2.5 text-[13px] text-white outline-none transition-colors border border-white/8 bg-white/[0.04] focus:border-accent/45"
+              :style="confirmPassword && confirmPassword !== password ? 'border-color:rgba(242,63,66,0.40)' : ''"
+            />
+            <button
+              type="button"
+              class="absolute right-3 top-1/2 -translate-y-1/2 transition-colors hover:text-white/50 cursor-pointer"
+              style="color:rgba(255,255,255,0.22);"
+              @click="showConfirm = !showConfirm"
+            >
+              <Eye v-if="!showConfirm" class="h-3.5 w-3.5" />
+              <EyeOff v-else class="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <p v-if="confirmPassword && confirmPassword !== password" class="mt-1 text-[10px]" style="color:rgba(242,63,66,0.75);">Passwords do not match.</p>
+        </div>
+
+        <!-- Turnstile -->
+        <div class="flex justify-center pt-1">
+          <ClientOnly>
+            <Turnstile @token="onTsToken" @error="onTsError" />
+          </ClientOnly>
         </div>
 
         <!-- Error -->
@@ -127,7 +180,7 @@ async function register() {
         <!-- Submit -->
         <button
           type="submit"
-          :disabled="loading"
+          :disabled="loading || (!!confirmPassword && confirmPassword !== password)"
           class="w-full rounded-xl py-3 text-[13px] font-bold flex items-center justify-center gap-2 transition-colors bg-accent hover:bg-accent/90 disabled:opacity-60 disabled:cursor-not-allowed text-white"
         >
           <Loader2 v-if="loading" class="h-4 w-4 animate-spin" />

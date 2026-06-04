@@ -3,7 +3,7 @@ import { Exclude } from 'class-transformer'
 import { UserRole } from '../../roles/entities/user-role.entity'
 import { ApiToken } from '../../api-tokens/entities/api-token.entity'
 
-@Entity('api_users')
+@Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string
@@ -11,7 +11,7 @@ export class User {
   @Column({ unique: true, length: 255 })
   email: string
 
-  @Column({ name: 'display_name', nullable: true, length: 100 })
+  @Column({ name: 'display_name', type: 'varchar', nullable: true, length: 100 })
   displayName: string | null
 
   @Column({ name: 'password_hash', length: 255 })

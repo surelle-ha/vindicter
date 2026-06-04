@@ -1,7 +1,7 @@
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm'
 import { RoleAccess } from './role-access.entity'
 
-@Entity('api_accesses')
+@Entity('accesses')
 export class Access {
   @PrimaryGeneratedColumn('uuid')
   id: string
@@ -12,7 +12,7 @@ export class Access {
   @Column({ length: 50 })
   action: string
 
-  @Column({ nullable: true, length: 255 })
+  @Column({ type: 'varchar', nullable: true, length: 255 })
   description: string | null
 
   @CreateDateColumn({ name: 'created_at' })

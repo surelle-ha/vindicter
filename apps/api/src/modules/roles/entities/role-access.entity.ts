@@ -2,7 +2,7 @@ import { CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn
 import { Role } from './role.entity'
 import { Access } from './access.entity'
 
-@Entity('api_roles_access')
+@Entity('roles_access')
 export class RoleAccess {
   @PrimaryGeneratedColumn('uuid')
   id: string
