@@ -7,7 +7,6 @@ const LOGIN_DESC = 'Internal workspace for Vindicter admins and operations teams
 
 export default defineNuxtConfig({
   compatibilityDate: '2025-05-12',
-  buildDir: process.env.NUXT_BUILD_DIR ?? 'node_modules/.cache/nuxt/.nuxt',
   ssr: true,
   nitro: { preset: 'static' },
   modules: ['@pinia/nuxt'],
