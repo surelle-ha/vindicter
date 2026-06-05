@@ -7,7 +7,7 @@ definePageMeta({ layout: 'dashboard' })
 
 const route  = useRoute()
 const router = useRouter()
-const supabase = useSupabase()
+const api    = useApi()
 const { user } = useAuth()
 
 const DAEMON_PORT = 7476
@@ -466,26 +466,27 @@ const lessonComplete = ref(false)
 async function markComplete() {
   if (lessonComplete.value) return
   lessonComplete.value = true
-  const uid = (user.value as any)?.id
-  if (!uid) return
-  await supabase.from('academy_progress').upsert({ user_id: uid, lesson_id: lessonId.value, completed_at: new Date().toISOString(), started_at: new Date().toISOString() }, { onConflict: 'user_id,lesson_id' })
+  if (!user.value) return
+  await api.post(`/academy/progress/${lessonId.value}`, { completedAt: new Date().toISOString() }).catch(() => null)
 }
 
 async function loadProgress() {
-  const uid = (user.value as any)?.id; if (!uid) return
-  const { data } = await supabase.from('academy_progress').select('completed_at').eq('user_id', uid).eq('lesson_id', lessonId.value).single()
-  lessonComplete.value = !!data?.completed_at
+  if (!user.value) return
+  const rows = await api.get<{ lessonId: string; completedAt: string | null }[]>('/academy/progress').catch(() => []) ?? []
+  const row = rows.find(r => r.lessonId === lessonId.value)
+  lessonComplete.value = !!row?.completedAt
 }
 
 async function saveSession() {
-  const uid = (user.value as any)?.id; if (!uid) return
-  await supabase.from('academy_chat_sessions').upsert({ user_id: uid, lesson_id: lessonId.value, messages: messages.value.filter(m => !m.streaming), updated_at: new Date().toISOString() }, { onConflict: 'user_id,lesson_id' })
+  if (!user.value) return
+  await api.put(`/academy/sessions/${lessonId.value}`, {
+    messages: messages.value.filter(m => !m.streaming),
+  }).catch(() => null)
 }
 
 async function loadSession() {
-  const uid = (user.value as any)?.id
-  if (!uid) { await initLesson(); return }
-  const { data } = await supabase.from('academy_chat_sessions').select('messages').eq('user_id', uid).eq('lesson_id', lessonId.value).single()
+  if (!user.value) { await initLesson(); return }
+  const data = await api.get<{ messages: Message[] } | null>(`/academy/sessions/${lessonId.value}`).catch(() => null)
   if (data?.messages?.length) {
     messages.value = (data.messages as Message[]).map(m => ({ ...m, streaming: false }))
     nextId = Math.max(0, ...messages.value.map(m => m.id)) + 1
@@ -501,9 +502,9 @@ async function initLesson() {
 async function resetSession() {
   if (!confirm('Reset this session? Your conversation history and progress for this lesson will be cleared.')) return
   const uid = (user.value as any)?.id
-  if (uid) {
-    await supabase.from('academy_chat_sessions').delete().eq('user_id', uid).eq('lesson_id', lessonId.value)
-    await supabase.from('academy_progress').delete().eq('user_id', uid).eq('lesson_id', lessonId.value)
+  if (user.value) {
+    await api.del(`/academy/sessions/${lessonId.value}`).catch(() => null)
+    await api.del(`/academy/progress/${lessonId.value}`).catch(() => null)
   }
   messages.value = []; lessonComplete.value = false
   whiteboardItems.value = []; whiteboardVisible.value = false

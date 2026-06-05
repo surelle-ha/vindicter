@@ -113,7 +113,6 @@ const ttsModelOptions: { id: TTSScriptModel; label: string; description: string;
   { id: 'codex',       label: 'Codex',       description: 'OpenAI Codex CLI' },
   { id: 'openrouter',  label: 'OpenRouter',  description: 'Configured OpenRouter model' },
   { id: 'ollama',      label: 'Ollama',      description: 'Local Ollama server' },
-  { id: 'core',        label: 'DefendCore',  description: "Vindicter's native AI model — currently in training", disabled: true, soon: true },
 ]
 
 function openCreateTTSModal(lesson: Lesson | CustomLesson) {

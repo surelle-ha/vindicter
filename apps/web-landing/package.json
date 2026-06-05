@@ -16,7 +16,6 @@
     "vue": "latest"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.4",
     "lucide-vue-next": "latest",
     "ogl": "^1.0.11"
   }

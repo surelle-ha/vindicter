@@ -8,6 +8,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { AppModule } from './app.module'
 import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter'
+import { CorsService, allowedOrigins } from './modules/cors/cors.service'
 import { randomUUID } from 'crypto'
 
 const logger = new Logger('Bootstrap')
@@ -55,27 +56,22 @@ async function bootstrap() {
     crossOriginEmbedderPolicy: false,
   })
 
-  // ── CORS ───────────────────────────────────────────────────────────────────
-  const allowedOrigins = [
-    'http://localhost:3002',
-    'http://localhost:3003',
-    'http://localhost:3004',
-    'https://vindicter.xyz',
-    'https://dashboard.vindicter.xyz',
-    'https://marketing.vindicta.xyz',
-    ...(process.env.CORS_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean) ?? []),
-  ]
+  // ── CORS — DB-driven, runtime-mutable (no restart needed) ─────────────────
+  // Populate the shared Set from DB before registering CORS so the first
+  // request is already covered.
+  const corsService = app.get(CorsService)
+  await corsService.init()
 
   await app.register(import('@fastify/cors'), {
     origin: (origin, cb) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.has(origin)) {
         cb(null, true)
       } else {
         cb(new Error('Not allowed by CORS'), false)
       }
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Api-Key'],
     credentials: true,
     maxAge: 86_400,
   })

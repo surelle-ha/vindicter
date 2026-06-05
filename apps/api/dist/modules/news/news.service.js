@@ -54,6 +54,11 @@ let NewsService = class NewsService {
     async upsertArticle(dto) {
         await this.articleRepo.upsert({ ...dto, fetchedAt: new Date() }, { conflictPaths: ['link'], skipUpdateIfNoValuesChanged: true });
     }
+    async upsertArticles(articles) {
+        const results = await Promise.allSettled(articles.map(a => this.upsertArticle(a)));
+        const synced = results.filter(r => r.status === 'fulfilled').length;
+        return { synced, total: articles.length };
+    }
 };
 exports.NewsService = NewsService;
 exports.NewsService = NewsService = __decorate([

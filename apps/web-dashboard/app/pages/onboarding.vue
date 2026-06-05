@@ -4,8 +4,7 @@ import { ArrowRight, Loader2, User, Briefcase, Shield } from 'lucide-vue-next'
 definePageMeta({ layout: false })
 useHead({ title: 'Welcome — Vindicter' })
 
-const supabase = useSupabase()
-const { user } = useAuth()
+const { user, updateProfile } = useAuth()
 const router = useRouter()
 
 const step = ref(1)
@@ -37,16 +36,12 @@ async function finish() {
   saving.value = true
   err.value = ''
   try {
-    const uid = (user.value as any)?.id
-    if (!uid) throw new Error('Not authenticated')
-
-    await supabase.from('user_profiles').update({
-      display_name: displayName.value.trim() || null,
-      job_role: jobRole.value,
-      experience_level: experience.value,
-      onboarding_complete: true,
-    }).eq('id', uid)
-
+    await updateProfile({
+      displayName:       displayName.value.trim() || undefined,
+      jobRole:           jobRole.value,
+      experienceLevel:   experience.value,
+      onboardingComplete: true,
+    })
     await router.push('/news')
   }
   catch (e: any) {

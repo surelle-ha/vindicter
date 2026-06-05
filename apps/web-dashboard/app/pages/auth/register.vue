@@ -39,20 +39,11 @@ async function register() {
 
   loading.value = true
   try {
-    const supabase = useSupabase()
-    const { data, error } = await supabase.auth.signUp({
-      email: email.value.trim(),
-      password: password.value,
-      options: {
-        data: { display_name: displayName.value.trim() },
-      },
+    const { signUp } = useAuth()
+    await signUp(email.value.trim(), password.value, displayName.value.trim() || undefined, {
+      turnstileToken: tsToken.value,
     })
-    if (error) throw error
-    if (data.session) {
-      await router.push('/news')
-      return
-    }
-    notice.value = 'Account created. Check your email to confirm your account before logging in.'
+    await router.push('/onboarding')
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Unable to register right now.'
   } finally {

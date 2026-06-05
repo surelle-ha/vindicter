@@ -18,6 +18,15 @@ export class User {
   @Exclude()
   passwordHash: string
 
+  @Column({ name: 'job_role', type: 'varchar', nullable: true, length: 100 })
+  jobRole: string | null
+
+  @Column({ name: 'experience_level', type: 'varchar', nullable: true, length: 100 })
+  experienceLevel: string | null
+
+  @Column({ name: 'onboarding_complete', default: false })
+  onboardingComplete: boolean
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean
 

@@ -35,6 +35,18 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "passwordHash", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'job_role', type: 'varchar', nullable: true, length: 100 }),
+    __metadata("design:type", Object)
+], User.prototype, "jobRole", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'experience_level', type: 'varchar', nullable: true, length: 100 }),
+    __metadata("design:type", Object)
+], User.prototype, "experienceLevel", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'onboarding_complete', default: false }),
+    __metadata("design:type", Boolean)
+], User.prototype, "onboardingComplete", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'is_active', default: true }),
     __metadata("design:type", Boolean)
 ], User.prototype, "isActive", void 0);

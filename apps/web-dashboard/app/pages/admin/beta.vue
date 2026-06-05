@@ -4,7 +4,7 @@ import { Star, Search, Loader2, ShieldAlert, RefreshCw, ChevronDown, Building2 }
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'Beta Requests — Vindicter' })
 
-const supabase = useSupabase()
+const api = useApi()
 const { isAdmin } = useAuth()
 const router = useRouter()
 
@@ -37,12 +37,7 @@ async function fetchApplications() {
   loading.value  = true
   fetchErr.value = ''
   try {
-    const { data, error } = await supabase
-      .from('special_beta_applications')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    applications.value = (data ?? []) as BetaApplication[]
+    applications.value = await api.get<BetaApplication[]>('/beta') ?? []
   } catch (e) {
     fetchErr.value = e instanceof Error ? e.message : 'Failed to load applications.'
   } finally {
@@ -53,11 +48,7 @@ async function fetchApplications() {
 async function setStatus(appId: string, newStatus: string) {
   saving.value = appId
   try {
-    const { error } = await supabase
-      .from('special_beta_applications')
-      .update({ status: newStatus })
-      .eq('id', appId)
-    if (error) throw error
+    await api.patch(`/beta/${appId}/status`, { status: newStatus })
     const a = applications.value.find(a => a.id === appId)
     if (a) a.status = newStatus
   } catch { /* silent */ }

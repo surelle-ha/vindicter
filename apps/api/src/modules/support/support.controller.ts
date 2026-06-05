@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import { SupportService } from './support.service'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { AccessGuard } from '../../common/guards/access.guard'
@@ -8,6 +9,7 @@ import { RequireAccess } from '../../common/decorators/require-access.decorator'
 export class SupportController {
   constructor(private service: SupportService) {}
 
+  @Throttle({ global: { ttl: 60_000, limit: 5 } })
   @Post('tickets')
   create(@Body() body: any) {
     return this.service.create(body)

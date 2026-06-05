@@ -16,7 +16,6 @@
     "vue": "latest"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.4",
     "fast-xml-parser": "^5.8.0",
     "lucide-vue-next": "latest",
     "mermaid": "^11.15.0"

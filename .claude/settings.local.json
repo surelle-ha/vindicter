@@ -76,7 +76,10 @@
       "Bash(sed -i \"s|'/dashboard'|'/news'|g\" apps/web-dashboard/app/pages/profile.vue)",
       "Bash(sed -i \"s|String\\(route.query.redirect ?? '/dashboard'\\)|String\\(route.query.redirect ?? '/news'\\)|g\" apps/web-dashboard/app/pages/auth/login.vue)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(copy \"d:\\\\Workspace\\\\vindicta\\\\apps\\\\web-marketing\\\\app\\\\components\\\\Dither.vue\" \"d:\\\\Workspace\\\\vindicta\\\\apps\\\\web-admin\\\\app\\\\components\\\\Dither.vue\")",
+      "Bash(copy \"d:\\\\Workspace\\\\vindicta\\\\apps\\\\web-marketing\\\\public\\\\icon.png\" \"d:\\\\Workspace\\\\vindicta\\\\apps\\\\web-admin\\\\public\\\\icon.png\")",
+      "Bash(copy \"d:\\\\Workspace\\\\vindicta\\\\apps\\\\web-marketing\\\\public\\\\favicon.ico\" \"d:\\\\Workspace\\\\vindicta\\\\apps\\\\web-admin\\\\public\\\\favicon.ico\")"
     ]
   }
 }

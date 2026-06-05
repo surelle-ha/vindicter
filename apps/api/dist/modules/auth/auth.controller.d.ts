@@ -2,7 +2,10 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 declare class UpdateProfileDto {
-    displayName: string;
+    displayName?: string;
+    jobRole?: string;
+    experienceLevel?: string;
+    onboardingComplete?: boolean;
 }
 export declare class AuthController {
     private auth;
@@ -20,12 +23,15 @@ export declare class AuthController {
         email?: string | undefined;
         displayName?: string | null | undefined;
         passwordHash?: string | undefined;
+        jobRole?: string | null | undefined;
+        experienceLevel?: string | null | undefined;
+        onboardingComplete?: boolean | undefined;
         isActive?: boolean | undefined;
         createdAt?: Date | undefined;
         updatedAt?: Date | undefined;
         userRoles?: import("../roles/entities/user-role.entity").UserRole[] | undefined;
         apiTokens?: import("../api-tokens/entities/api-token.entity").ApiToken[] | undefined;
     }>;
-    updateProfile(user: any, dto: UpdateProfileDto): Promise<void>;
+    updateProfile(user: any, dto: UpdateProfileDto): Promise<import("../users/entities/user.entity").User | null>;
 }
 export {};

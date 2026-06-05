@@ -2,133 +2,101 @@
 useHead({ title: 'Download Vindicter — Open Beta' })
 
 const MANIFEST = 'https://pub-1dcbd264e42f475e9f95858cc16ab6b7.r2.dev/releases/latest/update.json'
-const TOKEN_KEY = 'vindicter:download-token'
 
-// ── Release manifest ────────────────────────────────────────────────────────
-const manifestLoading = ref(true)
-const manifestError   = ref(false)
-const version         = ref<string | null>(null)
-const pubDate         = ref<string | null>(null)
-const winUrl          = ref<string | null>(null)
+// ── Release manifest (version display only) ─────────────────────────────────
+const version = ref<string | null>(null)
 
 onMounted(async () => {
   try {
     const res = await fetch(MANIFEST)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json() as {
-      version: string
-      pub_date: string
-      platforms: Record<string, { url: string }>
-    }
+    const data = await res.json() as { version: string }
     version.value = data.version ?? null
-    pubDate.value = data.pub_date
-      ? new Date(data.pub_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-      : null
-    winUrl.value = data.platforms?.['windows-x86_64']?.url ?? null
-  } catch {
-    manifestError.value = true
-  } finally {
-    manifestLoading.value = false
-  }
-
-  await checkExistingAccess()
+  } catch { /* non-critical */ }
 })
 
-// ── Token gate ──────────────────────────────────────────────────────────────
-type Step = 'gate' | 'download'
-const step         = ref<Step>('gate')
-const email        = ref('')
-const emailError   = ref('')
+// ── Email gate ───────────────────────────────────────────────────────────────
+type Step = 'gate' | 'sent'
+const step          = ref<Step>('gate')
+const email         = ref('')
+const emailError    = ref('')
+const captchaError  = ref('')
 const submitLoading = ref(false)
-const tokenVerifying = ref(false)
-const tokenEmail   = ref('')
+const sentEmail     = ref('')
+
+// ── Cloudflare Turnstile ─────────────────────────────────────────────────────
+const turnstileContainer = ref<HTMLElement | null>(null)
+const turnstileToken     = ref('')
+const config             = useRuntimeConfig()
+
+function onTurnstileSuccess(token: string) { turnstileToken.value = token }
+function onTurnstileExpired()              { turnstileToken.value = '' }
+function onTurnstileError()                { turnstileToken.value = '' }
+
+function mountTurnstile() {
+  if (!turnstileContainer.value) return
+  const w = window as any
+  if (!w.turnstile) return
+  w.turnstile.render(turnstileContainer.value, {
+    sitekey:            config.public.turnstileSiteKey as string,
+    theme:              'dark',
+    callback:           onTurnstileSuccess,
+    'expired-callback': onTurnstileExpired,
+    'error-callback':   onTurnstileError,
+  })
+}
+
+const isDev = process.env.NODE_ENV !== 'production'
+
+onMounted(() => {
+  if (isDev) {
+    // Skip the real widget in development — auto-satisfy so the form works locally
+    turnstileToken.value = 'dev-bypass'
+    return
+  }
+  if (typeof window === 'undefined') return
+  const w = window as any
+  if (w.turnstile) {
+    mountTurnstile()
+  } else {
+    w.__turnstileOnLoad = mountTurnstile
+    const s = document.createElement('script')
+    s.src   = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=__turnstileOnLoad&render=explicit'
+    s.async = true
+    s.defer = true
+    document.head.appendChild(s)
+  }
+})
 
 function validateEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 }
 
-async function checkExistingAccess() {
-  const route = useRoute()
-  const urlToken = route.query.token as string | undefined
-
-  // Priority 1: URL token parameter
-  if (urlToken) {
-    tokenVerifying.value = true
-    try {
-      const supabase = useSupabase()
-      const { data } = await supabase
-        .from('newsletter_signups')
-        .select('email, download_token')
-        .eq('download_token', urlToken)
-        .maybeSingle()
-      if (data) {
-        tokenEmail.value = data.email ?? ''
-        localStorage.setItem(TOKEN_KEY, urlToken)
-        step.value = 'download'
-        return
-      }
-    } catch { /* fall through */ } finally {
-      tokenVerifying.value = false
-    }
-  }
-
-  // Priority 2: localStorage saved token
-  const saved = localStorage.getItem(TOKEN_KEY)
-  if (saved) {
-    tokenVerifying.value = true
-    try {
-      const supabase = useSupabase()
-      const { data } = await supabase
-        .from('newsletter_signups')
-        .select('email')
-        .eq('download_token', saved)
-        .maybeSingle()
-      if (data) {
-        tokenEmail.value = data.email ?? ''
-        step.value = 'download'
-      } else {
-        localStorage.removeItem(TOKEN_KEY)
-      }
-    } catch { /* ignore */ } finally {
-      tokenVerifying.value = false
-    }
-  }
-}
-
 async function submitEmail() {
-  emailError.value = ''
+  emailError.value  = ''
+  captchaError.value = ''
+
   const raw = email.value.trim()
   if (!validateEmail(raw)) {
     emailError.value = 'Please enter a valid email address.'
     return
   }
+  if (!turnstileToken.value) {
+    captchaError.value = 'Please complete the verification challenge.'
+    return
+  }
 
   submitLoading.value = true
   try {
-    const supabase = useSupabase()
-    const token = crypto.randomUUID().replace(/-/g, '')
-
-    // Upsert: same email gets a fresh token each time
-    const { error } = await supabase
-      .from('newsletter_signups')
-      .upsert(
-        { email: raw, download_token: token, account_type: 'individual' },
-        { onConflict: 'email' },
-      )
-
-    if (error && error.code !== '23505') throw error
-
-    // For duplicate email, fetch the existing token so returning users get access
-    const { data: existing } = await supabase
-      .from('newsletter_signups')
-      .select('download_token')
-      .eq('email', raw)
-      .maybeSingle()
-
-    const finalToken = existing?.download_token ?? token
-    localStorage.setItem(TOKEN_KEY, finalToken)
-    tokenEmail.value = raw
-    step.value = 'download'
+    const { public: { apiBaseUrl } } = useRuntimeConfig()
+    const res = await fetch(`${apiBaseUrl}/newsletter/signups`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: raw, accountType: 'individual', captchaToken: turnstileToken.value }),
+    })
+    if (!res.ok) throw new Error(await res.text())
+    sentEmail.value = raw
+    step.value = 'sent'
   } catch (err) {
     emailError.value = 'Something went wrong. Please try again.'
     console.error('[download-gate]', err)
@@ -181,19 +149,11 @@ async function submitEmail() {
           </p>
         </div>
 
-        <!-- Verifying spinner -->
-        <div v-if="tokenVerifying" class="flex justify-center py-10">
-          <svg class="h-7 w-7 text-accent/40 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 100 16v-4l-3 3 3 3v-4a8 8 0 01-8-8z" />
-          </svg>
-        </div>
-
         <!-- ── Step: gate (email required) ─────────────────────────────── -->
-        <div v-else-if="step === 'gate'" class="rounded-2xl border border-white/8 bg-surface/60 p-6 sm:p-8">
+        <div v-if="step === 'gate'" class="rounded-2xl border border-white/8 bg-surface/60 p-6 sm:p-8">
           <p class="text-[15px] font-semibold text-white mb-1.5 text-center">Get your download link</p>
           <p class="text-[12px] text-white/40 text-center mb-6 leading-relaxed">
-            Enter your email to receive a personal download link. We'll also send you release notes.
+            Enter your email and we'll send your personal download link. We'll also keep you updated on new releases.
           </p>
 
           <div class="mb-4">
@@ -212,77 +172,47 @@ async function submitEmail() {
             <p v-if="emailError" class="mt-1.5 text-[11px] text-err/80">{{ emailError }}</p>
           </div>
 
+          <!-- Turnstile challenge (production only) -->
+          <div v-if="!isDev" class="mb-4">
+            <div ref="turnstileContainer" />
+            <p v-if="captchaError" class="mt-1.5 text-[11px] text-err/80">{{ captchaError }}</p>
+          </div>
+
           <button
             @click="submitEmail"
-            :disabled="submitLoading || !email.trim()"
+            :disabled="submitLoading || !email.trim() || !turnstileToken"
             class="w-full flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3.5 text-[13px] font-bold text-white transition-colors hover:bg-accent/85 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg v-if="submitLoading" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 100 16v-4l-3 3 3 3v-4a8 8 0 01-8-8z" />
             </svg>
-            {{ submitLoading ? 'Generating link…' : 'Get Download Link →' }}
+            {{ submitLoading ? 'Sending link…' : 'Send Download Link →' }}
           </button>
 
           <p class="mt-3 text-center text-[10px] text-white/20">
-            No spam. Unsubscribe any time. Personal link is reusable.
+            No spam. Unsubscribe any time.
           </p>
         </div>
 
-        <!-- ── Step: download ────────────────────────────────────────────── -->
-        <div v-else>
-          <!-- Registered confirmation -->
-          <div v-if="tokenEmail" class="mb-5 rounded-xl border border-ok/20 bg-ok/5 px-4 py-3 flex items-center gap-3">
-            <svg class="h-4 w-4 text-ok shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p class="text-[12px] text-ok/80">Access granted for <strong>{{ tokenEmail }}</strong>.</p>
-          </div>
-
-          <!-- Loading manifest -->
-          <div v-if="manifestLoading" class="flex justify-center py-6">
-            <svg class="h-7 w-7 text-accent/40 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 100 16v-4l-3 3 3 3v-4a8 8 0 01-8-8z" />
-            </svg>
-          </div>
-
-          <!-- Manifest error -->
-          <div v-else-if="manifestError" class="rounded-2xl border border-err/20 bg-err/5 px-5 py-4 text-center">
-            <p class="text-[13px] text-err/80">Could not load release info. Try refreshing the page.</p>
-          </div>
-
-          <!-- Download card -->
-          <div v-else class="rounded-2xl border border-white/8 bg-surface/60 p-6 sm:p-8">
-            <a
-              :href="winUrl ?? '#'"
-              :class="winUrl ? '' : 'pointer-events-none opacity-40'"
-              class="group flex items-center gap-3 rounded-xl bg-accent px-6 py-4 text-[14px] font-bold text-white transition-all hover:bg-accent/85 hover:scale-[1.02] active:scale-[0.98] w-full justify-center mb-4"
-            >
-              <svg class="h-5 w-5 transition-transform group-hover:translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+        <!-- ── Step: sent (check inbox) ──────────────────────────────────── -->
+        <div v-else class="rounded-2xl border border-ok/20 bg-ok/5 p-6 sm:p-8 text-center">
+          <div class="mb-5 flex justify-center">
+            <div class="flex h-14 w-14 items-center justify-center rounded-full bg-ok/10 border border-ok/20">
+              <svg class="h-7 w-7 text-ok" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
               </svg>
-              Download for Windows
-              <span v-if="version" class="opacity-55 font-normal text-[12px]">v{{ version }}</span>
-            </a>
-
-            <div class="flex items-center justify-center gap-4 text-[11px] text-white/30">
-              <span>Windows 10 / 11 · x64</span>
-              <span class="text-white/15">·</span>
-              <span>Free</span>
-              <span v-if="pubDate" class="text-white/15">·</span>
-              <span v-if="pubDate">{{ pubDate }}</span>
-            </div>
-
-            <div class="mt-5 rounded-xl border border-warn/15 bg-warn/5 px-4 py-3 flex items-start gap-2.5">
-              <svg class="h-4 w-4 text-warn/70 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <p class="text-[11px] text-white/35 leading-relaxed">
-                Windows SmartScreen may prompt you. Click <strong class="text-white/55">"More info"</strong> → <strong class="text-white/55">"Run anyway"</strong> to proceed.
-              </p>
             </div>
           </div>
+
+          <p class="text-[17px] font-bold text-white mb-2">Check your inbox</p>
+          <p class="text-[13px] text-white/50 leading-relaxed mb-1">
+            Your download link has been sent to
+          </p>
+          <p class="text-[13px] font-semibold text-ok/80 mb-5">{{ sentEmail }}</p>
+          <p class="text-[12px] text-white/30 leading-relaxed">
+            Click the link in the email to start your download. Check your spam folder if it doesn't arrive within a few minutes.
+          </p>
         </div>
 
         <!-- Perks (always visible) -->

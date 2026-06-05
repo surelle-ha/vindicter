@@ -4,17 +4,17 @@ import { Rss, ExternalLink, RefreshCw, Loader2, ChevronLeft, ChevronRight } from
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'News — Vindicter' })
 
-const supabase = useSupabase()
+const api = useApi()
 
 interface Article {
   id: string
-  feed_name: string
+  feedName: string
   title: string
   link: string
   summary: string | null
-  image_url?: string | null
-  published_at: string | null
-  fetched_at: string
+  imageUrl?: string | null
+  publishedAt: string | null
+  fetchedAt: string
 }
 
 const articles   = ref<Article[]>([])
@@ -28,20 +28,13 @@ interface Feed { id: string; name: string; category: string; enabled: boolean }
 const feeds = ref<Feed[]>([])
 
 async function loadFeeds() {
-  const { data } = await supabase
-    .from('rss_feeds')
-    .select('id, name, category, enabled')
-    .eq('enabled', true)
-  feeds.value = (data ?? []) as Feed[]
+  const data = await api.get<Feed[]>('/news/feeds').catch(() => [])
+  feeds.value = (data ?? []).filter(f => f.enabled)
 }
 
 async function loadArticles() {
-  const { data } = await supabase
-    .from('rss_articles')
-    .select('*')
-    .order('published_at', { ascending: false })
-    .limit(200)
-  articles.value = (data ?? []) as Article[]
+  const data = await api.get<Article[]>('/news/articles?limit=200').catch(() => [])
+  articles.value = data ?? []
 }
 
 async function refresh() {
@@ -63,7 +56,7 @@ const categories = computed(() => {
 const filtered = computed(() => {
   if (activeCategory.value === 'all') return articles.value
   const names = feeds.value.filter(f => f.category === activeCategory.value).map(f => f.name)
-  return articles.value.filter(a => names.includes(a.feed_name))
+  return articles.value.filter(a => names.includes(a.feedName))
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / PAGE_SIZE)))
@@ -89,7 +82,8 @@ function fmt(iso: string | null) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function categoryColor(cat: string): string {
+function categoryColor(cat?: string): string {
+  if (!cat) return 'rgba(139,92,246,0.70)'
   const map: Record<string, string> = {
     attacks:  'rgba(248,113,113,0.70)',
     reports:  'rgba(139,92,246,0.70)',
@@ -171,9 +165,9 @@ function categoryColor(cat: string): string {
           style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.08);"
         >
           <!-- Article image -->
-          <div v-if="article.image_url" class="aspect-video overflow-hidden shrink-0">
+          <div v-if="article.imageUrl" class="aspect-video overflow-hidden shrink-0">
             <img
-              :src="article.image_url"
+              :src="article.imageUrl"
               :alt="article.title"
               class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
               loading="lazy"
@@ -189,10 +183,10 @@ function categoryColor(cat: string): string {
           <div class="flex flex-col flex-1 p-4 gap-2">
             <!-- Meta row -->
             <div class="flex items-center justify-between gap-2">
-              <span class="text-[10px] font-bold uppercase tracking-wide truncate" :style="`color:${categoryColor(article.feed_name)};`">
-                {{ article.feed_name }}
+              <span class="text-[10px] font-bold uppercase tracking-wide truncate" :style="`color:${categoryColor(article.feedName)};`">
+                {{ article.feedName }}
               </span>
-              <span class="text-[10px] shrink-0" style="color:rgba(255,255,255,0.22);">{{ fmt(article.published_at) }}</span>
+              <span class="text-[10px] shrink-0" style="color:rgba(255,255,255,0.22);">{{ fmt(article.publishedAt) }}</span>
             </div>
 
             <!-- Title -->

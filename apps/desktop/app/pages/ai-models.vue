@@ -63,6 +63,7 @@ const openRouterStatus = {
   description: 'Unified API gateway for 200+ AI models. Will allow Vindicter to route security scans to any supported model — Mistral, Llama, Gemini, and more.',
 }
 
+// Ollama
 const ollamaUrl = ref(app.ollama.url)
 const ollamaModel = ref(app.ollama.model)
 const ollamaChecking = ref(false)
@@ -564,42 +565,6 @@ onMounted(() => {
               <RefreshCw v-else class="size-3.5" />
               Verify
             </GlassButton>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- DefendCore -->
-    <div class="space-y-3">
-      <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">Vindicter AI</p>
-      <div class="rounded-xl border border-rose-500/15 bg-[var(--bg-card)] p-5">
-        <div class="flex items-start gap-4">
-          <div class="grid size-10 shrink-0 place-items-center rounded-xl border border-rose-500/20 bg-rose-500/10">
-            <span class="text-sm font-bold text-rose-300">DC</span>
-          </div>
-          <div class="flex-1 min-w-0 space-y-3">
-            <div class="flex flex-wrap items-center gap-2">
-              <p class="text-sm font-semibold text-[var(--text)]">DefendCore</p>
-              <span class="rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[9px] font-semibold text-rose-300">Soon</span>
-              <span class="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-semibold text-[var(--text-faint)]">In Training</span>
-            </div>
-            <p class="text-xs leading-relaxed text-[var(--text-muted)]">
-              Vindicter's native AI model — purpose-built for security education and analysis. Currently in development and training. Will be available as a first-party option across the Academy, scanner, and all AI features.
-            </p>
-            <!-- API key field — disabled until launch -->
-            <div class="space-y-1.5">
-              <label class="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">API Key</label>
-              <GlassInput
-                model-value=""
-                type="password"
-                placeholder="Not available yet"
-                :disabled="true"
-                class="opacity-50 cursor-not-allowed"
-              />
-            </div>
-            <div class="rounded-lg border border-rose-500/15 bg-rose-500/[0.05] px-3 py-2.5">
-              <p class="text-[11px] text-rose-300/80">DefendCore is not available as of the moment. API access will be enabled when the model launches.</p>
-            </div>
           </div>
         </div>
       </div>

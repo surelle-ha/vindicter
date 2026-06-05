@@ -1,51 +1,78 @@
+import { getStoredToken, setStoredToken } from './useApi'
+
+interface ApiUser {
+  id: string
+  email: string
+  displayName: string | null
+  jobRole: string | null
+  experienceLevel: string | null
+  onboardingComplete: boolean
+  createdAt: string
+  roles: string[]
+  accesses: string[]
+}
+
 export const useAuth = () => {
-  const supabase   = useSupabase()
-  const user       = useState<Record<string, unknown> | null>('auth-user',    () => null)
-  const isAdmin    = useState<boolean>('auth-is-admin',   () => false)
-  const authReady  = useState<boolean>('auth-ready',      () => false)
+  const api     = useApi()
+  const user    = useState<ApiUser | null>('auth-user',     () => null)
+  const isAdmin = useState<boolean>('auth-is-admin', () => false)
 
   async function init() {
     if (import.meta.server) return
+    const token = getStoredToken()
+    if (!token) return
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        user.value = session.user as unknown as Record<string, unknown>
-        const { data } = await supabase
-          .from('user_profiles').select('role').eq('id', session.user.id).single()
-        isAdmin.value = data?.role === 'admin'
-      } else {
-        user.value    = null
-        isAdmin.value = false
-      }
-    } catch {
+      const me = await api.get<ApiUser>('/auth/me')
+      user.value    = me
+      isAdmin.value = me?.roles?.includes('admin') ?? false
+    }
+    catch {
+      setStoredToken(null)
       user.value    = null
       isAdmin.value = false
-    } finally {
-      authReady.value = true
     }
   }
 
-  async function signIn(email: string, password: string): Promise<{ needsOnboarding: boolean }> {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
-    let needsOnboarding = false
-    if (data.user) {
-      user.value = data.user as unknown as Record<string, unknown>
-      const { data: profile } = await supabase
-        .from('user_profiles').select('role, onboarding_complete').eq('id', data.user.id).single()
-      isAdmin.value = profile?.role === 'admin'
-      needsOnboarding = !profile?.onboarding_complete
-    }
-    authReady.value = true
-    return { needsOnboarding }
+  async function signIn(email: string, password: string, opts?: { turnstileToken?: string; clientApp?: string }): Promise<{ needsOnboarding: boolean }> {
+    const res = await api.post<{ access_token: string }>('/auth/login', {
+      email,
+      password,
+      turnstileToken: opts?.turnstileToken,
+      clientApp:      opts?.clientApp,
+    })
+    setStoredToken(res.access_token)
+    const me = await api.get<ApiUser>('/auth/me')
+    user.value    = me
+    isAdmin.value = me?.roles?.includes('admin') ?? false
+    return { needsOnboarding: !me?.onboardingComplete }
+  }
+
+  async function signUp(email: string, password: string, displayName?: string, opts?: { turnstileToken?: string }): Promise<void> {
+    const res = await api.post<{ access_token: string }>('/auth/register', {
+      email, password, displayName, turnstileToken: opts?.turnstileToken,
+    })
+    setStoredToken(res.access_token)
+    const me = await api.get<ApiUser>('/auth/me')
+    user.value    = me
+    isAdmin.value = me?.roles?.includes('admin') ?? false
   }
 
   async function signOut() {
-    await supabase.auth.signOut()
-    user.value      = null
-    isAdmin.value   = false
-    authReady.value = false
+    setStoredToken(null)
+    user.value    = null
+    isAdmin.value = false
   }
 
-  return { user, isAdmin, authReady, init, signIn, signOut }
+  async function updateProfile(patch: {
+    displayName?: string
+    jobRole?: string
+    experienceLevel?: string
+    onboardingComplete?: boolean
+  }) {
+    const updated = await api.patch<ApiUser>('/auth/me', patch)
+    if (user.value) Object.assign(user.value, updated)
+    return updated
+  }
+
+  return { user, isAdmin, init, signIn, signUp, signOut, updateProfile }
 }

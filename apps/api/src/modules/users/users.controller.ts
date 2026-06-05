@@ -27,6 +27,12 @@ export class UsersController {
     return this.service.updateActive(id, isActive)
   }
 
+  @Patch(':id/role')
+  @RequireAccess('users', 'update')
+  updateRole(@Param('id') id: string, @Body('role') role: string) {
+    return this.service.updateRole(id, role)
+  }
+
   @Delete(':id')
   @RequireAccess('users', 'delete')
   remove(@Param('id') id: string) {

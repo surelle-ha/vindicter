@@ -17,6 +17,13 @@ export class NewsController {
     return this.newsService.findArticles(limit ? Number(limit) : 60, category)
   }
 
+  @Post('articles/sync')
+  @UseGuards(RolesGuard)
+  @RequireRoles('admin')
+  syncArticles(@Body() body: { articles: any[] }) {
+    return this.newsService.upsertArticles(body.articles ?? [])
+  }
+
   @Get('feeds')
   getFeeds() {
     return this.newsService.findAllFeeds()

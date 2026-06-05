@@ -9,6 +9,7 @@ const platform_fastify_1 = require("@nestjs/platform-fastify");
 const app_module_1 = require("./app.module");
 const response_interceptor_1 = require("./common/interceptors/response.interceptor");
 const http_exception_filter_1 = require("./common/filters/http-exception.filter");
+const cors_service_1 = require("./modules/cors/cors.service");
 const crypto_1 = require("crypto");
 const logger = new common_1.Logger('Bootstrap');
 const dbUrl = process.env.DATABASE_URL ?? '';
@@ -43,18 +44,11 @@ async function bootstrap() {
         referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
         crossOriginEmbedderPolicy: false,
     });
-    const allowedOrigins = [
-        'http://localhost:3002',
-        'http://localhost:3003',
-        'http://localhost:3004',
-        'https://vindicter.xyz',
-        'https://dashboard.vindicter.xyz',
-        'https://marketing.vindicta.xyz',
-        ...(process.env.CORS_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean) ?? []),
-    ];
+    const corsService = app.get(cors_service_1.CorsService);
+    await corsService.init();
     await app.register(Promise.resolve().then(() => require('@fastify/cors')), {
         origin: (origin, cb) => {
-            if (!origin || allowedOrigins.includes(origin)) {
+            if (!origin || cors_service_1.allowedOrigins.has(origin)) {
                 cb(null, true);
             }
             else {
@@ -62,7 +56,7 @@ async function bootstrap() {
             }
         },
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Api-Key'],
         credentials: true,
         maxAge: 86_400,
     });

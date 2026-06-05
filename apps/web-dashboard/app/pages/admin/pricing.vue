@@ -6,7 +6,7 @@ import {
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'Pricing Management — Vindicter' })
 
-const supabase = useSupabase()
+const api = useApi()
 const { isAdmin } = useAuth()
 const router = useRouter()
 
@@ -16,11 +16,11 @@ interface Plan {
   id: string
   name: string
   description: string | null
-  token_limit: number
-  price_usd: number
-  is_active: boolean
-  sort_order: number
-  created_at: string
+  tokenLimit: number
+  priceUsd: number
+  isActive: boolean
+  sortOrder: number
+  createdAt: string
 }
 
 const plans   = ref<Plan[]>([])
@@ -33,9 +33,9 @@ const saving  = ref(false)
 const showAdd    = ref(false)
 const editingId  = ref<string | null>(null)
 
-const blankForm  = () => ({ name: '', description: '', token_limit: 0, price_usd: 0, sort_order: 0 })
+const blankForm  = () => ({ name: '', description: '', tokenLimit: 0, priceUsd: 0, sortOrder: 0 })
 const addForm    = reactive(blankForm())
-const editForm   = reactive({ name: '', description: '', token_limit: 0, price_usd: 0, sort_order: 0 })
+const editForm   = reactive({ name: '', description: '', tokenLimit: 0, priceUsd: 0, sortOrder: 0 })
 const addErr     = ref('')
 
 function fmt(n: number) {
@@ -45,9 +45,7 @@ function fmt(n: number) {
 async function fetchPlans() {
   loading.value = true; err.value = ''
   try {
-    const { data, error } = await supabase.from('pricing_plans').select('*').order('sort_order')
-    if (error) throw error
-    plans.value = (data ?? []) as Plan[]
+    plans.value = await api.get<Plan[]>('/pricing/admin') ?? []
   } catch (e) {
     err.value = e instanceof Error ? e.message : 'Failed to load plans.'
   } finally {
@@ -58,19 +56,18 @@ async function fetchPlans() {
 async function addPlan() {
   addErr.value = ''
   if (!addForm.name.trim())   { addErr.value = 'Name is required.'; return }
-  if (addForm.token_limit < 0) { addErr.value = 'Token limit must be ≥ 0.'; return }
+  if (addForm.tokenLimit < 0) { addErr.value = 'Token limit must be ≥ 0.'; return }
   saving.value = true
   try {
-    const { data, error } = await supabase.from('pricing_plans').insert({
+    const created = await api.post<Plan>('/pricing', {
       name:        addForm.name.trim(),
       description: addForm.description.trim() || null,
-      token_limit: Number(addForm.token_limit),
-      price_usd:   Number(addForm.price_usd),
-      sort_order:  Number(addForm.sort_order),
-    }).select().single()
-    if (error) throw error
-    plans.value.push(data as Plan)
-    plans.value.sort((a, b) => a.sort_order - b.sort_order)
+      tokenLimit:  Number(addForm.tokenLimit),
+      priceUsd:    Number(addForm.priceUsd),
+      sortOrder:   Number(addForm.sortOrder),
+    })
+    plans.value.push(created)
+    plans.value.sort((a, b) => a.sortOrder - b.sortOrder)
     Object.assign(addForm, blankForm())
     showAdd.value = false
     setMsg('Plan created.', 'ok')
@@ -82,32 +79,31 @@ async function addPlan() {
 }
 
 function startEdit(plan: Plan) {
-  editingId.value = plan.id
-  editForm.name         = plan.name
-  editForm.description  = plan.description ?? ''
-  editForm.token_limit  = plan.token_limit
-  editForm.price_usd    = plan.price_usd
-  editForm.sort_order   = plan.sort_order
+  editingId.value      = plan.id
+  editForm.name        = plan.name
+  editForm.description = plan.description ?? ''
+  editForm.tokenLimit  = plan.tokenLimit
+  editForm.priceUsd    = plan.priceUsd
+  editForm.sortOrder   = plan.sortOrder
 }
 
 async function saveEdit(plan: Plan) {
   try {
-    const { error } = await supabase.from('pricing_plans').update({
+    await api.patch(`/pricing/${plan.id}`, {
       name:        editForm.name.trim(),
       description: editForm.description.trim() || null,
-      token_limit: Number(editForm.token_limit),
-      price_usd:   Number(editForm.price_usd),
-      sort_order:  Number(editForm.sort_order),
-    }).eq('id', plan.id)
-    if (error) throw error
-    Object.assign(plan, {
-      name: editForm.name.trim(),
-      description: editForm.description.trim() || null,
-      token_limit: Number(editForm.token_limit),
-      price_usd: Number(editForm.price_usd),
-      sort_order: Number(editForm.sort_order),
+      tokenLimit:  Number(editForm.tokenLimit),
+      priceUsd:    Number(editForm.priceUsd),
+      sortOrder:   Number(editForm.sortOrder),
     })
-    plans.value.sort((a, b) => a.sort_order - b.sort_order)
+    Object.assign(plan, {
+      name:        editForm.name.trim(),
+      description: editForm.description.trim() || null,
+      tokenLimit:  Number(editForm.tokenLimit),
+      priceUsd:    Number(editForm.priceUsd),
+      sortOrder:   Number(editForm.sortOrder),
+    })
+    plans.value.sort((a, b) => a.sortOrder - b.sortOrder)
     editingId.value = null
     setMsg('Plan saved.', 'ok')
   } catch (e) {
@@ -117,9 +113,8 @@ async function saveEdit(plan: Plan) {
 
 async function toggleActive(plan: Plan) {
   try {
-    const { error } = await supabase.from('pricing_plans').update({ is_active: !plan.is_active }).eq('id', plan.id)
-    if (error) throw error
-    plan.is_active = !plan.is_active
+    await api.patch(`/pricing/${plan.id}`, { isActive: !plan.isActive })
+    plan.isActive = !plan.isActive
   } catch (e) {
     setMsg(e instanceof Error ? e.message : 'Failed to update.', 'err')
   }
@@ -128,8 +123,7 @@ async function toggleActive(plan: Plan) {
 async function deletePlan(id: string) {
   if (!confirm('Delete this plan?')) return
   try {
-    const { error } = await supabase.from('pricing_plans').delete().eq('id', id)
-    if (error) throw error
+    await api.del(`/pricing/${id}`)
     plans.value = plans.value.filter(p => p.id !== id)
     setMsg('Plan deleted.', 'ok')
   } catch (e) {
@@ -209,19 +203,19 @@ onMounted(fetchPlans)
         </div>
         <div>
           <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:rgba(255,255,255,0.30);">Token Limit</label>
-          <input v-model.number="addForm.token_limit" type="number" min="0" placeholder="e.g. 1000000"
+          <input v-model.number="addForm.tokenLimit" type="number" min="0" placeholder="e.g. 1000000"
             class="w-full rounded-xl px-3 py-2 text-[12px] text-white outline-none"
             style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);" />
         </div>
         <div>
           <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:rgba(255,255,255,0.30);">Price (USD/mo)</label>
-          <input v-model.number="addForm.price_usd" type="number" min="0" step="0.01" placeholder="0.00"
+          <input v-model.number="addForm.priceUsd" type="number" min="0" step="0.01" placeholder="0.00"
             class="w-full rounded-xl px-3 py-2 text-[12px] text-white outline-none"
             style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);" />
         </div>
         <div>
           <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:rgba(255,255,255,0.30);">Sort Order</label>
-          <input v-model.number="addForm.sort_order" type="number" min="0"
+          <input v-model.number="addForm.sortOrder" type="number" min="0"
             class="w-full rounded-xl px-3 py-2 text-[12px] text-white outline-none"
             style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);" />
         </div>
@@ -250,7 +244,7 @@ onMounted(fetchPlans)
     <div v-else-if="plans.length" class="grid gap-3 sm:grid-cols-2">
       <div v-for="plan in plans" :key="plan.id"
         class="rounded-xl p-5 transition-colors"
-        :style="plan.is_active
+        :style="plan.isActive
           ? 'background:rgba(255,255,255,0.03);border:1px solid rgba(139,92,246,0.18);'
           : 'background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.07);opacity:0.55;'">
 
@@ -267,8 +261,8 @@ onMounted(fetchPlans)
                 <Edit3 class="h-3 w-3" />
               </button>
               <button class="h-6 w-6 flex items-center justify-center rounded transition-colors cursor-pointer"
-                @click="toggleActive(plan)" :title="plan.is_active ? 'Disable' : 'Enable'">
-                <ToggleRight v-if="plan.is_active" class="h-4 w-4" style="color:rgba(35,165,90,0.75);" />
+                @click="toggleActive(plan)" :title="plan.isActive ? 'Disable' : 'Enable'">
+                <ToggleRight v-if="plan.isActive" class="h-4 w-4" style="color:rgba(35,165,90,0.75);" />
                 <ToggleLeft v-else class="h-4 w-4" style="color:rgba(255,255,255,0.25);" />
               </button>
               <button class="h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-red-500/10 cursor-pointer"
@@ -280,12 +274,12 @@ onMounted(fetchPlans)
           <div class="flex items-end justify-between mt-4">
             <div>
               <p class="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style="color:rgba(255,255,255,0.25);">Tokens / month</p>
-              <p class="text-[18px] font-black" style="color:rgba(167,139,250,0.90);">{{ fmt(plan.token_limit) }}</p>
+              <p class="text-[18px] font-black" style="color:rgba(167,139,250,0.90);">{{ fmt(plan.tokenLimit) }}</p>
             </div>
             <div class="text-right">
               <p class="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style="color:rgba(255,255,255,0.25);">Price</p>
               <p class="text-[18px] font-black" style="color:rgba(255,255,255,0.80);">
-                {{ plan.price_usd === 0 ? 'Free' : `$${Number(plan.price_usd).toFixed(2)}/mo` }}
+                {{ plan.priceUsd === 0 ? 'Free' : `$${Number(plan.priceUsd).toFixed(2)}/mo` }}
               </p>
             </div>
           </div>
@@ -302,7 +296,7 @@ onMounted(fetchPlans)
               </div>
               <div>
                 <label class="block text-[9px] font-semibold uppercase tracking-wider mb-1" style="color:rgba(255,255,255,0.25);">Sort</label>
-                <input v-model.number="editForm.sort_order" type="number" class="w-full rounded-lg px-2.5 py-1.5 text-[12px] text-white outline-none"
+                <input v-model.number="editForm.sortOrder" type="number" class="w-full rounded-lg px-2.5 py-1.5 text-[12px] text-white outline-none"
                   style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);" />
               </div>
             </div>
@@ -314,12 +308,12 @@ onMounted(fetchPlans)
             <div class="grid gap-2 grid-cols-2">
               <div>
                 <label class="block text-[9px] font-semibold uppercase tracking-wider mb-1" style="color:rgba(255,255,255,0.25);">Token Limit</label>
-                <input v-model.number="editForm.token_limit" type="number" min="0" class="w-full rounded-lg px-2.5 py-1.5 text-[12px] text-white outline-none"
+                <input v-model.number="editForm.tokenLimit" type="number" min="0" class="w-full rounded-lg px-2.5 py-1.5 text-[12px] text-white outline-none"
                   style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);" />
               </div>
               <div>
                 <label class="block text-[9px] font-semibold uppercase tracking-wider mb-1" style="color:rgba(255,255,255,0.25);">Price USD</label>
-                <input v-model.number="editForm.price_usd" type="number" min="0" step="0.01" class="w-full rounded-lg px-2.5 py-1.5 text-[12px] text-white outline-none"
+                <input v-model.number="editForm.priceUsd" type="number" min="0" step="0.01" class="w-full rounded-lg px-2.5 py-1.5 text-[12px] text-white outline-none"
                   style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);" />
               </div>
             </div>

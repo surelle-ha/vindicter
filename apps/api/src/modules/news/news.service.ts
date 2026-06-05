@@ -51,4 +51,12 @@ export class NewsService {
       { conflictPaths: ['link'], skipUpdateIfNoValuesChanged: true },
     )
   }
+
+  async upsertArticles(articles: any[]) {
+    const results = await Promise.allSettled(
+      articles.map(a => this.upsertArticle(a)),
+    )
+    const synced = results.filter(r => r.status === 'fulfilled').length
+    return { synced, total: articles.length }
+  }
 }

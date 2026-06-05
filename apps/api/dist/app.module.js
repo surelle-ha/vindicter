@@ -21,8 +21,10 @@ const beta_module_1 = require("./modules/beta/beta.module");
 const support_module_1 = require("./modules/support/support.module");
 const api_tokens_module_1 = require("./modules/api-tokens/api-tokens.module");
 const news_module_1 = require("./modules/news/news.module");
-const pricing_module_1 = require("./modules/pricing/pricing.module");
 const marketing_module_1 = require("./modules/marketing/marketing.module");
+const academy_module_1 = require("./modules/academy/academy.module");
+const defendcore_module_1 = require("./modules/defendcore/defendcore.module");
+const cors_module_1 = require("./modules/cors/cors.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -41,8 +43,10 @@ exports.AppModule = AppModule = __decorate([
             support_module_1.SupportModule,
             api_tokens_module_1.ApiTokensModule,
             news_module_1.NewsModule,
-            pricing_module_1.PricingModule,
             marketing_module_1.MarketingModule,
+            academy_module_1.AcademyModule,
+            defendcore_module_1.DefendCoreModule,
+            cors_module_1.CorsModule,
         ],
         providers: [
             { provide: core_1.APP_GUARD, useClass: throttler_1.ThrottlerGuard },

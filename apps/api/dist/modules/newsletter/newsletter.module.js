@@ -13,6 +13,7 @@ const newsletter_signup_entity_1 = require("./entities/newsletter-signup.entity"
 const newsletter_update_entity_1 = require("./entities/newsletter-update.entity");
 const newsletter_controller_1 = require("./newsletter.controller");
 const newsletter_service_1 = require("./newsletter.service");
+const smtp_service_1 = require("../marketing/smtp.service");
 let NewsletterModule = class NewsletterModule {
 };
 exports.NewsletterModule = NewsletterModule;
@@ -20,7 +21,7 @@ exports.NewsletterModule = NewsletterModule = __decorate([
     (0, common_1.Module)({
         imports: [typeorm_1.TypeOrmModule.forFeature([newsletter_signup_entity_1.NewsletterSignup, newsletter_update_entity_1.NewsletterUpdate])],
         controllers: [newsletter_controller_1.NewsletterController],
-        providers: [newsletter_service_1.NewsletterService],
+        providers: [newsletter_service_1.NewsletterService, smtp_service_1.SmtpService],
     })
 ], NewsletterModule);
 //# sourceMappingURL=newsletter.module.js.map

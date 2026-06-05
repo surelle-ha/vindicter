@@ -12,10 +12,13 @@ export default defineNuxtConfig({
   nitro: { preset: 'static' },
   modules: [],
   runtimeConfig: {
+    // server-only — used by the /download/[token] route to proxy releases
+    apiBaseUrl: process.env.NUXT_API_BASE_URL ?? process.env.NUXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1',
     public: {
-      supabaseUrl:      process.env.SUPABASE_URL                     ?? '',
-      supabaseAnonKey:  process.env.SUPABASE_ANON_KEY                ?? '',
-      turnstileSiteKey: process.env.NUXT_PUBLIC_TURNSTILE_SITE_KEY   ?? '1x00000000000000000000AA',
+      apiBaseUrl:       process.env.NUXT_PUBLIC_API_BASE_URL          ?? 'http://localhost:4000/api/v1',
+      // Cloudflare test key (always-passes) in dev; require real key in prod
+      turnstileSiteKey: process.env.NUXT_PUBLIC_TURNSTILE_SITE_KEY
+        ?? (process.env.NODE_ENV !== 'production' ? '1x00000000000000000000AA' : ''),
     },
   },
   css: ['~/assets/css/main.css'],

@@ -63,21 +63,22 @@ async function submitSupport() {
 
   loading.value = true
   try {
-    const supabase = useSupabase()
-    const { error } = await supabase
-      .from('support_tickets')
-      .insert({
+    const { public: { apiBaseUrl } } = useRuntimeConfig()
+    const res = await fetch(`${apiBaseUrl}/support/tickets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         name: form.name.trim(),
         email: form.email.trim(),
         category: form.category,
         subject: form.subject.trim(),
         message: form.message.trim(),
-        documentation_checked: form.documentationChecked,
-        faq_checked: form.faqChecked,
-        source_url: import.meta.client ? window.location.href : null,
-      })
-
-    if (error) throw error
+        documentationChecked: form.documentationChecked,
+        faqChecked: form.faqChecked,
+        sourceUrl: import.meta.client ? window.location.href : null,
+      }),
+    })
+    if (!res.ok) throw new Error(await res.text())
     successEmail.value = form.email.trim()
     step.value = 'done'
   } catch {

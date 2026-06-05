@@ -249,8 +249,6 @@ async function generateScript(lesson: Lesson, model: TTSScriptModel): Promise<st
         model: app.ollama.model,
         messages: [{ role: 'user', content: prompt }],
       })
-    case 'core':
-      throw new Error('DefendCore is not yet available.')
     default:            throw new Error(`Unknown script model: ${model as string}`)
   }
 }

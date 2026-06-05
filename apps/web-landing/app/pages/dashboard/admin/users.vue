@@ -4,7 +4,7 @@ import { Users, Search, Loader2, ShieldAlert, RefreshCw } from 'lucide-vue-next'
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'User Management — Vindicter' })
 
-const supabase = useSupabase()
+const api = useApi()
 const { isAdmin } = useAuth()
 const router = useRouter()
 
@@ -32,12 +32,7 @@ async function fetchUsers() {
   fetchErr.value = ''
   saveMsg.value  = ''
   try {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    users.value = (data ?? []) as UserProfile[]
+    users.value = await api.get<UserProfile[]>('/users') ?? []
   } catch (e) {
     fetchErr.value = e instanceof Error ? e.message : 'Failed to load users.'
   } finally {
@@ -49,11 +44,7 @@ async function updateRole(userId: string, newRole: string) {
   saving.value  = userId
   saveMsg.value = ''
   try {
-    const { error } = await supabase
-      .from('user_profiles')
-      .update({ role: newRole })
-      .eq('id', userId)
-    if (error) throw error
+    await api.patch(`/users/${userId}`, { role: newRole })
     const u = users.value.find(u => u.id === userId)
     if (u) u.role = newRole
     saveMsg.value = 'Role updated.'

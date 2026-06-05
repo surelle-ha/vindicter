@@ -7,13 +7,14 @@ export type AIToolId = 'codex' | 'claude' | 'openrouter' | 'ollama'
 export interface AIToolStatus {
   available: boolean
   checking: boolean
+  message?: string
 }
 
 const state = reactive<Record<AIToolId, AIToolStatus>>({
-  codex:      { available: false, checking: false },
-  claude:     { available: false, checking: false },
-  openrouter: { available: false, checking: false },
-  ollama:     { available: false, checking: false },
+  codex:       { available: false, checking: false },
+  claude:      { available: false, checking: false },
+  openrouter:  { available: false, checking: false },
+  ollama:      { available: false, checking: false },
 })
 
 let checked = false

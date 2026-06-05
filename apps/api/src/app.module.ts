@@ -12,8 +12,10 @@ import { BetaModule } from './modules/beta/beta.module'
 import { SupportModule } from './modules/support/support.module'
 import { ApiTokensModule } from './modules/api-tokens/api-tokens.module'
 import { NewsModule } from './modules/news/news.module'
-import { PricingModule } from './modules/pricing/pricing.module'
 import { MarketingModule } from './modules/marketing/marketing.module'
+import { AcademyModule } from './modules/academy/academy.module'
+import { DefendCoreModule } from './modules/defendcore/defendcore.module'
+import { CorsModule } from './modules/cors/cors.module'
 
 @Module({
   imports: [
@@ -33,8 +35,10 @@ import { MarketingModule } from './modules/marketing/marketing.module'
     SupportModule,
     ApiTokensModule,
     NewsModule,
-    PricingModule,
     MarketingModule,
+    AcademyModule,
+    DefendCoreModule,
+    CorsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

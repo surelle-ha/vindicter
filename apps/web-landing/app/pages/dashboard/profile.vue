@@ -4,8 +4,8 @@ import { Loader2, Save, User, Mail, Shield, Calendar, KeyRound, Pencil, X } from
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'Profile — Vindicter' })
 
-const supabase = useSupabase()
-const { user, isAdmin, init } = useAuth()
+const api = useApi()
+const { user, isAdmin } = useAuth()
 
 const editing   = ref(false)
 const saving    = ref(false)
@@ -16,13 +16,12 @@ const newName   = ref('')
 
 const profile = computed(() => {
   if (!user.value) return null
-  const u = user.value as Record<string, unknown>
-  const meta = u.user_metadata as Record<string, unknown> | undefined
+  const u = user.value as any
   return {
     id:          u.id as string,
     email:       u.email as string,
-    displayName: (meta?.display_name as string) ?? (u.email as string) ?? 'User',
-    createdAt:   u.created_at as string | undefined,
+    displayName: (u.displayName as string) ?? (u.email as string) ?? 'User',
+    createdAt:   u.createdAt as string | undefined,
   }
 })
 
@@ -45,9 +44,8 @@ async function saveProfile() {
   if (!newName.value.trim()) { saveErr.value = 'Name cannot be empty.'; return }
   saving.value = true
   try {
-    const { error } = await supabase.auth.updateUser({ data: { display_name: newName.value.trim() } })
-    if (error) throw error
-    await init()
+    await api.patch('/auth/me', { displayName: newName.value.trim() })
+    if (user.value) (user.value as any).displayName = newName.value.trim()
     editing.value = false
     saveMsg.value = 'Profile updated successfully.'
   } catch (e) {
@@ -63,9 +61,7 @@ async function sendPasswordReset() {
   saveErr.value  = ''
   resetting.value = true
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(profile.value.email)
-    if (error) throw error
-    saveMsg.value = `Password reset link sent to ${profile.value.email}.`
+    saveMsg.value = `Please contact support to reset your password for ${profile.value?.email}.`
   } catch (e) {
     saveErr.value = e instanceof Error ? e.message : 'Failed to send reset email.'
   } finally {

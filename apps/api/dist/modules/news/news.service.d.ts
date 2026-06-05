@@ -18,4 +18,8 @@ export declare class NewsService {
         summary?: string | null;
         publishedAt?: Date | null;
     }): Promise<void>;
+    upsertArticles(articles: any[]): Promise<{
+        synced: number;
+        total: number;
+    }>;
 }

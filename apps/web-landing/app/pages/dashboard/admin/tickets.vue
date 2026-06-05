@@ -4,7 +4,7 @@ import { MessageCircle, Search, Loader2, ShieldAlert, RefreshCw, ChevronDown } f
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'Support Tickets — Vindicter' })
 
-const supabase = useSupabase()
+const api = useApi()
 const { isAdmin } = useAuth()
 const router = useRouter()
 
@@ -35,12 +35,7 @@ async function fetchTickets() {
   loading.value  = true
   fetchErr.value = ''
   try {
-    const { data, error } = await supabase
-      .from('support_tickets')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    tickets.value = (data ?? []) as Ticket[]
+    tickets.value = await api.get<Ticket[]>('/support/tickets') ?? []
   } catch (e) {
     fetchErr.value = e instanceof Error ? e.message : 'Failed to load tickets.'
   } finally {
@@ -51,11 +46,7 @@ async function fetchTickets() {
 async function setStatus(ticketId: string, newStatus: string) {
   saving.value = ticketId
   try {
-    const { error } = await supabase
-      .from('support_tickets')
-      .update({ status: newStatus })
-      .eq('id', ticketId)
-    if (error) throw error
+    await api.patch(`/support/tickets/${ticketId}/status`, { status: newStatus })
     const t = tickets.value.find(t => t.id === ticketId)
     if (t) t.status = newStatus
   } catch { /* silent — table may not have status column */ }

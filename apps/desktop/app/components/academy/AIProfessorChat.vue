@@ -4,6 +4,7 @@ import { runClaude } from '~/composables/useClaudeShell'
 import { runCodexExec } from '~/composables/useCodexShell'
 import { runOpenRouterChat } from '~/composables/useOpenRouterAI'
 import { runOllamaChat } from '~/composables/useOllamaAI'
+import { checkDefendCoreAvailable, fetchRAGContext } from '~/composables/useDefendCoreRAG'
 import { useAcademyStore } from '~/stores/academy'
 import type { AcademyAIModel, AcademyChatMessage, AcademyChatQuiz } from '~/stores/academy'
 import type { Lesson } from '~/data/curriculum'
@@ -41,6 +42,9 @@ const academy = useAcademyStore()
 const app = useAppStore()
 const projects = useProjectsStore()
 const { toolStatus, checkAIToolAvailability } = useAIToolAvailability()
+
+const ragAvailable = ref(false)
+const ragEnabled   = ref(false)
 
 // ── Session gate ──────────────────────────────────────────────────────────
 const sessionStarted = ref(false)
@@ -98,23 +102,14 @@ const modelOptions = computed(() => [
     checking: false,
     notReady: !toolStatus.ollama.available,
   },
-  {
-    id: 'core' as AcademyAIModel,
-    label: 'DefendCore',
-    sublabel: 'Vindicter\'s native AI model — currently in training',
-    color: 'text-rose-300',
-    bg: 'bg-rose-500/10',
-    border: 'border-rose-500/25',
-    icon: Bot,
-    disabled: true,
-    checking: false,
-    notReady: false,
-    soon: true,
-  },
 ])
 
 onMounted(() => {
   void checkAIToolAvailability()
+  checkDefendCoreAvailable().then(ok => {
+    ragAvailable.value = ok
+    if (!ok) ragEnabled.value = false
+  })
 })
 
 async function beginSession() {
@@ -461,12 +456,20 @@ async function sendMessage(text: string) {
   const projectPath = projects.activeProject?.absolutePath ?? '.'
 
   try {
+    // RAG only for cloud APIs — Claude/Codex build their own context from the prompt
+    const ragCtx = (ragEnabled.value && ragAvailable.value && (activeModel() === 'openrouter' || activeModel() === 'ollama'))
+      ? await fetchRAGContext(props.lesson.title)
+      : ''
+    const sysPrompt = ragCtx
+      ? `${buildSystemPrompt()}\n\n---\n${ragCtx}`
+      : buildSystemPrompt()
+
     if (activeModel() === 'openrouter') {
       const result = await runOpenRouterChat({
         apiKey: app.openRouter.apiKey,
         model: app.openRouter.model,
         messages: [
-          { role: 'system', content: buildSystemPrompt() },
+          { role: 'system', content: sysPrompt },
           ...conversationMessages(),
         ],
       })
@@ -480,7 +483,7 @@ async function sendMessage(text: string) {
         url: app.ollama.url,
         model: app.ollama.model,
         messages: [
-          { role: 'system', content: buildSystemPrompt() },
+          { role: 'system', content: sysPrompt },
           ...conversationMessages(),
         ],
       })
@@ -705,6 +708,23 @@ watch(() => props.lesson.id, () => {
             </button>
           </div>
         </div>
+
+        <!-- RAG KB toggle -->
+        <label class="flex items-center gap-2.5 rounded-xl border px-3 py-2 cursor-pointer transition-colors"
+          :class="ragAvailable ? 'border-violet-500/20 bg-violet-500/[0.04] hover:bg-violet-500/[0.07]' : 'border-[var(--border)] bg-black/10 opacity-50 cursor-not-allowed'">
+          <div class="relative shrink-0 h-5 w-9 rounded-full transition-colors duration-200 overflow-hidden"
+            :style="(ragEnabled && ragAvailable) ? 'background:rgba(139,92,246,0.70);' : 'background:rgba(255,255,255,0.12);'"
+            @click.prevent="ragAvailable && (ragEnabled = !ragEnabled)">
+            <span class="absolute top-[2px] h-4 w-4 rounded-full transition-all duration-200"
+              :style="(ragEnabled && ragAvailable) ? 'left:18px;background:white;' : 'left:2px;background:rgba(255,255,255,0.55);'" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-[11px] font-medium text-[var(--text)]">Enhance with Knowledge Base</p>
+            <p class="text-[9px] text-[var(--text-faint)]">
+              {{ ragAvailable ? 'DefendCore KB context injected into each professor prompt' : 'KB unavailable — enable in admin panel' }}
+            </p>
+          </div>
+        </label>
 
         <!-- Start button -->
         <button

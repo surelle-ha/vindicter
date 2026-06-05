@@ -4,16 +4,16 @@ import { Key, Plus, Trash2, Copy, Loader2, AlertTriangle, CheckCircle2 } from 'l
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'API — Vindicter' })
 
-const supabase = useSupabase()
+const api = useApi()
 const { user } = useAuth()
 
 interface APIToken {
   id: string
   name: string
-  token_prefix: string
-  created_at: string
-  expires_at: string | null
-  last_used_at: string | null
+  tokenPrefix: string
+  createdAt: string
+  expiresAt: string | null
+  lastUsedAt: string | null
 }
 
 const tokens     = ref<APIToken[]>([])
@@ -31,13 +31,8 @@ async function fetchTokens() {
   loading.value = true
   fetchErr.value = ''
   try {
-    const { data, error } = await supabase
-      .from('api_tokens')
-      .select('id, name, token_prefix, created_at, expires_at, last_used_at')
-      .eq('user_id', (user.value as any).id)
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    tokens.value = (data ?? []) as APIToken[]
+    const data = await api.get<APIToken[]>('/api-tokens')
+    tokens.value = data ?? []
   } catch (e) {
     fetchErr.value = e instanceof Error ? e.message : 'Failed to load tokens.'
   } finally {
@@ -50,31 +45,21 @@ async function createToken() {
   creating.value = true
   justCreatedFull.value = null
   try {
-    const rawToken = `vdk_${crypto.randomUUID().replace(/-/g, '')}`
-    const prefix   = rawToken.slice(0, 12) + '…'
     const expiresAt = newExpiry.value === 'never' ? null
       : newExpiry.value === '30d'  ? new Date(Date.now() + 30  * 86400_000).toISOString()
       : newExpiry.value === '90d'  ? new Date(Date.now() + 90  * 86400_000).toISOString()
       : newExpiry.value === '180d' ? new Date(Date.now() + 180 * 86400_000).toISOString()
       : new Date(Date.now() + 365 * 86400_000).toISOString()
 
-    const { data, error } = await supabase
-      .from('api_tokens')
-      .insert({
-        user_id:      (user.value as any).id,
-        name:         newName.value.trim(),
-        token:        rawToken,
-        token_prefix: prefix,
-        expires_at:   expiresAt,
-      })
-      .select('id, name, token_prefix, created_at, expires_at, last_used_at')
-      .single()
-    if (error) throw error
-
-    tokens.value.unshift(data as APIToken)
-    justCreatedFull.value = rawToken
-    newName.value  = ''
-    newExpiry.value = 'never'
+    const result = await api.post<APIToken & { token: string }>('/api-tokens', {
+      name: newName.value.trim(),
+      expiresAt,
+    })
+    justCreatedFull.value = result.token
+    const { token: _raw, ...tokenMeta } = result
+    tokens.value.unshift(tokenMeta as APIToken)
+    newName.value    = ''
+    newExpiry.value  = 'never'
     showCreate.value = false
   } catch (e) {
     fetchErr.value = e instanceof Error ? e.message : 'Failed to create token.'
@@ -85,7 +70,7 @@ async function createToken() {
 
 async function deleteToken(id: string) {
   try {
-    await supabase.from('api_tokens').delete().eq('id', id)
+    await api.del(`/api-tokens/${id}`)
     tokens.value = tokens.value.filter(t => t.id !== id)
     if (justCreatedFull.value) justCreatedFull.value = null
   } catch (e) {
@@ -113,28 +98,21 @@ onMounted(fetchTokens)
 </script>
 
 <template>
-  <div class="max-w-3xl mx-auto">
+  <div class="-m-5 mb-0">
+    <PageCover title="API &amp; Keys" subtitle="Manage your DefendCore API access tokens. Keep your tokens secure and never share them." :icon="Key"
+      icon-bg="rgba(139,92,246,0.25)" icon-color="rgba(167,139,250,0.95)">
+      <template #actions>
+        <button
+          class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors cursor-pointer shrink-0"
+          style="background:rgba(17,18,21,0.60);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.70);backdrop-filter:blur(8px);"
+          @click="showCreate = !showCreate">
+          <Plus class="h-3 w-3" /> New token
+        </button>
+      </template>
+    </PageCover>
+  </div>
 
-    <!-- Header -->
-    <div class="mb-8 flex items-start justify-between gap-4">
-      <div class="flex items-center gap-3">
-        <div class="h-9 w-9 flex items-center justify-center rounded-xl shrink-0" style="background:rgba(139,92,246,0.10);border:1px solid rgba(139,92,246,0.20);">
-          <Key class="h-4 w-4" style="color:rgba(139,92,246,0.80);" />
-        </div>
-        <div>
-          <h1 class="text-[22px] font-display font-black uppercase tracking-wide" style="color:rgba(255,255,255,0.90);">API &amp; Keys</h1>
-          <p class="text-[12px] mt-0.5" style="color:rgba(255,255,255,0.35);">Manage your DefendCore API access tokens.</p>
-        </div>
-      </div>
-      <button
-        class="shrink-0 flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[12px] font-semibold transition-colors"
-        style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);color:rgba(167,139,250,0.90);"
-        @click="showCreate = !showCreate"
-      >
-        <Plus class="h-3.5 w-3.5" />
-        New token
-      </button>
-    </div>
+  <div class="max-w-3xl mx-auto">
 
     <!-- DefendCore notice -->
     <div class="mb-6 rounded-xl px-4 py-3.5 flex items-start gap-3" style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.14);">
@@ -247,18 +225,18 @@ onMounted(fetchTokens)
         class="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-white/[0.02]"
         :style="i < tokens.length - 1 ? 'border-bottom:1px solid rgba(255,255,255,0.05);' : ''"
       >
-        <Key class="h-3.5 w-3.5 shrink-0" :style="isExpired(t.expires_at) ? 'color:rgba(242,63,66,0.50);' : 'color:rgba(139,92,246,0.55);'" />
+        <Key class="h-3.5 w-3.5 shrink-0" :style="isExpired(t.expiresAt) ? 'color:rgba(242,63,66,0.50);' : 'color:rgba(139,92,246,0.55);'" />
 
         <div class="flex-1 min-w-0">
           <p class="text-[12px] font-semibold truncate" style="color:rgba(255,255,255,0.75);">{{ t.name }}</p>
           <div class="flex items-center gap-3 mt-0.5 flex-wrap">
-            <code class="font-mono text-[10px]" style="color:rgba(255,255,255,0.30);">{{ t.token_prefix }}</code>
-            <span class="text-[10px]" style="color:rgba(255,255,255,0.22);">Created {{ fmtDate(t.created_at) }}</span>
+            <code class="font-mono text-[10px]" style="color:rgba(255,255,255,0.30);">{{ t.tokenPrefix }}</code>
+            <span class="text-[10px]" style="color:rgba(255,255,255,0.22);">Created {{ fmtDate(t.createdAt) }}</span>
             <span
               class="text-[10px]"
-              :style="isExpired(t.expires_at) ? 'color:rgba(242,63,66,0.55);' : 'color:rgba(255,255,255,0.22);'"
+              :style="isExpired(t.expiresAt) ? 'color:rgba(242,63,66,0.55);' : 'color:rgba(255,255,255,0.22);'"
             >
-              {{ t.expires_at ? (isExpired(t.expires_at) ? 'Expired' : `Expires ${fmtDate(t.expires_at)}`) : 'No expiry' }}
+              {{ t.expiresAt ? (isExpired(t.expiresAt) ? 'Expired' : `Expires ${fmtDate(t.expiresAt)}`) : 'No expiry' }}
             </span>
           </div>
         </div>

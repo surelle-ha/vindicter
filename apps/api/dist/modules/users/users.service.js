@@ -17,15 +17,31 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const user_entity_1 = require("./entities/user.entity");
+const user_role_entity_1 = require("../roles/entities/user-role.entity");
+const role_entity_1 = require("../roles/entities/role.entity");
 let UsersService = class UsersService {
-    constructor(repo) {
+    constructor(repo, userRoleRepo, roleRepo) {
         this.repo = repo;
+        this.userRoleRepo = userRoleRepo;
+        this.roleRepo = roleRepo;
     }
     findAll() {
         return this.repo.find({
             select: ['id', 'email', 'displayName', 'isActive', 'createdAt', 'updatedAt'],
+            relations: ['userRoles', 'userRoles.role'],
             order: { createdAt: 'DESC' },
         });
+    }
+    async updateRole(userId, roleName) {
+        const user = await this.repo.findOneBy({ id: userId });
+        if (!user)
+            throw new common_1.NotFoundException('User not found');
+        const role = await this.roleRepo.findOneBy({ name: roleName });
+        if (!role)
+            throw new common_1.NotFoundException(`Role '${roleName}' not found`);
+        await this.userRoleRepo.delete({ user: { id: userId } });
+        await this.userRoleRepo.save(this.userRoleRepo.create({ user, role }));
+        return this.findOne(userId);
     }
     async findOne(id) {
         const user = await this.repo.findOne({
@@ -52,6 +68,10 @@ exports.UsersService = UsersService;
 exports.UsersService = UsersService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __param(1, (0, typeorm_1.InjectRepository)(user_role_entity_1.UserRole)),
+    __param(2, (0, typeorm_1.InjectRepository)(role_entity_1.Role)),
+    __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository,
+        typeorm_2.Repository])
 ], UsersService);
 //# sourceMappingURL=users.service.js.map

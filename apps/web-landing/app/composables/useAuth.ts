@@ -1,23 +1,29 @@
+import { getStoredToken, setStoredToken } from './useApi'
+
+interface ApiUser {
+  id: string
+  email: string
+  displayName: string | null
+  onboardingComplete: boolean
+  roles: string[]
+}
+
 export const useAuth = () => {
-  const supabase   = useSupabase()
-  const user       = useState<Record<string, unknown> | null>('auth-user',    () => null)
-  const isAdmin    = useState<boolean>('auth-is-admin',   () => false)
-  const authReady  = useState<boolean>('auth-ready',      () => false)
+  const api       = useApi()
+  const user      = useState<ApiUser | null>('auth-user',    () => null)
+  const isAdmin   = useState<boolean>('auth-is-admin', () => false)
+  const authReady = useState<boolean>('auth-ready',    () => false)
 
   async function init() {
     if (import.meta.server) return
+    const token = getStoredToken()
+    if (!token) { authReady.value = true; return }
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        user.value = session.user as unknown as Record<string, unknown>
-        const { data } = await supabase
-          .from('user_profiles').select('role').eq('id', session.user.id).single()
-        isAdmin.value = data?.role === 'admin'
-      } else {
-        user.value    = null
-        isAdmin.value = false
-      }
+      const me = await api.get<ApiUser>('/auth/me')
+      user.value    = me
+      isAdmin.value = me?.roles?.includes('admin') ?? false
     } catch {
+      setStoredToken(null)
       user.value    = null
       isAdmin.value = false
     } finally {
@@ -25,21 +31,19 @@ export const useAuth = () => {
     }
   }
 
-  async function signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
-    // Use the returned user directly — avoids a second getSession() round-trip
-    if (data.user) {
-      user.value = data.user as unknown as Record<string, unknown>
-      const { data: profile } = await supabase
-        .from('user_profiles').select('role').eq('id', data.user.id).single()
-      isAdmin.value = profile?.role === 'admin'
-    }
+  async function signIn(email: string, password: string, opts?: { turnstileToken?: string }) {
+    const res = await api.post<{ access_token: string }>('/auth/login', {
+      email, password, turnstileToken: opts?.turnstileToken,
+    })
+    setStoredToken(res.access_token)
+    const me = await api.get<ApiUser>('/auth/me')
+    user.value      = me
+    isAdmin.value   = me?.roles?.includes('admin') ?? false
     authReady.value = true
   }
 
   async function signOut() {
-    await supabase.auth.signOut()
+    setStoredToken(null)
     user.value      = null
     isAdmin.value   = false
     authReady.value = false

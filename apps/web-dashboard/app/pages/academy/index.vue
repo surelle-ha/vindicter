@@ -4,7 +4,7 @@ import { BookOpen, CheckCircle2, Lock, GraduationCap, ChevronRight, Award, X, Sp
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'Academy — Vindicter' })
 
-const supabase = useSupabase()
+const api    = useApi()
 const { user } = useAuth()
 const router   = useRouter()
 
@@ -83,12 +83,11 @@ const progress        = ref<Record<string, ProgressRecord>>({})
 const loadingProgress = ref(true)
 
 async function loadProgress() {
-  const uid = (user.value as any)?.id
-  if (!uid) return
-  const { data } = await supabase.from('academy_progress').select('lesson_id, started_at, completed_at').eq('user_id', uid)
+  if (!user.value) return
+  const rows = await api.get<ProgressRecord[]>('/academy/progress').catch(() => []) ?? []
   const map: Record<string, ProgressRecord> = {}
-  for (const row of data ?? []) map[row.lesson_id] = row
-  progress.value    = map
+  for (const row of rows) map[row.lesson_id] = row
+  progress.value        = map
   loadingProgress.value = false
 }
 
@@ -273,6 +272,11 @@ onMounted(() => {
     </Transition>
   </Teleport>
 
+  <div class="-m-5">
+    <PageCover title="Academy" subtitle="AI-guided security bootcamp. Complete all modules to earn your certificate." :icon="GraduationCap"
+      icon-bg="rgba(139,92,246,0.25)" icon-color="rgba(167,139,250,0.95)" />
+  </div>
+
   <div class="max-w-5xl mx-auto">
 
     <!-- Certificate banner (shown when all complete) -->
@@ -295,18 +299,9 @@ onMounted(() => {
       </div>
     </Transition>
 
-    <!-- Header + progress -->
-    <div class="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <div class="flex items-center gap-3">
-        <div class="h-9 w-9 flex items-center justify-center rounded-xl shrink-0"
-          style="background:rgba(139,92,246,0.10);border:1px solid rgba(139,92,246,0.20);">
-          <GraduationCap class="h-4 w-4" style="color:rgba(139,92,246,0.80);" />
-        </div>
-        <div>
-          <h1 class="text-[22px] font-display font-black uppercase tracking-wide" style="color:rgba(255,255,255,0.90);">Academy</h1>
-          <p class="text-[12px] mt-0.5" style="color:rgba(255,255,255,0.35);">AI-guided security bootcamp · {{ completedCount }} / {{ totalLessons }} lessons complete.</p>
-        </div>
-      </div>
+    <!-- Progress bar -->
+    <div class="mb-6 flex items-center justify-between gap-4">
+      <p class="text-[12px]" style="color:rgba(255,255,255,0.35);">{{ completedCount }} / {{ totalLessons }} lessons complete</p>
       <div class="flex items-center gap-3 shrink-0">
         <div class="w-40 h-1.5 rounded-full overflow-hidden" style="background:rgba(255,255,255,0.08);">
           <div class="h-full rounded-full transition-all duration-700" style="background:rgba(139,92,246,0.75);" :style="{ width: progressPercent + '%' }" />

@@ -7,7 +7,7 @@ import {
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'News Management — Vindicter' })
 
-const supabase = useSupabase()
+const api = useApi()
 const { isAdmin } = useAuth()
 const router = useRouter()
 
@@ -19,7 +19,7 @@ interface RssFeed {
   url: string
   category: string
   enabled: boolean
-  created_at: string
+  createdAt: string
 }
 
 const feeds    = ref<RssFeed[]>([])
@@ -40,12 +40,7 @@ async function fetchFeeds() {
   loading.value  = true
   fetchErr.value = ''
   try {
-    const { data, error } = await supabase
-      .from('rss_feeds')
-      .select('*')
-      .order('created_at', { ascending: true })
-    if (error) throw error
-    feeds.value = (data ?? []) as RssFeed[]
+    feeds.value = await api.get<RssFeed[]>('/news/feeds') ?? []
   } catch (e) {
     fetchErr.value = e instanceof Error ? e.message : 'Failed to load feeds.'
   } finally {
@@ -55,11 +50,7 @@ async function fetchFeeds() {
 
 async function toggleFeed(feed: RssFeed) {
   try {
-    const { error } = await supabase
-      .from('rss_feeds')
-      .update({ enabled: !feed.enabled })
-      .eq('id', feed.id)
-    if (error) throw error
+    await api.patch(`/news/feeds/${feed.id}`, { enabled: !feed.enabled })
     feed.enabled = !feed.enabled
   } catch (e) {
     setMsg(e instanceof Error ? e.message : 'Failed to update feed.', 'err')
@@ -69,8 +60,7 @@ async function toggleFeed(feed: RssFeed) {
 async function deleteFeed(id: string) {
   if (!confirm('Delete this feed? Cached articles will also be removed.')) return
   try {
-    const { error } = await supabase.from('rss_feeds').delete().eq('id', id)
-    if (error) throw error
+    await api.del(`/news/feeds/${id}`)
     feeds.value = feeds.value.filter(f => f.id !== id)
     setMsg('Feed removed.', 'ok')
   } catch (e) {
@@ -86,13 +76,10 @@ async function addFeed() {
 
   saving.value = true
   try {
-    const { data, error } = await supabase
-      .from('rss_feeds')
-      .insert({ name: newFeed.name.trim(), url: newFeed.url.trim(), category: newFeed.category })
-      .select()
-      .single()
-    if (error) throw error
-    feeds.value.push(data as RssFeed)
+    const created = await api.post<RssFeed>('/news/feeds', {
+      name: newFeed.name.trim(), url: newFeed.url.trim(), category: newFeed.category,
+    })
+    feeds.value.push(created)
     newFeed.name = ''; newFeed.url = ''; newFeed.category = 'general'
     showAdd.value = false
     setMsg('Feed added.', 'ok')
@@ -114,27 +101,23 @@ async function syncArticles() {
 
     for (const feed of enabledFeeds) {
       try {
-        // Use our server-side RSS proxy to avoid CORS and rss2json rate limits
         const res = await fetch(`/api/rss?url=${encodeURIComponent(feed.url)}`)
         if (!res.ok) throw new Error(`Proxy error ${res.status}`)
-        const { items } = await res.json() as { items: { title: string; link: string; description: string; pubDate: string | null }[] }
+        const { items } = await res.json() as { items: any[] }
         if (!items?.length) { errors.push(`${feed.name}: no items returned`); continue }
 
-        for (const item of items.slice(0, 30)) {
-          if (!item.link) continue
-          const { error } = await supabase.from('rss_articles').upsert({
-            feed_id:      feed.id,
-            feed_name:    feed.name,
-            title:        item.title || 'Untitled',
-            link:         item.link,
-            summary:      item.description?.slice(0, 500) || null,
-            published_at: item.pubDate ? new Date(item.pubDate).toISOString() : null,
-            fetched_at:   new Date().toISOString(),
-          }, { onConflict: 'link', ignoreDuplicates: false })
-          if (!error) total++
-        }
-      }
-      catch (e: any) {
+        const articles = items.slice(0, 30).filter(i => i.link).map(item => ({
+          feedId:      feed.id,
+          feedName:    feed.name,
+          title:       item.title || 'Untitled',
+          link:        item.link,
+          summary:     item.description?.slice(0, 500) ?? null,
+          publishedAt: item.pubDate ? new Date(item.pubDate).toISOString() : null,
+        }))
+
+        const result = await api.post<{ synced: number }>('/news/articles/sync', { articles })
+        total += result?.synced ?? 0
+      } catch (e: any) {
         errors.push(`${feed.name}: ${e?.message ?? 'fetch failed'}`)
       }
     }
@@ -142,11 +125,9 @@ async function syncArticles() {
     syncMsg.value = total
       ? `Synced ${total} article${total !== 1 ? 's' : ''} from ${enabledFeeds.length} feed${enabledFeeds.length !== 1 ? 's' : ''}.`
       : `No new articles. ${errors.length ? 'Errors: ' + errors.join('; ') : ''}`
-  }
-  catch (e: any) {
+  } catch (e: any) {
     syncMsg.value = e instanceof Error ? e.message : 'Sync failed.'
-  }
-  finally {
+  } finally {
     syncing.value = false
   }
 }
@@ -306,7 +287,7 @@ onMounted(fetchFeeds)
           style="background:rgba(139,92,246,0.10);border:1px solid rgba(139,92,246,0.18);color:rgba(167,139,250,0.75);">
           {{ feed.category }}
         </span>
-        <span style="color:rgba(255,255,255,0.25);">{{ fmt(feed.created_at) }}</span>
+        <span style="color:rgba(255,255,255,0.25);">{{ fmt(feed.createdAt) }}</span>
         <button class="flex items-center gap-1 text-[11px] cursor-pointer" @click="toggleFeed(feed)">
           <ToggleRight v-if="feed.enabled" class="h-4 w-4" style="color:rgba(35,165,90,0.80);" />
           <ToggleLeft v-else class="h-4 w-4" style="color:rgba(255,255,255,0.25);" />

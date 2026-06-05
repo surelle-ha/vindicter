@@ -48,7 +48,13 @@ function mountTurnstile() {
   })
 }
 
+const isDev = process.env.NODE_ENV !== 'production'
+
 onMounted(() => {
+  if (isDev) {
+    turnstileToken.value = 'dev-bypass'
+    return
+  }
   if (typeof window === 'undefined') return
   const w = window as any
   if (w.turnstile) {
@@ -143,18 +149,22 @@ async function submit() {
 
   loading.value = true
   try {
-    const supabase = useSupabase()
-    const { error } = await supabase.from('special_beta_applications').insert({
-      org_name:      orgName.value.trim(),
-      org_size:      orgSize.value,
-      country:       country.value,
-      contact_name:  contactName.value.trim(),
-      contact_email: contactEmail.value.trim(),
-      partner_type:  'organization',
-      referral:      referral.value.trim() || null,
-      agreed_terms:  agreedTerms.value,
+    const { public: { apiBaseUrl } } = useRuntimeConfig()
+    const res = await fetch(`${apiBaseUrl}/beta`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orgName:      orgName.value.trim(),
+        orgSize:      orgSize.value,
+        country:      country.value,
+        contactName:  contactName.value.trim(),
+        contactEmail: contactEmail.value.trim(),
+        partnerType:  'organization',
+        referral:     referral.value.trim() || null,
+        agreedTerms:  agreedTerms.value,
+      }),
     })
-    if (error) throw error
+    if (!res.ok) throw new Error(await res.text())
     success.value = true
   } catch {
     apiError.value = 'Something went wrong. Please try again or contact support@vindicter.xyz.'
@@ -357,8 +367,8 @@ const orgSizes = [
               />
             </div>
 
-            <!-- Cloudflare Turnstile -->
-            <div>
+            <!-- Cloudflare Turnstile (production only) -->
+            <div v-if="!isDev">
               <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/40 mb-2">
                 Verification
               </label>

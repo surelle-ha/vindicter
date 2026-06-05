@@ -94,11 +94,22 @@ export class AuthService {
   async me(userId: string) {
     return this.userRepo.findOne({
       where: { id: userId },
-      select: ['id', 'email', 'displayName', 'createdAt'],
+      select: ['id', 'email', 'displayName', 'jobRole', 'experienceLevel', 'onboardingComplete', 'createdAt'],
     })
   }
 
-  async updateDisplayName(userId: string, displayName: string) {
-    await this.userRepo.update(userId, { displayName })
+  async updateProfile(userId: string, dto: {
+    displayName?: string
+    jobRole?: string
+    experienceLevel?: string
+    onboardingComplete?: boolean
+  }) {
+    const patch: Record<string, unknown> = {}
+    if (dto.displayName       !== undefined) patch.displayName       = dto.displayName
+    if (dto.jobRole           !== undefined) patch.jobRole           = dto.jobRole
+    if (dto.experienceLevel   !== undefined) patch.experienceLevel   = dto.experienceLevel
+    if (dto.onboardingComplete !== undefined) patch.onboardingComplete = dto.onboardingComplete
+    if (Object.keys(patch).length) await this.userRepo.update(userId, patch as any)
+    return this.me(userId)
   }
 }

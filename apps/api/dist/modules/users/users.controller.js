@@ -31,6 +31,9 @@ let UsersController = class UsersController {
     updateActive(id, isActive) {
         return this.service.updateActive(id, isActive);
     }
+    updateRole(id, role) {
+        return this.service.updateRole(id, role);
+    }
     remove(id) {
         return this.service.remove(id);
     }
@@ -60,6 +63,15 @@ __decorate([
     __metadata("design:paramtypes", [String, Boolean]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "updateActive", null);
+__decorate([
+    (0, common_1.Patch)(':id/role'),
+    (0, require_access_decorator_1.RequireAccess)('users', 'update'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)('role')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "updateRole", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     (0, require_access_decorator_1.RequireAccess)('users', 'delete'),

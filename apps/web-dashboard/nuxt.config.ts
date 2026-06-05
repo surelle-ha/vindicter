@@ -14,9 +14,8 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      supabaseUrl:      process.env.SUPABASE_URL                   ?? '',
-      supabaseAnonKey:  process.env.SUPABASE_ANON_KEY              ?? '',
-      turnstileSiteKey: process.env.NUXT_PUBLIC_TURNSTILE_SITE_KEY ?? '1x00000000000000000000AA',
+      apiBaseUrl:       process.env.NUXT_PUBLIC_API_BASE_URL        ?? 'http://localhost:4000/api/v1',
+      turnstileSiteKey: process.env.NUXT_PUBLIC_TURNSTILE_SITE_KEY  ?? '1x00000000000000000000AA',
     },
   },
   css: ['~/assets/css/main.css'],

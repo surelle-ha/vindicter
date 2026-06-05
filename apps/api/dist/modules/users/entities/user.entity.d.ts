@@ -5,6 +5,9 @@ export declare class User {
     email: string;
     displayName: string | null;
     passwordHash: string;
+    jobRole: string | null;
+    experienceLevel: string | null;
+    onboardingComplete: boolean;
     isActive: boolean;
     createdAt: Date;
     updatedAt: Date;

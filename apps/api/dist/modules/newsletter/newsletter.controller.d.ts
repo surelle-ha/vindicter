@@ -1,3 +1,4 @@
+import type { FastifyReply } from 'fastify';
 import { NewsletterService } from './newsletter.service';
 declare class SignupDto {
     email: string;
@@ -14,6 +15,7 @@ export declare class NewsletterController {
         email: string;
         downloadToken: string | null;
     }>;
+    downloadByToken(token: string, res: FastifyReply): Promise<void>;
     getPublished(limit?: string): Promise<import("./entities/newsletter-update.entity").NewsletterUpdate[]>;
     findAllSignups(): Promise<import("./entities/newsletter-signup.entity").NewsletterSignup[]>;
     findAllUpdates(): Promise<import("./entities/newsletter-update.entity").NewsletterUpdate[]>;

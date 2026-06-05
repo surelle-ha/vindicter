@@ -41,6 +41,7 @@ import { runCodexExec } from '~/composables/useCodexShell'
 import { runClaudeExec } from '~/composables/useClaudeAI'
 import { runOpenRouterChat } from '~/composables/useOpenRouterAI'
 import { runOllamaChat } from '~/composables/useOllamaAI'
+import { checkDefendCoreAvailable, fetchRAGContext } from '~/composables/useDefendCoreRAG'
 import type {
   ProjectMeta,
   SecurityFinding,
@@ -109,6 +110,9 @@ const selectedFindingLimit = ref(10)
 const metricsCollapsed = ref(false)
 const showToolPicker = ref(false)
 const showScopePicker = ref(false)
+const ragEnabled     = ref(false)
+const ragAvailable   = ref(false)
+const showScanConfirm = ref(false)
 const scopeScanAll = ref(true)
 const scopeEntries = ref<{ path: string; name: string; isDir: boolean; depth: number; selected: boolean }[]>([])
 const scopeLoading = ref(false)
@@ -148,7 +152,12 @@ const validateError = ref('')
 const { toolStatus: toolAvailability, checkAIToolAvailability } = useAIToolAvailability()
 
 async function checkToolAvailability() {
-  await checkAIToolAvailability()
+  const [, available] = await Promise.all([
+    checkAIToolAvailability(),
+    checkDefendCoreAvailable(),
+  ])
+  ragAvailable.value = available
+  if (!available) ragEnabled.value = false
   if (!toolAvailability[selectedAITool.value].available) {
     const first = (['codex', 'claude', 'openrouter', 'ollama'] as SecurityAITool[])
       .find(t => toolAvailability[t].available)
@@ -1489,6 +1498,53 @@ async function runOssScanners(): Promise<SecurityScanFinding[]> {
   return allFindings
 }
 
+const SCAN_EXTS = new Set([
+  'ts', 'tsx', 'js', 'jsx', 'vue', 'svelte',
+  'py', 'rb', 'php', 'go', 'rs', 'java', 'cs', 'cpp', 'c', 'h',
+  'json', 'yaml', 'yml', 'toml', 'env', 'sh', 'bash', 'ps1',
+  'sql', 'prisma', 'graphql',
+])
+const SCAN_SKIP_DIRS = new Set([
+  'node_modules', 'dist', '.nuxt', '.output', 'target', 'build',
+  '.cache', 'bin', 'obj', '__pycache__', '.venv', 'venv', '.git',
+  'vendor', 'coverage', '.turbo',
+])
+const MAX_FILE_BYTES = 6_000
+const MAX_TOTAL_BYTES = 40_000
+
+async function readProjectFilesForScan(projectPath: string): Promise<string> {
+  const fs = useTauriFs()
+  const sep = projectPath.includes('\\') ? '\\' : '/'
+  const parts: string[] = []
+  let totalBytes = 0
+
+  async function walk(dir: string, depth: number) {
+    if (depth > 4 || totalBytes >= MAX_TOTAL_BYTES) return
+    const items = await fs.readDir(dir).catch(() => [])
+    for (const item of items) {
+      if (totalBytes >= MAX_TOTAL_BYTES) break
+      if (SCAN_SKIP_DIRS.has(item.name)) continue
+      if (item.isDir) {
+        await walk(item.path, depth + 1)
+      } else {
+        const ext = item.name.split('.').pop()?.toLowerCase() ?? ''
+        if (!SCAN_EXTS.has(ext)) continue
+        try {
+          const content = await fs.readTextFile(item.path)
+          const truncated = content.length > MAX_FILE_BYTES ? content.slice(0, MAX_FILE_BYTES) + '\n[truncated]' : content
+          const rel = item.path.replace(projectPath + sep, '').replace(projectPath + '/', '')
+          const block = `=== ${rel} ===\n${truncated}`
+          totalBytes += block.length
+          parts.push(block)
+        } catch { /* unreadable, skip */ }
+      }
+    }
+  }
+
+  await walk(projectPath, 0)
+  return parts.join('\n\n')
+}
+
 async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false) {
   if (!props.project.absolutePath) {
     notify('Select a project before running an AI security scan.', 'warning')
@@ -1512,6 +1568,7 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
     return
   }
 
+
   if (!automatic) {
     selectedFindingLimit.value = findingLimit
     await security.updateSettings({ aiFindingLimit: findingLimit })
@@ -1531,17 +1588,28 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
     const scopeConstraint = automatic ? '' : buildScopeConstraint()
     const prompt = buildSecurityScanPrompt(props.project.name, buildExistingSecurityContext(), effort, findingLimit) + scopeConstraint
 
+    const fileContent = (tool === 'openrouter' || tool === 'ollama')
+      ? await readProjectFilesForScan(props.project.absolutePath)
+      : ''
+    // RAG only for cloud APIs — Claude/Codex read files themselves via CLI,
+    // injecting extra tokens just slows them down without adding value.
+    const ragContext = (ragEnabled.value && ragAvailable.value && (tool === 'openrouter' || tool === 'ollama'))
+      ? await fetchRAGContext(`security vulnerabilities ${props.project.name}`)
+      : ''
+    const enrichedPrompt = [
+      prompt,
+      fileContent ? `---\nProject source files for analysis:\n\n${fileContent}` : '',
+      ragContext  ? `---\n${ragContext}` : '',
+    ].filter(Boolean).join('\n\n')
+
     let result: { stdout: string; stderr: string }
     if (tool === 'openrouter') {
       const output = await runOpenRouterChat({
         apiKey: app.openRouter.apiKey,
         model: app.openRouter.model,
         messages: [
-          {
-            role: 'system',
-            content: 'You are Vindicter, an AI security reviewer. Return only the JSON requested by the user.',
-          },
-          { role: 'user', content: prompt },
+          { role: 'system', content: 'You are Vindicter, an AI security reviewer. Return only the JSON requested by the user.' },
+          { role: 'user', content: enrichedPrompt },
         ],
       })
       result = { stdout: output, stderr: '' }
@@ -1551,11 +1619,8 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
         url: app.ollama.url,
         model: app.ollama.model,
         messages: [
-          {
-            role: 'system',
-            content: 'You are Vindicter, an AI security reviewer. Return only the JSON requested by the user.',
-          },
-          { role: 'user', content: prompt },
+          { role: 'system', content: 'You are Vindicter, an AI security reviewer. Return only the JSON requested by the user.' },
+          { role: 'user', content: enrichedPrompt },
         ],
       })
       result = { stdout: output, stderr: '' }
@@ -3297,12 +3362,6 @@ async function clearScanHistory() {
               {{ toolAvailability.ollama.available ? app.ollama.model : 'Configure Ollama URL in AI Models' }}
             </p>
           </button>
-          <div class="col-span-2 flex cursor-not-allowed items-center gap-3 rounded-xl border border-[var(--border)] bg-black/10 p-3 opacity-50">
-            <div class="size-6 shrink-0 grid place-items-center rounded-md border border-rose-500/30 bg-rose-500/15 text-[11px] font-bold text-rose-200">C</div>
-            <p class="text-xs font-semibold text-[var(--text)]">DefendCore</p>
-            <span class="rounded-full border border-rose-500/25 bg-rose-500/10 px-1.5 py-px text-[9px] font-semibold text-rose-300">Soon</span>
-            <p class="ml-1 text-[10px] text-[var(--text-faint)]">Vindicter's native model — in training.</p>
-          </div>
         </div>
         <div class="space-y-2">
           <p class="text-xs font-medium text-[var(--text-muted)]">Effort Level</p>
@@ -3321,6 +3380,25 @@ async function clearScanHistory() {
           <span class="text-xs font-medium text-[var(--text)]">Finding limit</span>
           <input v-model.number="selectedFindingLimit" type="number" min="0" max="50" class="mt-2 h-9 w-full rounded-lg border border-[var(--border)] bg-black/20 px-2 text-xs text-[var(--text)] outline-none">
           <span class="mt-2 block text-[10px] leading-relaxed text-[var(--text-faint)]">Set the maximum number of AI findings for this scan. Use 0 for no explicit cap.</span>
+        </label>
+
+        <!-- RAG enhancement toggle — only relevant for cloud API tools -->
+        <label v-if="selectedAITool === 'openrouter' || selectedAITool === 'ollama'"
+          class="flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors"
+          :class="ragAvailable ? 'border-violet-500/20 bg-violet-500/[0.04] hover:bg-violet-500/[0.07]' : 'border-[var(--border)] bg-black/10 opacity-50 cursor-not-allowed'">
+          <div class="mt-0.5 relative shrink-0 h-5 w-9 rounded-full transition-colors duration-200 overflow-hidden"
+            :style="(ragEnabled && ragAvailable) ? 'background:rgba(139,92,246,0.70);' : 'background:rgba(255,255,255,0.12);'"
+            @click.prevent="ragAvailable && (ragEnabled = !ragEnabled)">
+            <span class="absolute top-[2px] h-4 w-4 rounded-full transition-all duration-200"
+              :style="(ragEnabled && ragAvailable) ? 'left:18px;background:white;' : 'left:2px;background:rgba(255,255,255,0.55);'" />
+          </div>
+          <div>
+            <p class="text-xs font-medium text-[var(--text)]">Enhance with Knowledge Base</p>
+            <p class="mt-0.5 text-[10px] leading-relaxed text-[var(--text-faint)]">
+              <template v-if="ragAvailable">Prepend relevant DefendCore KB chunks to the prompt for richer security context.</template>
+              <template v-else>DefendCore KB is unavailable — enable "Ready for Vindicter Desktop" in the admin panel.</template>
+            </p>
+          </div>
         </label>
         <div class="flex justify-end gap-2 border-t border-[var(--border)] pt-4">
           <button class="rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)]" @click="showToolPicker = false">Cancel</button>
@@ -3395,10 +3473,84 @@ async function clearScanHistory() {
             class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
             :class="securityToolRunButtonClass(selectedAITool)"
             :disabled="!canRunAIScan || scopeLoading"
-            @click="showScopePicker = false; runAIScan()"
+            @click="showScopePicker = false; showScanConfirm = true"
+          >
+            <FileSearch class="size-3.5" />
+            Review & Confirm →
+          </button>
+        </div>
+      </div>
+    </GlassModal>
+
+    <!-- ── Scan Confirmation Modal ───────────────────────────────────────── -->
+    <GlassModal v-model="showScanConfirm" title="Confirm Scan" max-width="md">
+      <div class="space-y-4">
+        <p class="text-xs text-[var(--text-muted)]">Review your selections before starting the security scan.</p>
+
+        <div class="space-y-2">
+          <!-- AI Model -->
+          <div class="flex items-center justify-between rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3">
+            <span class="text-xs text-[var(--text-muted)]">AI Model</span>
+            <span class="text-xs font-semibold" :class="securityToolAccentClass(selectedAITool)">{{ selectedAIToolLabel }}</span>
+          </div>
+
+          <!-- Effort level -->
+          <div class="flex items-center justify-between rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3">
+            <span class="text-xs text-[var(--text-muted)]">Effort Level</span>
+            <div class="text-right">
+              <span class="text-xs font-semibold text-indigo-300">{{ selectedEffortOption.label }}</span>
+              <span class="ml-2 text-[10px] text-[var(--text-faint)]">{{ selectedEffortOption.tokenNote }}</span>
+            </div>
+          </div>
+
+          <!-- Finding limit -->
+          <div class="flex items-center justify-between rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3">
+            <span class="text-xs text-[var(--text-muted)]">Finding Limit</span>
+            <span class="text-xs font-semibold text-[var(--text)]">{{ normalizedFindingLimit === 0 ? 'No cap' : normalizedFindingLimit }}</span>
+          </div>
+
+          <!-- KB enhancement — only shown for cloud API tools -->
+          <div v-if="selectedAITool === 'openrouter' || selectedAITool === 'ollama'"
+            class="flex items-center justify-between rounded-xl border px-4 py-3"
+            :class="ragEnabled && ragAvailable ? 'border-violet-500/25 bg-violet-500/[0.04]' : 'border-[var(--border)] bg-black/10'">
+            <span class="text-xs text-[var(--text-muted)]">Knowledge Base Enhancement</span>
+            <span class="text-xs font-semibold" :class="ragEnabled && ragAvailable ? 'text-violet-300' : 'text-[var(--text-faint)]'">
+              {{ ragEnabled && ragAvailable ? 'Enabled' : 'Disabled' }}
+            </span>
+          </div>
+
+          <!-- Scope -->
+          <div class="rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs text-[var(--text-muted)]">Scan Scope</span>
+              <span class="text-xs font-semibold text-[var(--text)]">
+                {{ scopeScanAll ? 'Full project' : `${scopeEntries.filter(e => e.selected && e.depth === 0).length} path${scopeEntries.filter(e => e.selected && e.depth === 0).length !== 1 ? 's' : ''}` }}
+              </span>
+            </div>
+            <div v-if="!scopeScanAll" class="space-y-1 max-h-24 overflow-y-auto">
+              <p v-for="e in scopeEntries.filter(e => e.selected && e.depth === 0)" :key="e.path"
+                class="text-[10px] font-mono truncate" style="color:rgba(255,255,255,0.30);">{{ e.name }}</p>
+            </div>
+          </div>
+
+          <!-- Project -->
+          <div class="flex items-center justify-between rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3">
+            <span class="text-xs text-[var(--text-muted)]">Project</span>
+            <span class="text-xs font-semibold text-[var(--text)] truncate max-w-[60%] text-right">{{ props.project.name }}</span>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 border-t border-[var(--border)] pt-4">
+          <button class="rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)]"
+            @click="showScanConfirm = false; showScopePicker = true">← Back</button>
+          <button
+            class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            :class="securityToolRunButtonClass(selectedAITool)"
+            :disabled="!canRunAIScan"
+            @click="showScanConfirm = false; runAIScan()"
           >
             <Bot class="size-3.5" />
-            Run {{ selectedEffortOption.label }} Scan with {{ selectedAIToolLabel }}
+            Start Scan
           </button>
         </div>
       </div>

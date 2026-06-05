@@ -4,21 +4,15 @@ import { Users, MessageCircle, Star, ShieldAlert } from 'lucide-vue-next'
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'Dashboard — Vindicter' })
 
-const supabase = useSupabase()
+const api = useApi()
 const { isAdmin } = useAuth()
 
-interface Update { id: string; title: string; summary: string | null; published_at: string }
+interface Update { id: string; title: string; summary: string | null; publishedAt: string }
 const updates = ref<Update[]>([])
 const loading = ref(true)
 
 onMounted(async () => {
-  const { data } = await supabase
-    .from('newsletter_updates')
-    .select('id, title, summary, published_at')
-    .eq('status', 'published')
-    .order('published_at', { ascending: false })
-    .limit(3)
-  updates.value = (data ?? []) as Update[]
+  updates.value = await api.get<Update[]>('/newsletter/updates/published?limit=3').catch(() => []) ?? []
   loading.value = false
 })
 
@@ -109,7 +103,7 @@ function fmt(iso: string) {
             <p class="text-[13px] font-medium truncate" style="color:rgba(255,255,255,0.75);">{{ u.title }}</p>
             <p v-if="u.summary" class="text-[11px] mt-0.5 truncate" style="color:rgba(255,255,255,0.35);">{{ u.summary }}</p>
           </div>
-          <p class="shrink-0 text-[11px]" style="color:rgba(255,255,255,0.25);">{{ fmt(u.published_at) }}</p>
+          <p class="shrink-0 text-[11px]" style="color:rgba(255,255,255,0.25);">{{ fmt(u.publishedAt) }}</p>
         </div>
       </div>
 

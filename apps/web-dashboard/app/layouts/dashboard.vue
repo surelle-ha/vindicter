@@ -223,6 +223,30 @@ const landingUrl = computed(() => {
             </NuxtLink>
           </template>
         </nav>
+
+        <!-- ── Sidebar footer ───────────────────────────────────────────── -->
+        <div class="shrink-0 p-2" style="border-top:1px solid rgba(255,255,255,0.06);">
+          <!-- Expanded: version badge + tagline -->
+          <template v-if="!collapsed">
+            <div class="rounded-lg px-3 py-2.5" style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.12);">
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <span class="text-[10px] font-bold uppercase tracking-wider" style="color:rgba(139,92,246,0.70);">Vindicter</span>
+                <span class="text-[9px] font-semibold rounded-full px-1.5 py-0.5" style="background:rgba(139,92,246,0.15);color:rgba(167,139,250,0.80);">Beta</span>
+              </div>
+              <p class="text-[10px] leading-relaxed" style="color:rgba(255,255,255,0.22);">Local-first AI security platform. Your data stays on your device.</p>
+              <div class="flex items-center gap-1 mt-2">
+                <span class="h-1.5 w-1.5 rounded-full animate-pulse" style="background:rgba(35,165,90,0.80);" />
+                <span class="text-[9px]" style="color:rgba(35,165,90,0.65);">All systems operational</span>
+              </div>
+            </div>
+          </template>
+          <!-- Collapsed: just a pulsing status dot -->
+          <template v-else>
+            <div class="flex items-center justify-center py-1">
+              <span class="h-2 w-2 rounded-full animate-pulse" style="background:rgba(35,165,90,0.70);" title="All systems operational" />
+            </div>
+          </template>
+        </div>
       </aside>
 
       <!-- Main area -->

@@ -9,11 +9,18 @@ import { NewsletterUpdate } from '../modules/newsletter/entities/newsletter-upda
 import { SpecialBetaApplication } from '../modules/beta/entities/special-beta-application.entity'
 import { SupportTicket } from '../modules/support/entities/support-ticket.entity'
 import { ApiToken } from '../modules/api-tokens/entities/api-token.entity'
+import { RssFeed } from '../modules/news/entities/rss-feed.entity'
+import { RssArticle } from '../modules/news/entities/rss-article.entity'
 import { MarketingSegment } from '../modules/marketing/entities/marketing-segment.entity'
 import { MarketingContact } from '../modules/marketing/entities/marketing-contact.entity'
 import { MarketingCampaign } from '../modules/marketing/entities/marketing-campaign.entity'
 import { MarketingTemplate } from '../modules/marketing/entities/marketing-template.entity'
 import { MarketingSendEvent } from '../modules/marketing/entities/marketing-send-event.entity'
+import { AcademyProgress } from '../modules/academy/entities/academy-progress.entity'
+import { AcademyChatSession } from '../modules/academy/entities/academy-chat-session.entity'
+import { DefendCoreConfig } from '../modules/defendcore/entities/defendcore-config.entity'
+import { KnowledgeDocument } from '../modules/defendcore/entities/knowledge-document.entity'
+import { CorsOrigin } from '../modules/cors/entities/cors-origin.entity'
 
 export const databaseConfig = (): TypeOrmModuleOptions => {
   const url = process.env.DATABASE_URL ?? ''
@@ -31,8 +38,11 @@ export const databaseConfig = (): TypeOrmModuleOptions => {
       User, Role, Access, RoleAccess, UserRole,
       NewsletterSignup, NewsletterUpdate,
       SpecialBetaApplication, SupportTicket, ApiToken,
+      RssFeed, RssArticle,
       MarketingSegment, MarketingContact, MarketingCampaign,
       MarketingTemplate, MarketingSendEvent,
+      AcademyProgress, AcademyChatSession,
+      DefendCoreConfig, KnowledgeDocument, CorsOrigin,
     ],
     migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
     synchronize: false,

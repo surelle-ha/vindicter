@@ -25,6 +25,9 @@ let NewsController = class NewsController {
     getArticles(limit, category) {
         return this.newsService.findArticles(limit ? Number(limit) : 60, category);
     }
+    syncArticles(body) {
+        return this.newsService.upsertArticles(body.articles ?? []);
+    }
     getFeeds() {
         return this.newsService.findAllFeeds();
     }
@@ -47,6 +50,15 @@ __decorate([
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", void 0)
 ], NewsController.prototype, "getArticles", null);
+__decorate([
+    (0, common_1.Post)('articles/sync'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, require_roles_decorator_1.RequireRoles)('admin'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], NewsController.prototype, "syncArticles", null);
 __decorate([
     (0, common_1.Get)('feeds'),
     __metadata("design:type", Function),

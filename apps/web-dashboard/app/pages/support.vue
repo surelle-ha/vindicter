@@ -4,7 +4,7 @@ import { LifeBuoy, Send, CheckCircle2, Loader2, BookOpen, HelpCircle, Mail } fro
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'Support — Vindicter' })
 
-const supabase = useSupabase()
+const api = useApi()
 const { user } = useAuth()
 
 const landingUrl = computed(() => {
@@ -44,7 +44,7 @@ onMounted(() => {
   if (user.value) {
     const u = user.value as any
     form.email = u.email ?? ''
-    form.name  = u.user_metadata?.display_name ?? ''
+    form.name  = u.displayName ?? ''
   }
 })
 
@@ -68,17 +68,16 @@ async function submit() {
   if (!validate()) return
   loading.value = true
   try {
-    const { error } = await supabase.from('support_tickets').insert({
-      name:                   form.name.trim(),
-      email:                  form.email.trim(),
-      category:               form.category,
-      subject:                form.subject.trim(),
-      message:                form.message.trim(),
-      documentation_checked:  form.docsChecked,
-      faq_checked:            form.faqChecked,
-      source_url:             import.meta.client ? window.location.href : null,
+    await api.post('/support/tickets', {
+      name:                 form.name.trim(),
+      email:                form.email.trim(),
+      category:             form.category,
+      subject:              form.subject.trim(),
+      message:              form.message.trim(),
+      documentationChecked: form.docsChecked,
+      faqChecked:           form.faqChecked,
+      sourceUrl:            import.meta.client ? window.location.href : null,
     })
-    if (error) throw error
     doneEmail.value = form.email.trim()
     step.value = 'done'
   } catch {
@@ -90,19 +89,12 @@ async function submit() {
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto">
+  <div class="-m-5 mb-0">
+    <PageCover title="Support" subtitle="We're here to help. Search docs before submitting — most questions are answered there." :icon="LifeBuoy"
+      icon-bg="rgba(139,92,246,0.25)" icon-color="rgba(167,139,250,0.95)" />
+  </div>
 
-    <!-- Header -->
-    <div class="mb-8 flex items-center gap-3">
-      <div class="h-9 w-9 flex items-center justify-center rounded-xl shrink-0"
-        style="background:rgba(139,92,246,0.10);border:1px solid rgba(139,92,246,0.20);">
-        <LifeBuoy class="h-4 w-4" style="color:rgba(139,92,246,0.80);" />
-      </div>
-      <div>
-        <h1 class="text-[22px] font-display font-black uppercase tracking-wide" style="color:rgba(255,255,255,0.90);">Support</h1>
-        <p class="text-[12px] mt-0.5" style="color:rgba(255,255,255,0.35);">Get help with Vindicter.</p>
-      </div>
-    </div>
+  <div class="max-w-2xl mx-auto">
 
     <!-- Step: check docs first -->
     <div v-if="step === 'check'" class="rounded-xl p-6 space-y-5"

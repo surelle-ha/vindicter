@@ -22,12 +22,8 @@ async function login() {
   errorMessage.value = ''
   loading.value = true
   try {
-    const supabase = useSupabase()
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.value.trim(),
-      password: password.value,
-    })
-    if (error) throw error
+    const { signIn } = useAuth()
+    await signIn(email.value.trim(), password.value)
     await router.push(String(route.query.redirect ?? '/dashboard'))
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Unable to login right now.'

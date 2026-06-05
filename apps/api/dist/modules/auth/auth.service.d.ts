@@ -19,5 +19,10 @@ export declare class AuthService {
         access_token: string;
     }>;
     me(userId: string): Promise<User | null>;
-    updateDisplayName(userId: string, displayName: string): Promise<void>;
+    updateProfile(userId: string, dto: {
+        displayName?: string;
+        jobRole?: string;
+        experienceLevel?: string;
+        onboardingComplete?: boolean;
+    }): Promise<User | null>;
 }

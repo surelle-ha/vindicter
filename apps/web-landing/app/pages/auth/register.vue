@@ -24,20 +24,14 @@ async function register() {
   notice.value = ''
   loading.value = true
   try {
-    const supabase = useSupabase()
-    const { data, error } = await supabase.auth.signUp({
+    const api = useApi()
+    const res = await api.post<{ access_token: string }>('/auth/register', {
       email: email.value.trim(),
       password: password.value,
-      options: {
-        data: { display_name: displayName.value.trim() },
-      },
+      displayName: displayName.value.trim() || undefined,
     })
-    if (error) throw error
-    if (data.session) {
-      await router.push('/dashboard')
-      return
-    }
-    notice.value = 'Account created. Check your email to confirm your account before logging in.'
+    if (typeof localStorage !== 'undefined') localStorage.setItem('auth-token', res.access_token)
+    await router.push('/dashboard')
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Unable to register right now.'
   } finally {

@@ -14,6 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NewsletterController = void 0;
 const common_1 = require("@nestjs/common");
+const throttler_1 = require("@nestjs/throttler");
 const newsletter_service_1 = require("./newsletter.service");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const access_guard_1 = require("../../common/guards/access.guard");
@@ -40,6 +41,28 @@ let NewsletterController = class NewsletterController {
     findByToken(token) {
         return this.service.findSignupByToken(token);
     }
+    async downloadByToken(token, res) {
+        const url = await this.service.getDownloadUrlForToken(token);
+        const safeUrl = encodeURI(url);
+        res.type('text/html; charset=utf-8').send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Downloading Vindicter…</title>
+  <script>window.location.href=${JSON.stringify(safeUrl)}</script>
+</head>
+<body style="margin:0;font-family:system-ui,sans-serif;background:#0f1012;color:#e4e4e7;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;">
+  <div>
+    <p style="font-size:18px;font-weight:700;margin:0 0 12px;">Your download is starting…</p>
+    <p style="font-size:13px;color:#9ca3af;margin:0;">
+      If it doesn't begin automatically,
+      <a href="${safeUrl}" style="color:#6366f1;text-decoration:underline;">click here</a>.
+    </p>
+  </div>
+</body>
+</html>`);
+    }
     getPublished(limit) {
         return this.service.findPublishedUpdates(limit ? Number(limit) : undefined);
     }
@@ -53,6 +76,7 @@ let NewsletterController = class NewsletterController {
 };
 exports.NewsletterController = NewsletterController;
 __decorate([
+    (0, throttler_1.Throttle)({ global: { ttl: 60_000, limit: 5 } }),
     (0, common_1.Post)('signups'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -66,6 +90,14 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], NewsletterController.prototype, "findByToken", null);
+__decorate([
+    (0, common_1.Get)('signups/download/:token'),
+    __param(0, (0, common_1.Param)('token')),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], NewsletterController.prototype, "downloadByToken", null);
 __decorate([
     (0, common_1.Get)('updates/published'),
     __param(0, (0, common_1.Query)('limit')),

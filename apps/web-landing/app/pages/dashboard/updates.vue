@@ -2,20 +2,15 @@
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'Updates — Vindicter' })
 
-const supabase = useSupabase()
+const api = useApi()
 
-interface Update { id: string; title: string; summary: string | null; body: string; published_at: string }
+interface Update { id: string; title: string; summary: string | null; body: string; publishedAt: string }
 const updates  = ref<Update[]>([])
 const loading  = ref(true)
 const expanded = ref<string | null>(null)
 
 onMounted(async () => {
-  const { data } = await supabase
-    .from('newsletter_updates')
-    .select('id, title, summary, body, published_at')
-    .eq('status', 'published')
-    .order('published_at', { ascending: false })
-  updates.value = (data ?? []) as Update[]
+  updates.value = await api.get<Update[]>('/newsletter/updates/published').catch(() => []) ?? []
   loading.value = false
 })
 
@@ -75,7 +70,7 @@ function toggle(id: string) {
             <p v-if="u.summary && expanded !== u.id" class="mt-0.5 text-[11px] truncate" style="color:rgba(255,255,255,0.40);">{{ u.summary }}</p>
           </div>
           <div class="shrink-0 flex items-center gap-3">
-            <span class="text-[11px]" style="color:rgba(255,255,255,0.25);">{{ fmt(u.published_at) }}</span>
+            <span class="text-[11px]" style="color:rgba(255,255,255,0.25);">{{ fmt(u.publishedAt) }}</span>
             <svg
               class="h-3.5 w-3.5 transition-transform shrink-0"
               :style="expanded === u.id ? 'color:rgba(129,140,248,0.70);transform:rotate(180deg)' : 'color:rgba(255,255,255,0.25);'"

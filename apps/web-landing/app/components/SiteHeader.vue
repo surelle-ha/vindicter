@@ -1,28 +1,19 @@
 <script setup lang="ts">
 const isLoggedIn = ref(false)
-let unsubscribe: (() => void) | undefined
 
 const dashboardUrl = computed(() => {
   if (import.meta.client && window.location.hostname === 'localhost') return 'http://localhost:3003'
   return 'https://dashboard.vindicter.xyz'
 })
 
-onMounted(async () => {
-  try {
-    const supabase = useSupabase()
-    const { data } = await supabase.auth.getSession()
-    isLoggedIn.value = Boolean(data.session)
-
-    const listener = supabase.auth.onAuthStateChange((_event, session) => {
-      isLoggedIn.value = Boolean(session)
-    })
-    unsubscribe = () => listener.data.subscription.unsubscribe()
-  } catch {
-    isLoggedIn.value = false
+onMounted(() => {
+  const { getStoredToken } = useApi() as any
+  if (typeof getStoredToken === 'function') {
+    isLoggedIn.value = Boolean(getStoredToken())
+  } else {
+    isLoggedIn.value = Boolean(typeof localStorage !== 'undefined' && localStorage.getItem('auth-token'))
   }
 })
-
-onUnmounted(() => unsubscribe?.())
 </script>
 
 <template>

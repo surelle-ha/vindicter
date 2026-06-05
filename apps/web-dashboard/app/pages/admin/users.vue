@@ -4,7 +4,7 @@ import { Users, Search, Loader2, ShieldAlert, RefreshCw } from 'lucide-vue-next'
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'User Management — Vindicter' })
 
-const supabase = useSupabase()
+const api = useApi()
 const { isAdmin, user } = useAuth()
 const router = useRouter()
 
@@ -16,10 +16,10 @@ onMounted(() => {
 
 interface UserProfile {
   id: string
-  role: string
-  display_name?: string
+  userRoles?: { role: { name: string } }[]
+  displayName?: string
   email?: string
-  created_at?: string
+  createdAt?: string
 }
 
 const users    = ref<UserProfile[]>([])
@@ -34,12 +34,7 @@ async function fetchUsers() {
   fetchErr.value = ''
   saveMsg.value  = ''
   try {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    users.value = (data ?? []) as UserProfile[]
+    users.value = await api.get<UserProfile[]>('/users') ?? []
   } catch (e) {
     fetchErr.value = e instanceof Error ? e.message : 'Failed to load users.'
   } finally {
@@ -51,13 +46,9 @@ async function updateRole(userId: string, newRole: string) {
   saving.value  = userId
   saveMsg.value = ''
   try {
-    const { error } = await supabase
-      .from('user_profiles')
-      .update({ role: newRole })
-      .eq('id', userId)
-    if (error) throw error
+    await api.patch(`/users/${userId}/role`, { role: newRole })
     const u = users.value.find(u => u.id === userId)
-    if (u) u.role = newRole
+    if (u) u.userRoles = [{ role: { name: newRole } }]
     saveMsg.value = 'Role updated.'
   } catch (e) {
     saveMsg.value = e instanceof Error ? e.message : 'Failed to update role.'
@@ -74,8 +65,8 @@ const filtered = computed(() => {
   return users.value.filter(u =>
     u.id.toLowerCase().includes(q) ||
     (u.email ?? '').toLowerCase().includes(q) ||
-    (u.display_name ?? '').toLowerCase().includes(q) ||
-    (u.role ?? '').toLowerCase().includes(q)
+    (u.displayName ?? '').toLowerCase().includes(q) ||
+    (u.userRoles?.[0]?.role?.name ?? '').toLowerCase().includes(q)
   )
 })
 
@@ -174,22 +165,22 @@ function fmt(iso?: string) {
 
         <!-- Account -->
         <div class="min-w-0 pr-4">
-          <p class="font-medium truncate" style="color:rgba(255,255,255,0.80);">{{ u.display_name ?? u.email ?? '—' }}</p>
-          <p v-if="u.display_name && u.email" class="text-[11px] truncate mt-0.5" style="color:rgba(255,255,255,0.30);">{{ u.email }}</p>
+          <p class="font-medium truncate" style="color:rgba(255,255,255,0.80);">{{ u.displayName ?? u.email ?? '—' }}</p>
+          <p v-if="u.displayName && u.email" class="text-[11px] truncate mt-0.5" style="color:rgba(255,255,255,0.30);">{{ u.email }}</p>
         </div>
 
         <!-- Role badge -->
         <span
           class="inline-flex w-max items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
-          :style="u.role === 'admin'
+          :style="u.userRoles?.[0]?.role?.name === 'admin'
             ? 'background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.22);color:rgba(167,139,250,0.85);'
             : 'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);color:rgba(255,255,255,0.40);'"
         >
-          {{ u.role ?? 'user' }}
+          {{ u.userRoles?.[0]?.role?.name ?? 'member' }}
         </span>
 
         <!-- Joined -->
-        <span style="color:rgba(255,255,255,0.25);">{{ fmt(u.created_at) }}</span>
+        <span style="color:rgba(255,255,255,0.25);">{{ fmt(u.createdAt) }}</span>
 
         <!-- Role select -->
         <div class="flex items-center gap-2">
@@ -198,7 +189,7 @@ function fmt(iso?: string) {
           </template>
           <template v-else>
             <select
-              :value="u.role"
+              :value="u.userRoles?.[0]?.role?.name ?? 'member'"
               :disabled="saving === u.id"
               class="rounded-lg px-2.5 py-1 text-[11px] outline-none transition-colors cursor-pointer disabled:opacity-50"
               style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);color:rgba(255,255,255,0.60);"

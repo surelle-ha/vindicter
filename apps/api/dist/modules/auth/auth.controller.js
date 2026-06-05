@@ -15,19 +15,37 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthController = void 0;
 const common_1 = require("@nestjs/common");
 const throttler_1 = require("@nestjs/throttler");
+const class_validator_1 = require("class-validator");
 const auth_service_1 = require("./auth.service");
 const login_dto_1 = require("./dto/login.dto");
 const register_dto_1 = require("./dto/register.dto");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
-const class_validator_1 = require("class-validator");
 class UpdateProfileDto {
 }
 __decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MaxLength)(100),
     __metadata("design:type", String)
 ], UpdateProfileDto.prototype, "displayName", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(100),
+    __metadata("design:type", String)
+], UpdateProfileDto.prototype, "jobRole", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(100),
+    __metadata("design:type", String)
+], UpdateProfileDto.prototype, "experienceLevel", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], UpdateProfileDto.prototype, "onboardingComplete", void 0);
 let AuthController = class AuthController {
     constructor(auth) {
         this.auth = auth;
@@ -43,7 +61,7 @@ let AuthController = class AuthController {
         return { ...profile, roles: user.roles ?? [], accesses: user.accesses ?? [] };
     }
     updateProfile(user, dto) {
-        return this.auth.updateDisplayName(user.id, dto.displayName);
+        return this.auth.updateProfile(user.id, dto);
     }
 };
 exports.AuthController = AuthController;
@@ -56,6 +74,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "login", null);
 __decorate([
+    (0, throttler_1.Throttle)({ global: { ttl: 60_000, limit: 10 } }),
     (0, common_1.Post)('register'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),

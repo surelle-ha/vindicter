@@ -4,8 +4,7 @@ import { Loader2, Save, User, Mail, Shield, Calendar, KeyRound, Pencil, X } from
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'Profile — Vindicter' })
 
-const supabase = useSupabase()
-const { user, isAdmin, init } = useAuth()
+const { user, isAdmin, updateProfile } = useAuth()
 
 const editing   = ref(false)
 const saving    = ref(false)
@@ -16,13 +15,12 @@ const newName   = ref('')
 
 const profile = computed(() => {
   if (!user.value) return null
-  const u = user.value as Record<string, unknown>
-  const meta = u.user_metadata as Record<string, unknown> | undefined
+  const u = user.value
   return {
-    id:          u.id as string,
-    email:       u.email as string,
-    displayName: (meta?.display_name as string) ?? (u.email as string) ?? 'User',
-    createdAt:   u.created_at as string | undefined,
+    id:          u.id,
+    email:       u.email,
+    displayName: u.displayName ?? u.email ?? 'User',
+    createdAt:   u.createdAt,
   }
 })
 
@@ -45,9 +43,7 @@ async function saveProfile() {
   if (!newName.value.trim()) { saveErr.value = 'Name cannot be empty.'; return }
   saving.value = true
   try {
-    const { error } = await supabase.auth.updateUser({ data: { display_name: newName.value.trim() } })
-    if (error) throw error
-    await init()
+    await updateProfile({ displayName: newName.value.trim() })
     editing.value = false
     saveMsg.value = 'Profile updated successfully.'
   } catch (e) {
@@ -63,9 +59,8 @@ async function sendPasswordReset() {
   saveErr.value  = ''
   resetting.value = true
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(profile.value.email)
-    if (error) throw error
-    saveMsg.value = `Password reset link sent to ${profile.value.email}.`
+    // Password reset is handled by the user contacting support; self-service not available via API yet
+    saveMsg.value = `Please contact support to reset your password for ${profile.value?.email}.`
   } catch (e) {
     saveErr.value = e instanceof Error ? e.message : 'Failed to send reset email.'
   } finally {
@@ -79,14 +74,12 @@ function fmt(iso: string) {
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto">
+  <div class="-m-5 mb-0">
+    <PageCover title="My Profile" subtitle="Manage your account information and security settings." :icon="User"
+      icon-bg="rgba(139,92,246,0.25)" icon-color="rgba(167,139,250,0.95)" />
+  </div>
 
-    <!-- Header -->
-    <div class="mb-8">
-      <p class="text-[11px] font-semibold uppercase tracking-[0.25em] mb-1" style="color:rgba(139,92,246,0.70);">Account</p>
-      <h1 class="text-[26px] font-display font-black uppercase tracking-wide" style="color:rgba(255,255,255,0.90);">My Profile</h1>
-      <p class="mt-1 text-[13px]" style="color:rgba(255,255,255,0.40);">Manage your account information and security settings.</p>
-    </div>
+  <div class="max-w-2xl mx-auto">
 
     <!-- Feedback messages -->
     <div v-if="saveMsg" class="mb-4 rounded-xl px-4 py-3 text-[12px]" style="background:rgba(35,165,90,0.08);border:1px solid rgba(35,165,90,0.18);color:rgba(35,165,90,0.85);">

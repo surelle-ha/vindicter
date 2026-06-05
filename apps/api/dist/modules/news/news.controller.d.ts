@@ -3,6 +3,12 @@ export declare class NewsController {
     private readonly newsService;
     constructor(newsService: NewsService);
     getArticles(limit?: string, category?: string): Promise<import("./entities/rss-article.entity").RssArticle[]>;
+    syncArticles(body: {
+        articles: any[];
+    }): Promise<{
+        synced: number;
+        total: number;
+    }>;
     getFeeds(): Promise<import("./entities/rss-feed.entity").RssFeed[]>;
     createFeed(body: {
         name: string;

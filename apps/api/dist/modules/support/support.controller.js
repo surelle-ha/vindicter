@@ -14,6 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SupportController = void 0;
 const common_1 = require("@nestjs/common");
+const throttler_1 = require("@nestjs/throttler");
 const support_service_1 = require("./support.service");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const access_guard_1 = require("../../common/guards/access.guard");
@@ -33,6 +34,7 @@ let SupportController = class SupportController {
 };
 exports.SupportController = SupportController;
 __decorate([
+    (0, throttler_1.Throttle)({ global: { ttl: 60_000, limit: 5 } }),
     (0, common_1.Post)('tickets'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
