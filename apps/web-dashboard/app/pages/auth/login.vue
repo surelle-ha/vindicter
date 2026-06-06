@@ -26,7 +26,10 @@ async function login() {
   loading.value = true
   try {
     const { signIn } = useAuth()
-    const { needsOnboarding } = await signIn(email.value.trim(), password.value)
+    const { needsOnboarding } = await signIn(email.value.trim(), password.value, {
+      turnstileToken: tsToken.value,
+      clientApp: 'web-dashboard',
+    })
     if (needsOnboarding) {
       await router.push('/onboarding')
     } else {
@@ -34,6 +37,7 @@ async function login() {
     }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Unable to login right now.'
+    tsToken.value = ''
   } finally {
     loading.value = false
   }

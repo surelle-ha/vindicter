@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import {
-  Newspaper, Key, User, Users, MessageCircle, Star,
-  PanelLeftClose, LogOut, Loader2, ChevronRight, ChevronDown,
-  LifeBuoy, CreditCard, Rss, GraduationCap,
+  Newspaper, Key, User,
+  PanelLeftClose, LogOut, ChevronRight, ChevronDown,
+  LifeBuoy, GraduationCap,
 } from 'lucide-vue-next'
 
 const route  = useRoute()
@@ -53,14 +53,6 @@ const developerNav = [
   { label: 'API',     to: '/api',     icon: Key },
 ]
 
-const adminNav = [
-  { label: 'Users',           to: '/admin/users',   icon: Users },
-  { label: 'News Management', to: '/admin/news',    icon: Rss },
-  { label: 'Pricing',         to: '/admin/pricing', icon: CreditCard },
-  { label: 'Tickets',         to: '/admin/tickets', icon: MessageCircle },
-  { label: 'Beta Requests',   to: '/admin/beta',    icon: Star },
-]
-
 function active(to: string) {
   return route.path === to || (to !== '/news' && route.path.startsWith(to))
 }
@@ -88,11 +80,6 @@ const pageTitle = computed(() => {
   if (p === '/api')           return 'API & Keys'
   if (p === '/support')       return 'Support'
   if (p === '/profile')       return 'Profile'
-  if (p.startsWith('/admin/users'))   return 'User Management'
-  if (p.startsWith('/admin/news'))    return 'News Management'
-  if (p.startsWith('/admin/pricing')) return 'Pricing'
-  if (p.startsWith('/admin/tickets')) return 'Support Tickets'
-  if (p.startsWith('/admin/beta'))    return 'Beta Requests'
   return 'Dashboard'
 })
 
@@ -203,25 +190,6 @@ const landingUrl = computed(() => {
             <span v-if="!collapsed">{{ item.label }}</span>
           </NuxtLink>
 
-          <!-- Admin -->
-          <template v-if="isAdmin">
-            <div class="h-px mx-1 my-2" style="background:rgba(255,255,255,0.07);" />
-            <p v-if="!collapsed" class="px-2 mb-1 text-[10px] font-semibold uppercase tracking-[0.12em]" style="color:rgba(248,113,113,0.35);">Admin</p>
-            <NuxtLink
-              v-for="item in adminNav"
-              :key="item.to"
-              :to="item.to"
-              class="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer"
-              :class="[
-                collapsed ? 'justify-center' : '',
-                active(item.to) ? 'bg-red-500/10 text-red-400' : 'text-white/35 hover:text-white/70 hover:bg-white/[0.04]',
-              ]"
-              :title="collapsed ? item.label : undefined"
-            >
-              <component :is="item.icon" class="size-3.5 shrink-0" />
-              <span v-if="!collapsed">{{ item.label }}</span>
-            </NuxtLink>
-          </template>
         </nav>
 
         <!-- ── Sidebar footer ───────────────────────────────────────────── -->
