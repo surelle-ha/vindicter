@@ -2,6 +2,7 @@
 import {
   Building2, Crown, Shield, Users, FolderOpen, CreditCard,
   Loader2, RefreshCw, UserPlus, X, CheckCircle2, Mail, UserMinus,
+  Pencil, Check,
 } from 'lucide-vue-next'
 
 definePageMeta({ layout: 'dashboard' })
@@ -108,6 +109,32 @@ async function respond(invId: string, action: 'accept' | 'decline') {
     pendingInvites.value = pendingInvites.value.filter(i => i.id !== invId)
     if (action === 'accept') await fetchWorkspaces()
   } finally { respondingId.value = null }
+}
+
+// ── Rename workspace ───────────────────────────────────────────────────────
+const editingName = ref(false)
+const editName    = ref('')
+const renaming    = ref(false)
+const renameErr   = ref('')
+
+function startRename() {
+  editName.value   = active.value?.name ?? ''
+  renameErr.value  = ''
+  editingName.value = true
+}
+
+async function saveRename() {
+  const name = editName.value.trim()
+  if (!name || !activeId.value) return
+  renaming.value = true; renameErr.value = ''
+  try {
+    const updated = await api.patch<Workspace>(`/workspaces/${activeId.value}`, { name })
+    const idx = workspaces.value.findIndex(w => w.id === activeId.value)
+    if (idx !== -1) workspaces.value[idx] = { ...workspaces.value[idx]!, ...updated }
+    editingName.value = false
+  } catch (e) {
+    renameErr.value = e instanceof Error ? e.message : 'Failed to rename workspace.'
+  } finally { renaming.value = false }
 }
 
 // ── Remove member ──────────────────────────────────────────────────────────
@@ -217,7 +244,44 @@ onMounted(fetchWorkspaces)
 
           <!-- Header -->
           <div class="rounded-xl p-5" style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);">
-            <h2 class="text-[18px] font-display font-black uppercase tracking-wide" style="color:rgba(255,255,255,0.88);">{{ active.name }}</h2>
+            <!-- Rename mode -->
+            <div v-if="editingName" class="flex items-center gap-2">
+              <input
+                v-model="editName"
+                class="flex-1 rounded-lg px-3 py-1.5 text-[15px] font-bold outline-none transition-colors"
+                style="background:rgba(255,255,255,0.05);border:1px solid rgba(139,92,246,0.30);color:rgba(255,255,255,0.88);"
+                autofocus
+                @keydown.enter="saveRename"
+                @keydown.esc="editingName = false"
+              />
+              <button
+                :disabled="!editName.trim() || renaming"
+                class="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-40"
+                style="background:rgba(139,92,246,0.70);color:white;"
+                @click="saveRename"
+              >
+                <Loader2 v-if="renaming" class="h-3 w-3 animate-spin" />
+                <Check v-else class="h-3 w-3" />
+                Save
+              </button>
+              <button class="rounded-lg p-1.5 transition-colors cursor-pointer" style="color:rgba(255,255,255,0.30);" @click="editingName = false">
+                <X class="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <!-- View mode -->
+            <div v-else class="flex items-center gap-2 group">
+              <h2 class="text-[18px] font-display font-black uppercase tracking-wide" style="color:rgba(255,255,255,0.88);">{{ active.name }}</h2>
+              <button
+                v-if="active.memberRole && ['owner','admin'].includes(active.memberRole)"
+                class="opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-md p-1 transition-all cursor-pointer"
+                style="color:rgba(255,255,255,0.30);"
+                title="Rename workspace"
+                @click="startRename"
+              >
+                <Pencil class="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <p v-if="renameErr" class="mt-1 text-[11px]" style="color:rgba(242,63,66,0.80);">{{ renameErr }}</p>
             <p class="text-[11px] mt-1" style="color:rgba(255,255,255,0.28);">Created {{ fmt(active.createdAt) }}</p>
           </div>
 

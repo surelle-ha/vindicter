@@ -9,6 +9,7 @@ import {
   Github,
   House,
   KeyRound,
+  LogOut,
   Moon,
   PackageSearch,
   PanelLeftClose,
@@ -141,6 +142,12 @@ function toggleProjectTool(item: ProjectToolItem) {
 watch(() => route.fullPath, () => {
   projectSelectorOpen.value = false
 })
+
+async function handleLogout() {
+  await auth.logoutApi()
+  await auth.logoutGitHub()
+  void router.push('/login')
+}
 </script>
 
 <template>
@@ -425,5 +432,17 @@ watch(() => route.fullPath, () => {
       <Settings class="size-3.5 shrink-0" />
       <span v-if="!collapsed" class="text-xs">Settings</span>
     </NuxtLink>
+
+    <!-- Sign out (only when API auth is active) -->
+    <button
+      v-if="auth.isApiAuthenticated"
+      class="h-9 flex items-center gap-2 px-3 border-t border-[var(--border)] text-[var(--text-faint)] hover:text-red-400 hover:bg-red-500/[0.04] transition-colors cursor-pointer"
+      :class="collapsed ? 'justify-center' : ''"
+      title="Sign out"
+      @click="handleLogout"
+    >
+      <LogOut class="size-3.5 shrink-0" />
+      <span v-if="!collapsed" class="text-xs">Sign out</span>
+    </button>
   </aside>
 </template>

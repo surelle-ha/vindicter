@@ -18,8 +18,6 @@ import { MarketingTemplate } from '../modules/marketing/entities/marketing-templ
 import { MarketingSendEvent } from '../modules/marketing/entities/marketing-send-event.entity'
 import { AcademyProgress } from '../modules/academy/entities/academy-progress.entity'
 import { AcademyChatSession } from '../modules/academy/entities/academy-chat-session.entity'
-import { DefendCoreConfig } from '../modules/defendcore/entities/defendcore-config.entity'
-import { KnowledgeDocument } from '../modules/defendcore/entities/knowledge-document.entity'
 import { CorsOrigin } from '../modules/cors/entities/cors-origin.entity'
 import { PricingPlan } from '../modules/pricing/entities/pricing-plan.entity'
 import { Workspace } from '../modules/workspaces/entities/workspace.entity'
@@ -47,7 +45,7 @@ export const databaseConfig = (): TypeOrmModuleOptions => {
       MarketingSegment, MarketingContact, MarketingCampaign,
       MarketingTemplate, MarketingSendEvent,
       AcademyProgress, AcademyChatSession,
-      DefendCoreConfig, KnowledgeDocument, CorsOrigin,
+      CorsOrigin,
       PricingPlan, Workspace, WorkspaceMember, WorkspaceInvitation, Subscription,
     ],
     migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
