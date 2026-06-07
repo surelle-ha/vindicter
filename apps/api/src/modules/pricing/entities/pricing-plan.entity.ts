@@ -14,6 +14,12 @@ export class PricingPlan {
   @Column({ name: 'token_limit', default: 0 })
   tokenLimit: number
 
+  @Column({ name: 'seat_limit', default: 1 })
+  seatLimit: number
+
+  @Column({ name: 'project_limit', default: 3 })
+  projectLimit: number
+
   @Column({ name: 'price_usd', type: 'numeric', precision: 8, scale: 2, default: 0 })
   priceUsd: number
 

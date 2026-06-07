@@ -31,6 +31,14 @@ __decorate([
     __metadata("design:type", Number)
 ], PricingPlan.prototype, "tokenLimit", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'seat_limit', default: 1 }),
+    __metadata("design:type", Number)
+], PricingPlan.prototype, "seatLimit", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'project_limit', default: 3 }),
+    __metadata("design:type", Number)
+], PricingPlan.prototype, "projectLimit", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'price_usd', type: 'numeric', precision: 8, scale: 2, default: 0 }),
     __metadata("design:type", Number)
 ], PricingPlan.prototype, "priceUsd", void 0);

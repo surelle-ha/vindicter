@@ -3,14 +3,14 @@ import { HelpCircle } from 'lucide-vue-next'
 
 useLandingSeo({
   title: 'FAQ - Vindicter',
-  description: 'Common questions about Vindicter, local-first security review, beta access, AI providers, and support.',
+  description: 'Common questions about Vindicter, AI-powered security review, beta access, AI providers, and support.',
   path: '/faq',
 })
 
 const faqs = [
   {
     question: 'What is Vindicter?',
-    answer: 'Vindicter is a local-first desktop workspace for AI-assisted security review, vulnerability tracking, dependency inventory, secret checks, and security learning.',
+    answer: 'Vindicter is an AI-powered security platform for teams — automating vulnerability scanning, finding tracking, dependency inventory, secret detection, and security learning.',
   },
   {
     question: 'Is Vindicter free during beta?',
@@ -18,7 +18,7 @@ const faqs = [
   },
   {
     question: 'Does my code leave my machine?',
-    answer: 'Vindicter is designed around local-first workflows. Local files and project data stay on your machine unless you explicitly connect an external AI provider and send selected context to that provider.',
+    answer: 'Vindicter sends only the project context you explicitly select to your configured AI provider. Your source files are never uploaded — only the prompts you construct are forwarded.',
   },
   {
     question: 'Which operating systems are supported?',

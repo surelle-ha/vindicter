@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { Check, Loader2, Pencil, Plus, RefreshCw, Search, Trash2, UserPlus, UsersRound, X } from 'lucide-vue-next'
 import { useMarketingStore, type Contact } from '~/stores/marketing'
@@ -406,3 +406,4 @@ async function deleteContact(contact: Contact) {
     </section>
   </div>
 </template>
+

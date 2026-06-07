@@ -17,6 +17,7 @@ const projects = useProjectsStore()
 const app = useAppStore()
 const security = useSecurityStore()
 const wizard = useWizardStore()
+const auth = useAuthStore()
 const feed = useNotificationFeedStore()
 const { createProject } = useVindicterJson()
 const { notify } = useNotifications()
@@ -213,6 +214,15 @@ async function loadSecurityNews(forceRefresh = false) {
 
 async function handleFinish() {
   if (!wizard.selectedPath || !wizard.projectName) return
+
+  const sub = auth.activeWorkspace?.subscription
+  const projectLimit = sub?.projectLimit ?? -1
+  if (projectLimit !== -1 && projects.projects.length >= projectLimit) {
+    const planName = sub?.plan?.name ?? 'your current plan'
+    notify(`Project limit reached (${planName}: ${projectLimit} projects). Upgrade to add more.`, 'error')
+    wizard.closeWizard()
+    return
+  }
 
   const data = await createProject(wizard.selectedPath, {
     name: wizard.projectName,

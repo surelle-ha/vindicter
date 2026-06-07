@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
   Megaphone, SquarePen, History, UsersRound,
-  Users, MessageCircle, Star, Rss, Globe, Cpu,
+  Users, MessageCircle, Star, Rss, Globe, Cpu, Building2,
   PanelLeftClose, LogOut, ChevronRight, ChevronDown, User,
 } from 'lucide-vue-next'
 
@@ -54,6 +54,7 @@ const marketingNav = [
 
 const adminNav = [
   { label: 'Users',         to: '/admin/users',       icon: Users },
+  { label: 'Workspaces',    to: '/admin/workspaces',  icon: Building2 },
   { label: 'Tickets',       to: '/admin/tickets',     icon: MessageCircle },
   { label: 'Beta Requests', to: '/admin/beta',         icon: Star },
   { label: 'News Feeds',    to: '/admin/news',         icon: Rss },
@@ -67,7 +68,8 @@ function active(to: string) {
 
 const displayName = computed(() => {
   if (!user.value) return 'User'
-  return user.value.displayName ?? user.value.email ?? 'User'
+  const parts = [user.value.firstName, user.value.lastName].filter(Boolean)
+  return parts.length ? parts.join(' ') : (user.value.email ?? 'User')
 })
 const userEmail = computed(() => user.value?.email ?? '')
 const initials  = computed(() =>
@@ -98,14 +100,14 @@ const currentYear = new Date().getFullYear()
     <!-- Background -->
     <div class="pointer-events-none fixed inset-0 -z-10" aria-hidden="true">
       <div class="absolute inset-0" style="background:#111215;" />
-      <div style="position:absolute;width:600px;height:600px;border-radius:50%;filter:blur(130px);background:radial-gradient(circle,#3730a3 0%,transparent 70%);top:-220px;left:-120px;opacity:0.07;" />
-      <div style="position:absolute;width:400px;height:400px;border-radius:50%;filter:blur(130px);background:radial-gradient(circle,#4c1d95 0%,transparent 70%);bottom:-120px;right:-80px;opacity:0.05;" />
+      <div style="position:absolute;width:600px;height:600px;border-radius:50%;filter:blur(130px);background:radial-gradient(circle,#92400e 0%,transparent 70%);top:-220px;left:-120px;opacity:0.07;" />
+      <div style="position:absolute;width:400px;height:400px;border-radius:50%;filter:blur(130px);background:radial-gradient(circle,#78350f 0%,transparent 70%);bottom:-120px;right:-80px;opacity:0.05;" />
     </div>
 
     <!-- Auth checking -->
     <div v-if="dashState === 'checking'" class="flex flex-1 flex-col items-center justify-center gap-6">
       <div class="fixed inset-x-0 top-0 h-0.5 overflow-hidden" style="background:rgba(255,255,255,0.06);">
-        <div class="h-full animate-pulse" style="background:rgba(139,92,246,0.70);width:60%;" />
+        <div class="h-full animate-pulse" style="background:rgba(245,158,11,0.70);width:60%;" />
       </div>
       <img src="/icon.png" alt="" class="h-11 w-11 opacity-45" />
       <div class="text-center">
@@ -185,10 +187,10 @@ const currentYear = new Date().getFullYear()
         <!-- Sidebar footer -->
         <div class="shrink-0 p-2" style="border-top:1px solid rgba(255,255,255,0.06);">
           <template v-if="!collapsed">
-            <div class="rounded-lg px-3 py-2.5" style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.12);">
+            <div class="rounded-lg px-3 py-2.5" style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.12);">
               <div class="flex items-center justify-between gap-2 mb-1">
-                <span class="text-[10px] font-bold uppercase tracking-wider" style="color:rgba(139,92,246,0.65);">Vindicter</span>
-                <span class="text-[9px] font-semibold rounded-full px-1.5 py-0.5" style="background:rgba(139,92,246,0.15);color:rgba(167,139,250,0.80);">Admin</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider" style="color:rgba(245,158,11,0.65);">Vindicter</span>
+                <span class="text-[9px] font-semibold rounded-full px-1.5 py-0.5" style="background:rgba(245,158,11,0.15);color:rgba(251,191,36,0.90);">Admin</span>
               </div>
               <p class="text-[10px] leading-relaxed" style="color:rgba(255,255,255,0.22);">Internal admin & marketing panel.</p>
             </div>
@@ -207,7 +209,7 @@ const currentYear = new Date().getFullYear()
         <!-- Topbar -->
         <header class="h-11 shrink-0 flex items-center justify-between px-5" style="border-bottom:1px solid rgba(255,255,255,0.07);background:rgba(17,18,21,0.95);">
           <div class="flex items-center gap-1.5 text-[11px]" style="color:rgba(255,255,255,0.28);">
-            <span style="color:rgba(139,92,246,0.45);">admin</span>
+            <span style="color:rgba(245,158,11,0.55);">admin</span>
             <ChevronRight class="size-3 shrink-0" />
             <span class="font-semibold" style="color:rgba(255,255,255,0.68);">{{ pageTitle }}</span>
           </div>
@@ -215,7 +217,7 @@ const currentYear = new Date().getFullYear()
           <!-- User menu -->
           <div ref="userMenuRef" class="relative">
             <button class="flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 transition-colors hover:bg-white/[0.05] cursor-pointer" @click.stop="userMenuOpen = !userMenuOpen">
-              <div class="h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0" style="background:rgba(139,92,246,0.20);border:1.5px solid rgba(139,92,246,0.40);color:rgba(167,139,250,0.95);">
+              <div class="h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0" style="background:rgba(245,158,11,0.18);border:1.5px solid rgba(245,158,11,0.38);color:rgba(251,191,36,0.95);">
                 {{ initials }}
               </div>
               <div class="hidden sm:block text-left">
@@ -230,7 +232,7 @@ const currentYear = new Date().getFullYear()
                 <div class="px-3.5 py-3" style="border-bottom:1px solid rgba(255,255,255,0.07);">
                   <p class="text-[12px] font-semibold truncate" style="color:rgba(255,255,255,0.80);">{{ displayName }}</p>
                   <p class="text-[10px] mt-0.5 truncate" style="color:rgba(255,255,255,0.28);">{{ userEmail }}</p>
-                  <span class="mt-1.5 inline-block rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider" style="background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.25);color:rgba(167,139,250,0.90);">
+                  <span class="mt-1.5 inline-block rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider" style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.25);color:rgba(251,191,36,0.90);">
                     {{ isAdmin ? 'Admin' : 'Internal' }}
                   </span>
                 </div>

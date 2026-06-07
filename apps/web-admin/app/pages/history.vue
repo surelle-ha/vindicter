@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { AlertTriangle, CheckCircle2, History, MailCheck, Search, TestTube2 } from 'lucide-vue-next'
 import { useMarketingStore } from '~/stores/marketing'
@@ -186,3 +186,4 @@ function kindLabel(value: string) {
     </div>
   </div>
 </template>
+

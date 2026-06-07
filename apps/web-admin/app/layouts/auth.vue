@@ -27,7 +27,7 @@ const features = [
         </ClientOnly>
       </div>
       <div class="absolute inset-0" style="background:linear-gradient(135deg,rgba(17,18,21,0.80) 0%,rgba(17,18,21,0.50) 55%,transparent 100%);" />
-      <div class="absolute inset-0" style="background:radial-gradient(circle at 20% 25%,rgba(139,92,246,0.22),transparent 55%);" />
+      <div class="absolute inset-0" style="background:radial-gradient(circle at 20% 25%,rgba(245,158,11,0.22),transparent 55%);" />
 
       <div class="relative z-10 flex flex-col h-full p-10">
         <div class="flex items-center gap-3" style="color:rgba(255,255,255,0.85);">
@@ -37,15 +37,15 @@ const features = [
 
         <div class="flex-1 flex flex-col justify-center gap-8">
           <div>
-            <p class="text-[10px] font-semibold uppercase tracking-[0.28em] mb-3" style="color:rgba(139,92,246,0.70);">Internal Portal</p>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.28em] mb-3" style="color:rgba(245,158,11,0.70);">Internal Portal</p>
             <h2 class="font-display text-[30px] font-black uppercase leading-[1.1]" style="color:rgba(255,255,255,0.92);">
               Admin &<br />Marketing<br />Panel
             </h2>
           </div>
           <div class="space-y-5">
             <div v-for="f in features" :key="f.label" class="flex items-start gap-3.5">
-              <div class="shrink-0 mt-0.5 h-7 w-7 rounded-lg flex items-center justify-center" style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.22);">
-                <component :is="f.icon" class="h-3.5 w-3.5" style="color:rgba(139,92,246,0.80);" />
+              <div class="shrink-0 mt-0.5 h-7 w-7 rounded-lg flex items-center justify-center" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.22);">
+                <component :is="f.icon" class="h-3.5 w-3.5" style="color:rgba(245,158,11,0.80);" />
               </div>
               <div>
                 <p class="text-[12px] font-semibold" style="color:rgba(255,255,255,0.80);">{{ f.label }}</p>

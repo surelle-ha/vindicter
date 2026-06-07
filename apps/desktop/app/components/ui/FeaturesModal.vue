@@ -66,7 +66,7 @@ const features = [
   <GlassModal :model-value="show" title="Welcome to Vindicter" max-width="lg" @update:model-value="close">
     <div class="space-y-5">
       <p class="text-sm leading-relaxed text-[var(--text-muted)]">
-        Vindicter is a local-first AI-powered security analysis tool. Here's everything you can do:
+        Vindicter is an AI-powered security platform. Here's everything you can do:
       </p>
 
       <div class="grid gap-3 sm:grid-cols-2">

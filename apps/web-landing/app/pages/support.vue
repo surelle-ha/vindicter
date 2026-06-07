@@ -113,7 +113,7 @@ async function submitSupport() {
             <div>
               <h2 class="text-[16px] font-bold text-white">Has this already been answered?</h2>
               <p class="mt-1 text-[13px] leading-relaxed text-white/45">
-                Many setup, scanning, beta, and local-first questions are covered in the documentation or FAQ.
+                Many setup, scanning, beta, and account questions are covered in the documentation or FAQ.
               </p>
             </div>
           </div>

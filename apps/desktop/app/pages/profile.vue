@@ -1,31 +1,79 @@
 <script setup lang="ts">
-import { Activity, BookOpenCheck, Github, GraduationCap, LogIn, LogOut, MapPin, RotateCcw, UserCircle2 } from 'lucide-vue-next'
-import { LESSONS, TOTAL_DAYS } from '~/data/curriculum'
+import {
+  Activity, AlertTriangle, CheckCircle2, Github, LogIn, LogOut,
+  RotateCcw, ShieldCheck, ShieldX, Pencil, X, Loader2,
+} from 'lucide-vue-next'
 import { useAuthStore } from '~/stores/auth'
 
-const user = useUserStore()
-const academy = useAcademyStore()
-const auth = useAuthStore()
-const router = useRouter()
+const user     = useUserStore()
+const security = useSecurityStore()
+const auth     = useAuthStore()
+const router   = useRouter()
 
-const name = ref(user.name)
-const email = ref(user.email)
-const jobRole = ref(user.jobRole || 'Security Practitioner')
+// ── API profile edit ────────────────────────────────────────────────────────
+const editing       = ref(false)
+const saving        = ref(false)
+const saveErr       = ref('')
+const saveOk        = ref(false)
 
-const roles = ['Security Practitioner', 'Developer', 'DevSecOps', 'Pentester', 'Blue Team Analyst', 'Security Engineer', 'Tech Lead', 'Other']
-const saved = ref(false)
+const editFirstName = ref('')
+const editLastName  = ref('')
+const editJobRole   = ref('')
 
-async function saveProfile() {
-  await user.save({ name: name.value.trim(), email: email.value.trim(), jobRole: jobRole.value })
-  saved.value = true
-  setTimeout(() => { saved.value = false }, 2000)
+const jobRoles = [
+  'Security Practitioner', 'Developer', 'DevSecOps', 'Pentester',
+  'Blue Team Analyst', 'Security Engineer', 'Tech Lead', 'Other',
+]
+
+function startEdit() {
+  editFirstName.value = auth.apiUser?.firstName ?? ''
+  editLastName.value  = auth.apiUser?.lastName  ?? ''
+  editJobRole.value   = auth.apiUser?.jobRole   ?? jobRoles[0]!
+  saveErr.value = ''
+  editing.value = true
 }
 
-const initials = computed(() => {
-  const n = (name.value || user.name || 'U').trim()
-  return n.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+function cancelEdit() {
+  editing.value = false
+  saveErr.value = ''
+}
+
+async function saveProfile() {
+  if (!auth.apiToken) return
+  saving.value = true; saveErr.value = ''
+  try {
+    const { apiUpdateProfile } = await import('~/composables/useDesktopAuth')
+    const updated = await apiUpdateProfile(auth.apiToken, {
+      firstName: editFirstName.value.trim() || undefined,
+      lastName:  editLastName.value.trim()  || undefined,
+      jobRole:   editJobRole.value          || undefined,
+    })
+    auth.apiUser = updated
+    await auth._persist()
+    saveOk.value  = true
+    editing.value = false
+    setTimeout(() => { saveOk.value = false }, 2000)
+  } catch (e) {
+    saveErr.value = e instanceof Error ? e.message : 'Failed to save.'
+  } finally { saving.value = false }
+}
+
+// ── Derived display values ──────────────────────────────────────────────────
+const displayName = computed(() => {
+  if (auth.apiUser) {
+    const parts = [auth.apiUser.firstName, auth.apiUser.lastName].filter(Boolean)
+    return parts.length ? parts.join(' ') : auth.apiUser.email
+  }
+  return user.name || 'User'
 })
 
+const displayEmail = computed(() => auth.apiUser?.email ?? user.email ?? '')
+
+const initials = computed(() =>
+  displayName.value.split(' ').map((w: string) => w[0] ?? '').join('').slice(0, 2).toUpperCase()
+)
+
+// ── AI usage ────────────────────────────────────────────────────────────────
 const tokenUsage = computed(() => user.tokenUsage)
 const formattedTotalTokens = computed(() => tokenUsage.value.totalTokens.toLocaleString())
 const lastTokenUse = computed(() => {
@@ -33,28 +81,46 @@ const lastTokenUse = computed(() => {
   return new Date(tokenUsage.value.lastUsedAt).toLocaleString()
 })
 
-const academyProgress = computed(() => academy.progressPercent)
-const totalLessons = TOTAL_DAYS
-const lastLesson = computed(() => {
-  if (academy.lastVisitedLessonId) {
-    return LESSONS.find(lesson => lesson.id === academy.lastVisitedLessonId) ?? null
-  }
-  return LESSONS.find(lesson => !academy.isCompleted(lesson.id)) ?? LESSONS[0] ?? null
+// ── Security stats ──────────────────────────────────────────────────────────
+const totalFindings    = computed(() => security.findings.length)
+const openFindings     = computed(() => security.findings.filter(f => f.status === 'open').length)
+const resolvedFindings = computed(() => security.findings.filter(f => f.status === 'resolved').length)
+const criticalFindings = computed(() => security.findings.filter(f => f.severity === 'critical').length)
+const highFindings     = computed(() => security.findings.filter(f => f.severity === 'high').length)
+const latestScan       = computed(() => security.latestScan)
+
+const securityHealthLabel = computed(() => {
+  if (!totalFindings.value) return 'No findings'
+  if (criticalFindings.value > 0) return 'Critical issues'
+  if (highFindings.value > 0) return 'High risk'
+  if (openFindings.value > 0) return 'Needs attention'
+  return 'Looking good'
 })
-const completedLessons = computed(() => academy.completedCount)
-const academyStatus = computed(() => {
-  if (academy.allCompleted) return 'Completed'
-  if (completedLessons.value > 0) return 'In progress'
-  return 'Ready to begin'
+const securityHealthColor = computed(() => {
+  if (!totalFindings.value || openFindings.value === 0) return 'text-emerald-300'
+  if (criticalFindings.value > 0) return 'text-red-300'
+  if (highFindings.value > 0) return 'text-orange-300'
+  return 'text-amber-300'
 })
+
 onMounted(async () => {
-  void academy.loadFromDisk()
   await auth.load()
+  await security.load()
+  if (auth.apiToken) {
+    try {
+      const { apiFetchMe } = await import('~/composables/useDesktopAuth')
+      const fresh = await apiFetchMe(auth.apiToken)
+      auth.apiUser = fresh
+      await auth._persist()
+    } catch { /* token may be expired; display what we have */ }
+  }
 })
 </script>
 
 <template>
   <div class="mx-auto max-w-5xl px-4 py-6 space-y-6">
+
+    <!-- Cover + avatar -->
     <section class="isolate overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
       <div class="relative z-0 h-52 overflow-hidden">
         <Dither
@@ -80,10 +146,21 @@ onMounted(async () => {
             </div>
           </div>
           <div class="min-w-0 flex-1 pb-1">
-            <h1 class="truncate text-2xl font-bold text-[var(--text)]">{{ user.name || 'No name set' }}</h1>
-            <p class="truncate text-sm text-[var(--text-muted)]">{{ user.email || 'No email set' }}</p>
+            <div class="flex items-center gap-2">
+              <h1 class="truncate text-2xl font-bold text-[var(--text)]">{{ displayName }}</h1>
+              <button
+                v-if="auth.isApiAuthenticated && !editing"
+                class="shrink-0 rounded-lg p-1 transition-colors hover:bg-white/[0.06] text-[var(--text-faint)] hover:text-[var(--text-muted)] cursor-pointer"
+                title="Edit profile"
+                @click="startEdit"
+              >
+                <Pencil class="size-3.5" />
+              </button>
+              <span v-if="saveOk" class="text-[11px] text-emerald-400">Saved!</span>
+            </div>
+            <p class="truncate text-sm text-[var(--text-muted)]">{{ displayEmail }}</p>
             <div class="mt-2 flex flex-wrap items-center gap-2">
-              <GlassBadge variant="purple">{{ user.jobRole || 'Developer' }}</GlassBadge>
+              <GlassBadge variant="purple">{{ auth.apiUser?.jobRole || user.jobRole || 'Developer' }}</GlassBadge>
               <GlassBadge variant="info">{{ tokenUsage.runs }} AI run{{ tokenUsage.runs !== 1 ? 's' : '' }}</GlassBadge>
             </div>
           </div>
@@ -121,32 +198,50 @@ onMounted(async () => {
       </div>
     </section>
 
+    <!-- Edit panel (shown inline when editing) -->
+    <Transition
+      enter-active-class="transition-all duration-200"
+      enter-from-class="opacity-0 -translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
+    >
+      <div v-if="editing" class="rounded-xl border border-indigo-500/20 bg-indigo-500/[0.05] p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="text-sm font-semibold text-[var(--text)]">Edit Profile</p>
+          <button class="rounded-lg p-1 text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors cursor-pointer" @click="cancelEdit">
+            <X class="size-4" />
+          </button>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-[var(--text-muted)] mb-1.5 block">First name</label>
+            <GlassInput v-model="editFirstName" placeholder="First name" />
+          </div>
+          <div>
+            <label class="text-xs text-[var(--text-muted)] mb-1.5 block">Last name</label>
+            <GlassInput v-model="editLastName" placeholder="Last name" />
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-[var(--text-muted)] mb-1.5 block">Role</label>
+          <GlassSelect v-model="editJobRole" class="w-full">
+            <option v-for="r in jobRoles" :key="r" :value="r">{{ r }}</option>
+          </GlassSelect>
+        </div>
+        <p v-if="saveErr" class="text-[11px] text-red-400">{{ saveErr }}</p>
+        <div class="flex gap-2">
+          <GlassButton size="sm" :disabled="saving" @click="saveProfile">
+            <Loader2 v-if="saving" class="size-3.5 animate-spin" />
+            {{ saving ? 'Saving…' : 'Save changes' }}
+          </GlassButton>
+          <GlassButton variant="ghost" size="sm" @click="cancelEdit">Cancel</GlassButton>
+        </div>
+      </div>
+    </Transition>
+
     <div class="grid gap-6 lg:grid-cols-[20rem_1fr]">
       <aside class="space-y-6">
-        <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 space-y-4">
-          <div>
-            <p class="text-sm font-semibold text-[var(--text)]">Edit Profile</p>
-            <p class="mt-0.5 text-xs text-[var(--text-muted)]">This identity stays local until sign-in is ready.</p>
-          </div>
-          <div>
-            <label class="text-xs text-[var(--text-muted)] mb-1.5 block">Name</label>
-            <GlassInput v-model="name" placeholder="Your name" @keydown.enter="saveProfile" />
-          </div>
-          <div>
-            <label class="text-xs text-[var(--text-muted)] mb-1.5 block">Email</label>
-            <GlassInput v-model="email" placeholder="you@example.com" type="email" />
-          </div>
-          <div>
-            <label class="text-xs text-[var(--text-muted)] mb-1.5 block">Role</label>
-            <GlassSelect v-model="jobRole" class="w-full">
-              <option v-for="r in roles" :key="r" :value="r">{{ r }}</option>
-            </GlassSelect>
-          </div>
-          <GlassButton size="sm" @click="saveProfile">
-            {{ saved ? 'Saved!' : 'Save changes' }}
-          </GlassButton>
-        </div>
 
+        <!-- AI Usage -->
         <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 space-y-3">
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-2">
@@ -183,45 +278,56 @@ onMounted(async () => {
       </aside>
 
       <main class="space-y-6">
+        <!-- Security Overview -->
         <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 space-y-4">
           <div class="flex items-start justify-between gap-3">
             <div class="flex items-center gap-2">
-              <GraduationCap class="size-4 text-indigo-300" />
+              <ShieldCheck class="size-4 text-violet-300" />
               <div>
-                <p class="text-sm font-semibold text-[var(--text)]">Academy Progress</p>
-                <p class="text-xs text-[var(--text-muted)] mt-0.5">{{ academyStatus }}</p>
+                <p class="text-sm font-semibold text-[var(--text)]">Security Overview</p>
+                <p class="text-xs text-[var(--text-muted)] mt-0.5" :class="securityHealthColor">{{ securityHealthLabel }}</p>
               </div>
             </div>
-            <GlassBadge variant="info">{{ completedLessons }}/{{ totalLessons }}</GlassBadge>
+            <GlassBadge variant="purple">{{ totalFindings }} finding{{ totalFindings !== 1 ? 's' : '' }}</GlassBadge>
           </div>
 
-          <div>
-            <div class="flex items-center justify-between text-[10px] text-[var(--text-faint)]">
-              <span>Overall progress</span>
-              <span>{{ academyProgress }}%</span>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="rounded-lg border border-red-500/20 bg-red-500/[0.04] px-3 py-2">
+              <p class="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">Open</p>
+              <p class="text-lg font-semibold" :class="openFindings > 0 ? 'text-red-300' : 'text-[var(--text)]'">{{ openFindings }}</p>
             </div>
-            <div class="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-              <div class="h-full rounded-full bg-gradient-to-r from-indigo-400 via-violet-400 to-emerald-400" :style="{ width: `${academyProgress}%` }" />
+            <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] px-3 py-2">
+              <p class="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">Resolved</p>
+              <p class="text-lg font-semibold text-emerald-300">{{ resolvedFindings }}</p>
+            </div>
+            <div class="rounded-lg border border-orange-500/20 bg-orange-500/[0.04] px-3 py-2">
+              <p class="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">Critical</p>
+              <p class="text-lg font-semibold" :class="criticalFindings > 0 ? 'text-red-300' : 'text-[var(--text)]'">{{ criticalFindings }}</p>
+            </div>
+            <div class="rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-3 py-2">
+              <p class="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">High</p>
+              <p class="text-lg font-semibold" :class="highFindings > 0 ? 'text-orange-300' : 'text-[var(--text)]'">{{ highFindings }}</p>
             </div>
           </div>
 
           <div class="rounded-lg border border-[var(--border)] bg-black/10 p-3">
             <div class="flex items-start gap-2">
-              <MapPin class="mt-0.5 size-3.5 shrink-0 text-emerald-300" />
+              <CheckCircle2 v-if="!openFindings" class="mt-0.5 size-3.5 shrink-0 text-emerald-300" />
+              <AlertTriangle v-else class="mt-0.5 size-3.5 shrink-0 text-amber-300" />
               <div class="min-w-0">
-                <p class="text-xs font-semibold text-[var(--text)]">Where you left off</p>
-                <p class="mt-1 truncate text-sm text-[var(--text)]">{{ lastLesson ? `Lesson ${lastLesson.day}: ${lastLesson.title}` : 'Academy not started yet' }}</p>
-                <p class="mt-1 text-[11px] text-[var(--text-muted)]">{{ lastLesson?.duration ?? 'Start the first lesson whenever you are ready.' }}</p>
+                <p class="text-xs font-semibold text-[var(--text)]">Last scan</p>
+                <p class="mt-1 text-[11px] text-[var(--text-muted)]">
+                  {{ latestScan ? new Date(latestScan.scannedAt).toLocaleString() : 'No scan has been run yet.' }}
+                </p>
               </div>
             </div>
           </div>
 
-          <GlassButton size="sm" @click="router.push('/academy')">
-            <BookOpenCheck class="size-3.5" />
-            Continue Academy
+          <GlassButton size="sm" @click="router.push('/security')">
+            <ShieldX class="size-3.5" />
+            Open Workspace
           </GlassButton>
         </div>
-
       </main>
     </div>
   </div>

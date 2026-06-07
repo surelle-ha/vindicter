@@ -3,7 +3,8 @@ import { getStoredToken, setStoredToken } from './useApi'
 interface ApiUser {
   id: string
   email: string
-  displayName: string | null
+  firstName: string | null
+  lastName: string | null
   jobRole: string | null
   experienceLevel: string | null
   onboardingComplete: boolean
@@ -35,8 +36,7 @@ export const useAuth = () => {
 
   async function signIn(email: string, password: string, opts?: { turnstileToken?: string; clientApp?: string }): Promise<{ needsOnboarding: boolean }> {
     const res = await api.post<{ access_token: string }>('/auth/login', {
-      email,
-      password,
+      email, password,
       turnstileToken: opts?.turnstileToken,
       clientApp:      opts?.clientApp,
     })
@@ -47,9 +47,12 @@ export const useAuth = () => {
     return { needsOnboarding: !me?.onboardingComplete }
   }
 
-  async function signUp(email: string, password: string, displayName?: string, opts?: { turnstileToken?: string }): Promise<void> {
+  async function signUp(email: string, password: string, opts?: { firstName?: string; lastName?: string; turnstileToken?: string }): Promise<void> {
     const res = await api.post<{ access_token: string }>('/auth/register', {
-      email, password, displayName, turnstileToken: opts?.turnstileToken,
+      email, password,
+      firstName:      opts?.firstName,
+      lastName:       opts?.lastName,
+      turnstileToken: opts?.turnstileToken,
     })
     setStoredToken(res.access_token)
     const me = await api.get<ApiUser>('/auth/me')
@@ -64,7 +67,8 @@ export const useAuth = () => {
   }
 
   async function updateProfile(patch: {
-    displayName?: string
+    firstName?: string
+    lastName?: string
     jobRole?: string
     experienceLevel?: string
     onboardingComplete?: boolean

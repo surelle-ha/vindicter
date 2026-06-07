@@ -1,7 +1,7 @@
 <script setup lang="ts">
 useLandingSeo({
   title: 'Vindicter Privacy Policy',
-  description: 'Learn how Vindicter handles privacy with local-first storage, no telemetry, no accounts, no analytics, and transparent external AI provider calls.',
+  description: 'Learn how Vindicter handles privacy — account data, AI provider calls, minimal telemetry, and transparent data practices.',
   path: '/privacy',
 })
 
@@ -34,7 +34,7 @@ const lastUpdated = 'May 28, 2026'
             <div>
               <p class="text-[14px] font-bold text-white mb-1">The short version</p>
               <p class="text-[13px] leading-relaxed text-white/55">
-                Vindicter does not collect, transmit, or store any personal data. Everything you do in the app stays on your machine. There are no accounts, no analytics, no telemetry, and no cloud sync of any kind.
+                Vindicter requires an account to use. We collect only what is necessary to run the service: your email, workspace membership, and scan activity metadata. Your source code and project files are never uploaded or stored by Vindicter.
               </p>
             </div>
           </div>
@@ -46,9 +46,9 @@ const lastUpdated = 'May 28, 2026'
           <section>
             <h2>1. What We Collect</h2>
             <p>
-              <strong>Nothing.</strong> Vindicter is a local-first desktop application. We do not collect, process, or transmit any personally identifiable information (PII), usage data, crash reports, or analytics.
+              We collect the minimum necessary to operate the platform: your email address, display name, workspace memberships, and authentication tokens. We do not collect crash reports, usage analytics, or telemetry beyond what is required for account management.
             </p>
-            <p>All data you create — projects, scans, findings, scan history, and settings — is written to your local file system in a <code>vindicta.json</code> file and an app-local persistence store. That data never leaves your device through the Vindicter application.
+            <p>All scan results, findings, and project metadata are stored locally on your machine. Only your account credentials and workspace settings are synchronized with the Vindicter service.
             </p>
           </section>
 

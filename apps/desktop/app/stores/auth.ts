@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import type { ApiUser, ApiWorkspace } from '~/composables/useDesktopAuth'
 
 export interface GitHubUser {
   login: string
@@ -19,17 +20,28 @@ export interface GitHubAuth {
 
 interface AuthState {
   github: GitHubAuth | null
+  apiToken: string | null
+  apiUser: ApiUser | null
+  activeWorkspaceId: string | null
+  workspaces: ApiWorkspace[]
 }
 
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => ({
     github: null,
+    apiToken: null,
+    apiUser: null,
+    activeWorkspaceId: null,
+    workspaces: [],
   }),
 
   getters: {
     isGitHubConnected: (state): boolean => !!state.github?.accessToken,
     githubUser: (state): GitHubUser | null => state.github?.user ?? null,
     githubToken: (state): string | null => state.github?.accessToken ?? null,
+    isApiAuthenticated: (state): boolean => !!state.apiToken && !!state.apiUser,
+    activeWorkspace: (state): ApiWorkspace | null =>
+      state.workspaces.find(w => w.id === state.activeWorkspaceId) ?? state.workspaces[0] ?? null,
   },
 
   actions: {
@@ -39,7 +51,11 @@ export const useAuthStore = defineStore('auth', {
         const store = useTauriStore()
         const saved = await store.get<AuthState>('auth-state')
         if (saved) {
-          this.github = saved.github ?? null
+          this.github            = saved.github ?? null
+          this.apiToken          = saved.apiToken ?? null
+          this.apiUser           = saved.apiUser ?? null
+          this.activeWorkspaceId = saved.activeWorkspaceId ?? null
+          this.workspaces        = saved.workspaces ?? []
         }
       } catch { /* Tauri not available */ }
     },
@@ -48,7 +64,13 @@ export const useAuthStore = defineStore('auth', {
       try {
         const { useTauriStore } = await import('~/composables/useTauriStore')
         const store = useTauriStore()
-        await store.set('auth-state', { github: this.github })
+        await store.set('auth-state', {
+          github:            this.github,
+          apiToken:          this.apiToken,
+          apiUser:           this.apiUser,
+          activeWorkspaceId: this.activeWorkspaceId,
+          workspaces:        this.workspaces,
+        })
         await store.save()
       } catch { /* Tauri not available */ }
     },
@@ -60,6 +82,32 @@ export const useAuthStore = defineStore('auth', {
 
     async logoutGitHub() {
       this.github = null
+      await this._persist()
+    },
+
+    async loginWithApi(email: string, password: string) {
+      const { apiLogin, apiFetchWorkspaces } = await import('~/composables/useDesktopAuth')
+      const { token, user } = await apiLogin(email, password)
+      this.apiToken = token
+      this.apiUser  = user
+      const workspaces = await apiFetchWorkspaces(token)
+      this.workspaces = workspaces
+      if (workspaces.length === 1) {
+        this.activeWorkspaceId = workspaces[0]!.id
+      }
+      await this._persist()
+    },
+
+    async logoutApi() {
+      this.apiToken          = null
+      this.apiUser           = null
+      this.activeWorkspaceId = null
+      this.workspaces        = []
+      await this._persist()
+    },
+
+    async setActiveWorkspace(id: string) {
+      this.activeWorkspaceId = id
       await this._persist()
     },
 

@@ -9,6 +9,8 @@ export declare class PricingService {
         name: string;
         description?: string;
         tokenLimit: number;
+        seatLimit?: number;
+        projectLimit?: number;
         priceUsd: number;
         sortOrder?: number;
     }): Promise<PricingPlan>;
@@ -16,6 +18,8 @@ export declare class PricingService {
         name: string;
         description: string | null;
         tokenLimit: number;
+        seatLimit: number;
+        projectLimit: number;
         priceUsd: number;
         isActive: boolean;
         sortOrder: number;

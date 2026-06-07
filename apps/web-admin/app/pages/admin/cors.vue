@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { Globe, Plus, Loader2, Trash2, ToggleLeft, ToggleRight, RefreshCw, ShieldCheck } from 'lucide-vue-next'
 
 definePageMeta({ layout: 'dashboard' })
@@ -45,7 +45,7 @@ async function addOrigin() {
     const created = await api.post<CorsOrigin>('/cors', { origin: o, label: newLabel.value.trim() })
     origins.value.push(created)
     newOrigin.value = ''; newLabel.value = ''
-    flash('Origin added. Takes effect immediately — no restart needed.', true)
+    flash('Origin added. Takes effect immediately â€” no restart needed.', true)
   } catch (e) {
     addErr.value = e instanceof Error ? e.message : 'Failed to add.'
   } finally { adding.value = false }
@@ -91,13 +91,13 @@ onMounted(fetchOrigins)
       </div>
       <h1 class="text-[26px] font-display font-black uppercase tracking-wide" style="color:rgba(255,255,255,0.90);">CORS Origins</h1>
       <p class="mt-1 text-[13px]" style="color:rgba(255,255,255,0.40);">
-        Manage allowed cross-origin request sources. Changes take effect immediately — no server restart required.
+        Manage allowed cross-origin request sources. Changes take effect immediately â€” no server restart required.
       </p>
     </div>
 
     <!-- Info banner -->
-    <div class="mb-5 flex items-start gap-3 rounded-xl p-4" style="background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.15);">
-      <ShieldCheck class="h-4 w-4 shrink-0 mt-0.5" style="color:rgba(167,139,250,0.65);" />
+    <div class="mb-5 flex items-start gap-3 rounded-xl p-4" style="background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.15);">
+      <ShieldCheck class="h-4 w-4 shrink-0 mt-0.5" style="color:rgba(251,191,36,0.65);" />
       <p class="text-[12px] leading-relaxed" style="color:rgba(255,255,255,0.45);">
         Origins are stored in the database and applied to every request via a shared in-memory set. Enabling or disabling an origin here updates all running instances immediately.
       </p>
@@ -160,7 +160,7 @@ onMounted(fetchOrigins)
       <!-- Add origin panel -->
       <div class="rounded-xl p-5 space-y-4" style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.08);">
         <div class="flex items-center gap-2">
-          <Plus class="h-4 w-4" style="color:rgba(139,92,246,0.65);" />
+          <Plus class="h-4 w-4" style="color:rgba(245,158,11,0.65);" />
           <p class="text-[12px] font-semibold" style="color:rgba(255,255,255,0.70);">Add Origin</p>
         </div>
 
@@ -185,7 +185,7 @@ onMounted(fetchOrigins)
 
         <button :disabled="adding" @click="addOrigin"
           class="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-semibold cursor-pointer disabled:opacity-50"
-          style="background:rgba(139,92,246,0.18);border:1px solid rgba(139,92,246,0.30);color:rgba(167,139,250,0.90);">
+          style="background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.30);color:rgba(251,191,36,0.90);">
           <Loader2 v-if="adding" class="h-3.5 w-3.5 animate-spin" /><Plus v-else class="h-3.5 w-3.5" />
           Add to Allowlist
         </button>
@@ -194,3 +194,4 @@ onMounted(fetchOrigins)
 
   </div>
 </template>
+

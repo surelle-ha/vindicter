@@ -11,8 +11,8 @@ const features = [
   },
   {
     icon: HardDrive,
-    label: 'Local-First Privacy',
-    desc: 'All analysis runs on your machine — no code leaves your environment.',
+    label: 'Team Collaboration',
+    desc: 'Workspaces bring your team together with shared findings and remediation tracking.',
   },
   {
     icon: Cpu,
@@ -55,7 +55,7 @@ const features = [
           <div>
             <p class="text-[10px] font-semibold uppercase tracking-[0.30em] mb-3" style="color:rgba(139,92,246,0.75);">Security Platform</p>
             <h2 class="font-display text-[34px] font-black uppercase leading-[1.1]" style="color:rgba(255,255,255,0.92);">
-              Local-first<br />AI security<br />review.
+Professional<br />AI security<br />platform.
             </h2>
             <p class="mt-4 text-[13px] leading-relaxed" style="color:rgba(255,255,255,0.38);">
               The professional toolkit for developers who take security seriously.
@@ -76,7 +76,7 @@ const features = [
         </div>
 
         <p class="text-[11px]" style="color:rgba(255,255,255,0.22);">
-          &copy; {{ currentYear }} Vindicter. Local-first security review.
+          &copy; {{ currentYear }} Vindicter. Professional security platform.
         </p>
       </div>
     </div>

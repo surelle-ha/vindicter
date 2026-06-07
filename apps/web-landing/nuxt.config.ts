@@ -2,8 +2,8 @@ import tailwindcss from '@tailwindcss/vite'
 
 const SITE_URL  = 'https://vindicter.xyz'
 const SITE_NAME = 'Vindicter'
-const TITLE     = 'Vindicter — Free Local-First AI Security Workspace'
-const DESC      = 'Vindicter is a free, open-source desktop security workspace. Run AI-powered vulnerability scans with Claude, Codex, or Ollama — entirely on your machine. Track findings, inspect dependencies, detect secrets, and master security in the built-in Academy.'
+const TITLE     = 'Vindicter — AI-Powered Security Platform'
+const DESC      = 'Vindicter is an AI-powered security platform for teams. Run automated vulnerability scans with Claude, Codex, or Ollama. Track findings, inspect dependencies, detect secrets, and master security in the built-in Academy.'
 const OG_IMAGE  = `${SITE_URL}/og-image.png`
 
 export default defineNuxtConfig({
@@ -90,7 +90,7 @@ export default defineNuxtConfig({
             offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
             featureList: [
               'AI-powered vulnerability scanning',
-              'Local-first — no data leaves your machine',
+              'Team workspaces with seat and project limits',
               'Claude, Codex, OpenRouter, and Ollama support',
               'Dependency inventory and secret detection',
               'Security Academy with 30 lessons',

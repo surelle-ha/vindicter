@@ -41,7 +41,6 @@ import { runCodexExec } from '~/composables/useCodexShell'
 import { runClaudeExec } from '~/composables/useClaudeAI'
 import { runOpenRouterChat } from '~/composables/useOpenRouterAI'
 import { runOllamaChat } from '~/composables/useOllamaAI'
-import { checkDefendCoreAvailable, fetchRAGContext } from '~/composables/useDefendCoreRAG'
 import type {
   ProjectMeta,
   SecurityFinding,
@@ -110,12 +109,14 @@ const selectedFindingLimit = ref(10)
 const metricsCollapsed = ref(false)
 const showToolPicker = ref(false)
 const showScopePicker = ref(false)
-const ragEnabled     = ref(false)
-const ragAvailable   = ref(false)
 const showScanConfirm = ref(false)
 const scopeScanAll = ref(true)
 const scopeEntries = ref<{ path: string; name: string; isDir: boolean; depth: number; selected: boolean }[]>([])
 const scopeLoading = ref(false)
+const isGitRepo       = ref(false)
+const gitBranches     = ref<string[]>([])
+const gitCurrentBranch = ref<string | null>(null)
+const selectedBranch  = ref<string | null>(null)
 const aiScanRunning = ref(false)
 const creatingRemediation = ref(false)
 const exportingDocs = ref(false)
@@ -152,12 +153,7 @@ const validateError = ref('')
 const { toolStatus: toolAvailability, checkAIToolAvailability } = useAIToolAvailability()
 
 async function checkToolAvailability() {
-  const [, available] = await Promise.all([
-    checkAIToolAvailability(),
-    checkDefendCoreAvailable(),
-  ])
-  ragAvailable.value = available
-  if (!available) ragEnabled.value = false
+  await checkAIToolAvailability()
   if (!toolAvailability[selectedAITool.value].available) {
     const first = (['codex', 'claude', 'openrouter', 'ollama'] as SecurityAITool[])
       .find(t => toolAvailability[t].available)
@@ -719,7 +715,7 @@ const normalizedFindingLimit = computed(() => Math.max(0, Math.min(50, Math.floo
 const selectedAIToolLabel = computed(() => securityToolLabel(selectedAITool.value))
 const canUseSelectedAITool = computed(() => {
   if (selectedAITool.value === 'openrouter') return app.openRouter.enabled && Boolean(app.openRouter.apiKey.trim())
-  if (selectedAITool.value === 'ollama') return Boolean(app.ollama.url.trim())
+  if (selectedAITool.value === 'ollama') return app.ollama.enabled && Boolean(app.ollama.url.trim())
   return true
 })
 const latestScan = computed(() => security.latestScan)
@@ -889,7 +885,37 @@ async function openScopePicker() {
   scopeScanAll.value = true
   scopeEntries.value = []
   showScopePicker.value = true
-  await loadScopeTree()
+  await Promise.all([loadScopeTree(), loadGitBranches()])
+}
+
+async function loadGitBranches() {
+  isGitRepo.value    = false
+  gitBranches.value  = []
+  gitCurrentBranch.value = null
+  selectedBranch.value   = null
+  if (!props.project.absolutePath) return
+  const fs  = useTauriFs()
+  const sep = props.project.absolutePath.includes('\\') ? '\\' : '/'
+  const gitDir = props.project.absolutePath + sep + '.git'
+  const headFile = gitDir + sep + 'HEAD'
+  const exists = await fs.exists(headFile).catch(() => false)
+  if (!exists) return
+  isGitRepo.value = true
+  const headContent = await fs.readTextFile(headFile).catch(() => '')
+  const branchMatch = headContent.trim().match(/^ref: refs\/heads\/(.+)$/)
+  if (branchMatch) {
+    gitCurrentBranch.value = branchMatch[1]!
+    selectedBranch.value   = branchMatch[1]!
+  }
+  const headsDir = gitDir + sep + 'refs' + sep + 'heads'
+  const headsDirExists = await fs.exists(headsDir).catch(() => false)
+  if (headsDirExists) {
+    const items = await fs.readDir(headsDir).catch(() => [] as { name: string; isDir: boolean }[])
+    gitBranches.value = items.filter(i => !i.isDir).map(i => i.name).sort()
+    if (!selectedBranch.value && gitBranches.value.length) {
+      selectedBranch.value = gitBranches.value[0]!
+    }
+  }
 }
 
 async function loadScopeTree() {
@@ -915,14 +941,21 @@ async function loadScopeTree() {
 }
 
 function buildScopeConstraint(): string {
-  if (scopeScanAll.value) return ''
-  const sep = props.project.absolutePath.includes('\\') ? '\\' : '/'
-  const base = props.project.absolutePath
-  const selected = scopeEntries.value
-    .filter(e => e.selected && e.depth === 0)
-    .map(e => e.path.replace(base + sep, '').replace(base + '/', ''))
-  if (!selected.length) return ''
-  return `\n\nScope constraint — focus ONLY on these paths:\n${selected.map(p => `- ${p}`).join('\n')}\nIgnore everything else unless it is a direct dependency of the scoped paths.`
+  const parts: string[] = []
+  if (isGitRepo.value && selectedBranch.value) {
+    parts.push(`\n\nGit context — this scan targets the \`${selectedBranch.value}\` branch.`)
+  }
+  if (!scopeScanAll.value) {
+    const sep = props.project.absolutePath.includes('\\') ? '\\' : '/'
+    const base = props.project.absolutePath
+    const selected = scopeEntries.value
+      .filter(e => e.selected && e.depth === 0)
+      .map(e => e.path.replace(base + sep, '').replace(base + '/', ''))
+    if (selected.length) {
+      parts.push(`\n\nScope constraint — focus ONLY on these paths:\n${selected.map(p => `- ${p}`).join('\n')}\nIgnore everything else unless it is a direct dependency of the scoped paths.`)
+    }
+  }
+  return parts.join('')
 }
 
 function toggleScopeParent(entry: { path: string; isDir: boolean; depth: number; selected: boolean }) {
@@ -1562,8 +1595,8 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
     return
   }
 
-  if (tool === 'ollama' && !app.ollama.url.trim()) {
-    notify('Configure Ollama URL in AI Models before running this scan.', 'warning')
+  if (tool === 'ollama' && (!app.ollama.enabled || !app.ollama.url.trim())) {
+    notify('Enable Ollama and configure its URL in AI Models before running this scan.', 'warning')
     showToolPicker.value = true
     return
   }
@@ -1591,15 +1624,9 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
     const fileContent = (tool === 'openrouter' || tool === 'ollama')
       ? await readProjectFilesForScan(props.project.absolutePath)
       : ''
-    // RAG only for cloud APIs — Claude/Codex read files themselves via CLI,
-    // injecting extra tokens just slows them down without adding value.
-    const ragContext = (ragEnabled.value && ragAvailable.value && (tool === 'openrouter' || tool === 'ollama'))
-      ? await fetchRAGContext(`security vulnerabilities ${props.project.name}`)
-      : ''
     const enrichedPrompt = [
       prompt,
       fileContent ? `---\nProject source files for analysis:\n\n${fileContent}` : '',
-      ragContext  ? `---\n${ragContext}` : '',
     ].filter(Boolean).join('\n\n')
 
     let result: { stdout: string; stderr: string }
@@ -2481,40 +2508,37 @@ async function clearScanHistory() {
     <section v-else-if="tab === 'scanner'" class="grid gap-5" :class="(scanActivity.length || aiScanRunning || ossRunning || showHistoryDrawer) ? 'xl:grid-cols-[1fr_18rem]' : 'xl:grid-cols-1'">
       <main class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
         <div class="border-b border-[var(--border)] p-4">
-          <!-- Top row: title + actions -->
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div class="min-w-0">
-              <h2 class="text-sm font-semibold text-[var(--text)]">AI Scanner</h2>
-              <p class="mt-0.5 text-xs text-[var(--text-muted)]">{{ activeScan?.summary || 'Run an AI scan against this project to collect vulnerability findings.' }}</p>
-            </div>
-            <div class="flex flex-wrap gap-2 shrink-0">
-              <button class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="!canRunAIScan" @click="openAIScanPicker">
-                <Loader2 v-if="aiScanRunning" class="size-3.5 animate-spin" />
-                <Bot v-else class="size-3.5" />
-                {{ aiScanRunning ? 'AI Scanning…' : 'Run AI Scan' }}
-              </button>
-              <button v-if="aiScanRunning" class="inline-flex items-center gap-1.5 rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 hover:bg-red-500/18 transition-colors cursor-pointer" @click="cancelScan">
-                <X class="size-3.5" />
-                Cancel Scan
-              </button>
-              <button class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-500/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="!canExportDocs" @click="openExportModal">
-                <Loader2 v-if="exportingDocs" class="size-3.5 animate-spin" />
-                <Download v-else class="size-3.5" />
-                Export
-              </button>
-              <button
-                class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors"
-                :class="showHistoryDrawer
-                  ? 'border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/15'
-                  : 'border-white/10 bg-white/[0.04] text-[var(--text-muted)] hover:bg-white/[0.07] hover:text-[var(--text)]'"
-                :title="showHistoryDrawer ? 'Hide history' : 'Show scan history'"
-                @click="showHistoryDrawer = !showHistoryDrawer"
-              >
-                <History class="size-3.5" />
-                History
-                <span v-if="security.scans.length" class="ml-0.5 tabular-nums text-[10px] opacity-70">{{ security.scans.length }}</span>
-              </button>
-            </div>
+          <!-- Title row -->
+          <h2 class="text-sm font-semibold text-[var(--text)]">AI Scanner</h2>
+          <p class="mt-0.5 text-xs text-[var(--text-muted)] leading-relaxed">{{ activeScan?.summary || 'Run an AI scan against this project to collect vulnerability findings.' }}</p>
+          <!-- Action buttons — always on their own row so the description is never squished -->
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer" :disabled="!canRunAIScan" @click="openAIScanPicker">
+              <Loader2 v-if="aiScanRunning" class="size-3.5 animate-spin" />
+              <Bot v-else class="size-3.5" />
+              {{ aiScanRunning ? 'AI Scanning…' : 'Run AI Scan' }}
+            </button>
+            <button v-if="aiScanRunning" class="inline-flex items-center gap-1.5 rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 hover:bg-red-500/18 transition-colors cursor-pointer" @click="cancelScan">
+              <X class="size-3.5" />
+              Cancel Scan
+            </button>
+            <button class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-500/15 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer" :disabled="!canExportDocs" @click="openExportModal">
+              <Loader2 v-if="exportingDocs" class="size-3.5 animate-spin" />
+              <Download v-else class="size-3.5" />
+              Export
+            </button>
+            <button
+              class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors cursor-pointer"
+              :class="showHistoryDrawer
+                ? 'border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/15'
+                : 'border-white/10 bg-white/[0.04] text-[var(--text-muted)] hover:bg-white/[0.07] hover:text-[var(--text)]'"
+              :title="showHistoryDrawer ? 'Hide history' : 'Show scan history'"
+              @click="showHistoryDrawer = !showHistoryDrawer"
+            >
+              <History class="size-3.5" />
+              History
+              <span v-if="security.scans.length" class="ml-0.5 tabular-nums text-[10px] opacity-70">{{ security.scans.length }}</span>
+            </button>
           </div>
           <!-- Inline scan config + stack + OSS status chips -->
           <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
@@ -3382,24 +3406,7 @@ async function clearScanHistory() {
           <span class="mt-2 block text-[10px] leading-relaxed text-[var(--text-faint)]">Set the maximum number of AI findings for this scan. Use 0 for no explicit cap.</span>
         </label>
 
-        <!-- RAG enhancement toggle — only relevant for cloud API tools -->
-        <label v-if="selectedAITool === 'openrouter' || selectedAITool === 'ollama'"
-          class="flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors"
-          :class="ragAvailable ? 'border-violet-500/20 bg-violet-500/[0.04] hover:bg-violet-500/[0.07]' : 'border-[var(--border)] bg-black/10 opacity-50 cursor-not-allowed'">
-          <div class="mt-0.5 relative shrink-0 h-5 w-9 rounded-full transition-colors duration-200 overflow-hidden"
-            :style="(ragEnabled && ragAvailable) ? 'background:rgba(139,92,246,0.70);' : 'background:rgba(255,255,255,0.12);'"
-            @click.prevent="ragAvailable && (ragEnabled = !ragEnabled)">
-            <span class="absolute top-[2px] h-4 w-4 rounded-full transition-all duration-200"
-              :style="(ragEnabled && ragAvailable) ? 'left:18px;background:white;' : 'left:2px;background:rgba(255,255,255,0.55);'" />
-          </div>
-          <div>
-            <p class="text-xs font-medium text-[var(--text)]">Enhance with Knowledge Base</p>
-            <p class="mt-0.5 text-[10px] leading-relaxed text-[var(--text-faint)]">
-              <template v-if="ragAvailable">Prepend relevant DefendCore KB chunks to the prompt for richer security context.</template>
-              <template v-else>DefendCore KB is unavailable — enable "Ready for Vindicter Desktop" in the admin panel.</template>
-            </p>
-          </div>
-        </label>
+
         <div class="flex justify-end gap-2 border-t border-[var(--border)] pt-4">
           <button class="rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)]" @click="showToolPicker = false">Cancel</button>
           <button class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50" :class="securityToolRunButtonClass(selectedAITool)" :disabled="!canRunAIScan" @click="openScopePicker">
@@ -3412,6 +3419,24 @@ async function clearScanHistory() {
 
     <GlassModal v-model="showScopePicker" title="Select Scan Scope" max-width="lg">
       <div class="space-y-4">
+
+        <!-- Git branch selector (only if git repo detected) -->
+        <div v-if="isGitRepo" class="rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3">
+          <div class="flex items-center gap-2 mb-2">
+            <Github class="size-3.5 shrink-0 text-emerald-400" />
+            <p class="text-xs font-semibold text-[var(--text)]">Git Branch</p>
+            <span class="ml-auto text-[10px] text-[var(--text-faint)]">{{ gitCurrentBranch ? `on ${gitCurrentBranch}` : 'detached HEAD' }}</span>
+          </div>
+          <select
+            v-if="gitBranches.length"
+            v-model="selectedBranch"
+            class="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-1.5 text-xs text-[var(--text)] outline-none focus:border-indigo-500/50"
+          >
+            <option v-for="b in gitBranches" :key="b" :value="b">{{ b }}{{ b === gitCurrentBranch ? ' (current)' : '' }}</option>
+          </select>
+          <p v-else class="text-[11px] text-[var(--text-muted)]">No local branches found — using working tree as-is.</p>
+        </div>
+
         <!-- Scan all toggle -->
         <div class="flex items-center justify-between rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3">
           <div>
@@ -3509,15 +3534,6 @@ async function clearScanHistory() {
             <span class="text-xs font-semibold text-[var(--text)]">{{ normalizedFindingLimit === 0 ? 'No cap' : normalizedFindingLimit }}</span>
           </div>
 
-          <!-- KB enhancement — only shown for cloud API tools -->
-          <div v-if="selectedAITool === 'openrouter' || selectedAITool === 'ollama'"
-            class="flex items-center justify-between rounded-xl border px-4 py-3"
-            :class="ragEnabled && ragAvailable ? 'border-violet-500/25 bg-violet-500/[0.04]' : 'border-[var(--border)] bg-black/10'">
-            <span class="text-xs text-[var(--text-muted)]">Knowledge Base Enhancement</span>
-            <span class="text-xs font-semibold" :class="ragEnabled && ragAvailable ? 'text-violet-300' : 'text-[var(--text-faint)]'">
-              {{ ragEnabled && ragAvailable ? 'Enabled' : 'Disabled' }}
-            </span>
-          </div>
 
           <!-- Scope -->
           <div class="rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3">
@@ -3531,6 +3547,15 @@ async function clearScanHistory() {
               <p v-for="e in scopeEntries.filter(e => e.selected && e.depth === 0)" :key="e.path"
                 class="text-[10px] font-mono truncate" style="color:rgba(255,255,255,0.30);">{{ e.name }}</p>
             </div>
+          </div>
+
+          <!-- Git branch -->
+          <div v-if="isGitRepo" class="flex items-center justify-between rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3">
+            <span class="text-xs text-[var(--text-muted)]">Branch</span>
+            <span class="flex items-center gap-1.5 text-xs font-semibold text-emerald-300">
+              <Github class="size-3 shrink-0" />
+              {{ selectedBranch ?? 'detached HEAD' }}
+            </span>
           </div>
 
           <!-- Project -->

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck } from 'lucide-vue-next'
 
 definePageMeta({ layout: 'auth' })
@@ -15,7 +15,7 @@ const email     = ref('')
 const password  = ref('')
 const showPw    = ref(false)
 
-// ── Turnstile ────────────────────────────────────────────────────────────────
+// â”€â”€ Turnstile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const turnstileContainer = ref<HTMLElement | null>(null)
 const turnstileToken     = ref('')
 const turnstileWidgetId  = ref<string | null>(null)
@@ -92,8 +92,8 @@ async function login() {
   <div>
     <div class="mb-7">
       <div class="flex items-center gap-2 mb-2">
-        <ShieldCheck class="h-3.5 w-3.5" style="color:rgba(139,92,246,0.65);" />
-        <p class="text-[10px] font-semibold uppercase tracking-[0.28em]" style="color:rgba(139,92,246,0.65);">Internal Tool</p>
+        <ShieldCheck class="h-3.5 w-3.5" style="color:rgba(245,158,11,0.65);" />
+        <p class="text-[10px] font-semibold uppercase tracking-[0.28em]" style="color:rgba(245,158,11,0.65);">Internal Tool</p>
       </div>
       <h1 class="font-display text-[30px] font-black uppercase leading-none" style="color:rgba(255,255,255,0.92);">Admin Login</h1>
       <p class="mt-2.5 text-[13px] leading-relaxed" style="color:rgba(255,255,255,0.38);">Sign in with your Vindicter account.</p>
@@ -109,7 +109,7 @@ async function login() {
             <input v-model="email" type="email" required autocomplete="email" placeholder="admin@vindicter.xyz"
               class="w-full rounded-xl pl-9 pr-4 py-2.5 text-[13px] text-white outline-none transition-colors"
               style="border:1px solid rgba(255,255,255,0.09);background:rgba(255,255,255,0.04);"
-              @focus="($event.target as HTMLInputElement).style.borderColor='rgba(139,92,246,0.45)'"
+              @focus="($event.target as HTMLInputElement).style.borderColor='rgba(245,158,11,0.45)'"
               @blur="($event.target as HTMLInputElement).style.borderColor='rgba(255,255,255,0.09)'"
             />
           </div>
@@ -122,7 +122,7 @@ async function login() {
             <input v-model="password" :type="showPw ? 'text' : 'password'" required autocomplete="current-password" placeholder="Your password"
               class="w-full rounded-xl pl-9 pr-10 py-2.5 text-[13px] text-white outline-none transition-colors"
               style="border:1px solid rgba(255,255,255,0.09);background:rgba(255,255,255,0.04);"
-              @focus="($event.target as HTMLInputElement).style.borderColor='rgba(139,92,246,0.45)'"
+              @focus="($event.target as HTMLInputElement).style.borderColor='rgba(245,158,11,0.45)'"
               @blur="($event.target as HTMLInputElement).style.borderColor='rgba(255,255,255,0.09)'"
             />
             <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer transition-colors" style="color:rgba(255,255,255,0.20);" @click="showPw = !showPw">
@@ -143,12 +143,13 @@ async function login() {
 
         <button type="submit" :disabled="loading || !turnstileReady"
           class="w-full rounded-xl py-3 text-[13px] font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-55 disabled:cursor-not-allowed"
-          style="background:rgba(139,92,246,0.85);color:white;"
+          style="background:rgba(245,158,11,0.85);color:white;"
         >
           <Loader2 v-if="loading" class="h-4 w-4 animate-spin" />
-          {{ loading ? 'Signing in…' : 'Sign in' }}
+          {{ loading ? 'Signing inâ€¦' : 'Sign in' }}
         </button>
       </form>
     </div>
   </div>
 </template>
+

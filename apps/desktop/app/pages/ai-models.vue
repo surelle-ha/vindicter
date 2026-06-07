@@ -64,6 +64,7 @@ const openRouterStatus = {
 }
 
 // Ollama
+const ollamaEnabled = ref(app.ollama.enabled)
 const ollamaUrl = ref(app.ollama.url)
 const ollamaModel = ref(app.ollama.model)
 const ollamaChecking = ref(false)
@@ -73,6 +74,7 @@ const ollamaAvailableModels = ref<string[]>([])
 
 async function saveOllama() {
   await app.setOllama({
+    enabled: ollamaEnabled.value,
     url: ollamaUrl.value.trim() || 'http://localhost:11434',
     model: ollamaModel.value.trim() || 'llama3.2',
   })
@@ -517,20 +519,23 @@ onMounted(() => {
               class="ml-auto rounded-full border px-2 py-0.5 text-[10px] font-semibold"
               :class="ollamaOk
                 ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
-                : ollamaUrl
+                : ollamaEnabled
                   ? 'border-orange-500/20 bg-orange-500/10 text-orange-300'
                   : 'border-[var(--border)] bg-white/[0.04] text-[var(--text-faint)]'"
             >
-              {{ ollamaOk ? 'Connected' : ollamaUrl ? 'Configured' : 'Not set' }}
+              {{ ollamaOk ? 'Connected' : ollamaEnabled ? 'Enabled' : 'Disabled' }}
             </span>
           </div>
           <p class="text-xs leading-relaxed text-[var(--text-muted)]">
             Run LLMs locally via Ollama. Powers the Academy professor and AI security scans without sending data to external APIs. Requires Ollama running on your machine.
           </p>
 
-          <div class="grid gap-3 sm:grid-cols-2">
+          <div class="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
             <GlassInput v-model="ollamaUrl" label="Server URL" placeholder="http://localhost:11434" />
             <GlassInput v-model="ollamaModel" label="Model" placeholder="llama3.2" />
+            <GlassCheckbox v-model="ollamaEnabled" size="sm" class="items-end pb-2 text-xs text-[var(--text-muted)]">
+              Enabled
+            </GlassCheckbox>
           </div>
 
           <div v-if="ollamaAvailableModels.length" class="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] px-3 py-2">

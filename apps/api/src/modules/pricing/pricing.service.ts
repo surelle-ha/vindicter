@@ -20,11 +20,13 @@ export class PricingService {
     return plan
   }
 
-  create(dto: { name: string; description?: string; tokenLimit: number; priceUsd: number; sortOrder?: number }) {
+  create(dto: { name: string; description?: string; tokenLimit: number; seatLimit?: number; projectLimit?: number; priceUsd: number; sortOrder?: number }) {
     return this.planRepo.save(this.planRepo.create({
       name: dto.name,
       description: dto.description ?? null,
       tokenLimit: dto.tokenLimit,
+      seatLimit: dto.seatLimit ?? 1,
+      projectLimit: dto.projectLimit ?? 3,
       priceUsd: dto.priceUsd,
       sortOrder: dto.sortOrder ?? 0,
     }))
@@ -32,6 +34,7 @@ export class PricingService {
 
   async update(id: string, dto: Partial<{
     name: string; description: string | null; tokenLimit: number
+    seatLimit: number; projectLimit: number
     priceUsd: number; isActive: boolean; sortOrder: number
   }>) {
     const plan = await this.findOne(id)

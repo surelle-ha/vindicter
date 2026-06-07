@@ -16,6 +16,9 @@ import { MarketingModule } from './modules/marketing/marketing.module'
 import { AcademyModule } from './modules/academy/academy.module'
 import { DefendCoreModule } from './modules/defendcore/defendcore.module'
 import { CorsModule } from './modules/cors/cors.module'
+import { PricingModule } from './modules/pricing/pricing.module'
+import { WorkspacesModule } from './modules/workspaces/workspaces.module'
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module'
 
 @Module({
   imports: [
@@ -39,6 +42,9 @@ import { CorsModule } from './modules/cors/cors.module'
     AcademyModule,
     DefendCoreModule,
     CorsModule,
+    PricingModule,
+    WorkspacesModule,
+    SubscriptionsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

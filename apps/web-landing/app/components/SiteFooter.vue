@@ -13,7 +13,7 @@ defineProps<{
           <span>&copy; {{ year }} Vindicter. All rights reserved.</span>
         </div>
         <span class="hidden text-white/15 sm:inline">/</span>
-        <span class="text-white/20">Built for local-first security review.</span>
+        <span class="text-white/20">AI-powered security for modern teams.</span>
       </div>
 
       <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">

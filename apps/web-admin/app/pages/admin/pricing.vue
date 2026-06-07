@@ -1,10 +1,10 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import {
   CreditCard, Plus, Trash2, Edit3, Loader2, RefreshCw, Check, X, ToggleLeft, ToggleRight, Zap,
 } from 'lucide-vue-next'
 
 definePageMeta({ layout: 'dashboard' })
-useHead({ title: 'Pricing Management — Vindicter' })
+useHead({ title: 'Pricing Management â€” Vindicter' })
 
 const api = useApi()
 const { isAdmin } = useAuth()
@@ -17,6 +17,8 @@ interface Plan {
   name: string
   description: string | null
   tokenLimit: number
+  seatLimit: number
+  projectLimit: number
   priceUsd: number
   isActive: boolean
   sortOrder: number
@@ -33,9 +35,9 @@ const saving  = ref(false)
 const showAdd    = ref(false)
 const editingId  = ref<string | null>(null)
 
-const blankForm  = () => ({ name: '', description: '', tokenLimit: 0, priceUsd: 0, sortOrder: 0 })
+const blankForm  = () => ({ name: '', description: '', tokenLimit: 0, seatLimit: 1, projectLimit: 3, priceUsd: 0, sortOrder: 0 })
 const addForm    = reactive(blankForm())
-const editForm   = reactive({ name: '', description: '', tokenLimit: 0, priceUsd: 0, sortOrder: 0 })
+const editForm   = reactive({ name: '', description: '', tokenLimit: 0, seatLimit: 1, projectLimit: 3, priceUsd: 0, sortOrder: 0 })
 const addErr     = ref('')
 
 function fmt(n: number) {
@@ -56,15 +58,17 @@ async function fetchPlans() {
 async function addPlan() {
   addErr.value = ''
   if (!addForm.name.trim())   { addErr.value = 'Name is required.'; return }
-  if (addForm.tokenLimit < 0) { addErr.value = 'Token limit must be ≥ 0.'; return }
+  if (addForm.tokenLimit < 0) { addErr.value = 'Token limit must be â‰¥ 0.'; return }
   saving.value = true
   try {
     const created = await api.post<Plan>('/pricing', {
-      name:        addForm.name.trim(),
-      description: addForm.description.trim() || null,
-      tokenLimit:  Number(addForm.tokenLimit),
-      priceUsd:    Number(addForm.priceUsd),
-      sortOrder:   Number(addForm.sortOrder),
+      name:         addForm.name.trim(),
+      description:  addForm.description.trim() || null,
+      tokenLimit:   Number(addForm.tokenLimit),
+      seatLimit:    Number(addForm.seatLimit),
+      projectLimit: Number(addForm.projectLimit),
+      priceUsd:     Number(addForm.priceUsd),
+      sortOrder:    Number(addForm.sortOrder),
     })
     plans.value.push(created)
     plans.value.sort((a, b) => a.sortOrder - b.sortOrder)
@@ -79,29 +83,35 @@ async function addPlan() {
 }
 
 function startEdit(plan: Plan) {
-  editingId.value      = plan.id
-  editForm.name        = plan.name
-  editForm.description = plan.description ?? ''
-  editForm.tokenLimit  = plan.tokenLimit
-  editForm.priceUsd    = plan.priceUsd
-  editForm.sortOrder   = plan.sortOrder
+  editingId.value       = plan.id
+  editForm.name         = plan.name
+  editForm.description  = plan.description ?? ''
+  editForm.tokenLimit   = plan.tokenLimit
+  editForm.seatLimit    = plan.seatLimit
+  editForm.projectLimit = plan.projectLimit
+  editForm.priceUsd     = plan.priceUsd
+  editForm.sortOrder    = plan.sortOrder
 }
 
 async function saveEdit(plan: Plan) {
   try {
     await api.patch(`/pricing/${plan.id}`, {
-      name:        editForm.name.trim(),
-      description: editForm.description.trim() || null,
-      tokenLimit:  Number(editForm.tokenLimit),
-      priceUsd:    Number(editForm.priceUsd),
-      sortOrder:   Number(editForm.sortOrder),
+      name:         editForm.name.trim(),
+      description:  editForm.description.trim() || null,
+      tokenLimit:   Number(editForm.tokenLimit),
+      seatLimit:    Number(editForm.seatLimit),
+      projectLimit: Number(editForm.projectLimit),
+      priceUsd:     Number(editForm.priceUsd),
+      sortOrder:    Number(editForm.sortOrder),
     })
     Object.assign(plan, {
-      name:        editForm.name.trim(),
-      description: editForm.description.trim() || null,
-      tokenLimit:  Number(editForm.tokenLimit),
-      priceUsd:    Number(editForm.priceUsd),
-      sortOrder:   Number(editForm.sortOrder),
+      name:         editForm.name.trim(),
+      description:  editForm.description.trim() || null,
+      tokenLimit:   Number(editForm.tokenLimit),
+      seatLimit:    Number(editForm.seatLimit),
+      projectLimit: Number(editForm.projectLimit),
+      priceUsd:     Number(editForm.priceUsd),
+      sortOrder:    Number(editForm.sortOrder),
     })
     plans.value.sort((a, b) => a.sortOrder - b.sortOrder)
     editingId.value = null
@@ -159,7 +169,7 @@ onMounted(fetchPlans)
           <RefreshCw class="h-3 w-3" :class="loading ? 'animate-spin' : ''" /> Refresh
         </button>
         <button class="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold transition-colors cursor-pointer"
-          style="background:rgba(139,92,246,0.18);border:1px solid rgba(139,92,246,0.30);color:rgba(167,139,250,0.95);"
+          style="background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.30);color:rgba(251,191,36,0.95);"
           @click="showAdd = !showAdd">
           <Plus class="h-3 w-3" /> Add Plan
         </button>
@@ -177,8 +187,8 @@ onMounted(fetchPlans)
     <div v-if="err" class="mb-4 rounded-xl px-4 py-3 text-[12px]" style="background:rgba(242,63,66,0.08);border:1px solid rgba(242,63,66,0.18);color:rgba(242,63,66,0.80);">{{ err }}</div>
 
     <!-- Note about DefendCore -->
-    <div class="mb-5 rounded-xl px-4 py-3 flex items-start gap-3" style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.14);">
-      <Zap class="h-4 w-4 shrink-0 mt-0.5" style="color:rgba(167,139,250,0.65);" />
+    <div class="mb-5 rounded-xl px-4 py-3 flex items-start gap-3" style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.14);">
+      <Zap class="h-4 w-4 shrink-0 mt-0.5" style="color:rgba(251,191,36,0.65);" />
       <p class="text-[12px] leading-relaxed" style="color:rgba(255,255,255,0.45);">
         Plans define the token allowances for DefendCore usage. Token limits represent monthly AI token consumption.
         Pricing is informational until DefendCore billing is live.
@@ -208,6 +218,18 @@ onMounted(fetchPlans)
             style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);" />
         </div>
         <div>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:rgba(255,255,255,0.30);">Seat Limit (-1 = unlimited)</label>
+          <input v-model.number="addForm.seatLimit" type="number" min="-1" placeholder="e.g. 5"
+            class="w-full rounded-xl px-3 py-2 text-[12px] text-white outline-none"
+            style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:rgba(255,255,255,0.30);">Project Limit (-1 = unlimited)</label>
+          <input v-model.number="addForm.projectLimit" type="number" min="-1" placeholder="e.g. 20"
+            class="w-full rounded-xl px-3 py-2 text-[12px] text-white outline-none"
+            style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);" />
+        </div>
+        <div>
           <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:rgba(255,255,255,0.30);">Price (USD/mo)</label>
           <input v-model.number="addForm.priceUsd" type="number" min="0" step="0.01" placeholder="0.00"
             class="w-full rounded-xl px-3 py-2 text-[12px] text-white outline-none"
@@ -224,7 +246,7 @@ onMounted(fetchPlans)
       <div class="flex gap-2">
         <button :disabled="saving"
           class="flex items-center gap-1.5 rounded-xl px-4 py-2 text-[12px] font-semibold disabled:opacity-50 cursor-pointer"
-          style="background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.28);color:rgba(167,139,250,0.90);"
+          style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.28);color:rgba(251,191,36,0.90);"
           @click="addPlan">
           <Loader2 v-if="saving" class="h-3 w-3 animate-spin" />
           <Plus v-else class="h-3 w-3" /> Create
@@ -245,7 +267,7 @@ onMounted(fetchPlans)
       <div v-for="plan in plans" :key="plan.id"
         class="rounded-xl p-5 transition-colors"
         :style="plan.isActive
-          ? 'background:rgba(255,255,255,0.03);border:1px solid rgba(139,92,246,0.18);'
+          ? 'background:rgba(255,255,255,0.03);border:1px solid rgba(245,158,11,0.18);'
           : 'background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.07);opacity:0.55;'">
 
         <!-- View mode -->
@@ -271,14 +293,26 @@ onMounted(fetchPlans)
               </button>
             </div>
           </div>
-          <div class="flex items-end justify-between mt-4">
+          <div class="grid grid-cols-2 gap-3 mt-4">
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style="color:rgba(255,255,255,0.25);">Seats</p>
+              <p class="text-[16px] font-black" style="color:rgba(251,191,36,0.90);">
+                {{ plan.seatLimit === -1 ? '∞' : plan.seatLimit }}
+              </p>
+            </div>
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style="color:rgba(255,255,255,0.25);">Projects</p>
+              <p class="text-[16px] font-black" style="color:rgba(251,191,36,0.90);">
+                {{ plan.projectLimit === -1 ? '∞' : plan.projectLimit }}
+              </p>
+            </div>
             <div>
               <p class="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style="color:rgba(255,255,255,0.25);">Tokens / month</p>
-              <p class="text-[18px] font-black" style="color:rgba(167,139,250,0.90);">{{ fmt(plan.tokenLimit) }}</p>
+              <p class="text-[16px] font-black" style="color:rgba(255,255,255,0.60);">{{ fmt(plan.tokenLimit) }}</p>
             </div>
             <div class="text-right">
               <p class="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style="color:rgba(255,255,255,0.25);">Price</p>
-              <p class="text-[18px] font-black" style="color:rgba(255,255,255,0.80);">
+              <p class="text-[16px] font-black" style="color:rgba(255,255,255,0.80);">
                 {{ plan.priceUsd === 0 ? 'Free' : `$${Number(plan.priceUsd).toFixed(2)}/mo` }}
               </p>
             </div>
@@ -306,6 +340,16 @@ onMounted(fetchPlans)
                 style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);" />
             </div>
             <div class="grid gap-2 grid-cols-2">
+              <div>
+                <label class="block text-[9px] font-semibold uppercase tracking-wider mb-1" style="color:rgba(255,255,255,0.25);">Seat Limit</label>
+                <input v-model.number="editForm.seatLimit" type="number" min="-1" class="w-full rounded-lg px-2.5 py-1.5 text-[12px] text-white outline-none"
+                  style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);" />
+              </div>
+              <div>
+                <label class="block text-[9px] font-semibold uppercase tracking-wider mb-1" style="color:rgba(255,255,255,0.25);">Project Limit</label>
+                <input v-model.number="editForm.projectLimit" type="number" min="-1" class="w-full rounded-lg px-2.5 py-1.5 text-[12px] text-white outline-none"
+                  style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);" />
+              </div>
               <div>
                 <label class="block text-[9px] font-semibold uppercase tracking-wider mb-1" style="color:rgba(255,255,255,0.25);">Token Limit</label>
                 <input v-model.number="editForm.tokenLimit" type="number" min="0" class="w-full rounded-lg px-2.5 py-1.5 text-[12px] text-white outline-none"
@@ -344,3 +388,4 @@ onMounted(fetchPlans)
 
   </div>
 </template>
+

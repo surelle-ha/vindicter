@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { AlertTriangle, Clock3, FileText, FolderSearch, Github, KeyRound, PackageSearch, PanelBottomOpen, Radar, Settings, ShieldCheck, ShieldMinus, Trash2 } from 'lucide-vue-next'
+import { AlertTriangle, FileText, FolderSearch, Github, KeyRound, PackageSearch, PanelBottomOpen, Radar, Settings, ShieldCheck, ShieldMinus, Trash2 } from 'lucide-vue-next'
 import type { Component } from 'vue'
 
-type SecurityWorkspaceTab = 'overview' | 'scanner' | 'findings' | 'whitelist' | 'dependencies' | 'secrets' | 'reports' | 'settings' | 'github_issues'
+type SecurityWorkspaceTab = 'overview' | 'scanner' | 'findings' | 'whitelist' | 'dependencies' | 'secrets' | 'reports' | 'settings' | 'github_issues' | 'history'
 
 const route = useRoute()
 const router = useRouter()
@@ -64,7 +64,6 @@ const staticTabs: { id: SecurityWorkspaceTab; label: string; icon: Component }[]
   { id: 'secrets', label: 'Secrets', icon: KeyRound },
   { id: 'whitelist', label: 'Whitelist', icon: ShieldMinus },
   { id: 'reports', label: 'Reports', icon: FileText },
-  { id: 'history', label: 'History', icon: Clock3 },
   { id: 'settings', label: 'Settings', icon: Settings },
 ]
 

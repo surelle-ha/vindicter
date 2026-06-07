@@ -14,6 +14,10 @@ const typeorm_1 = require("@nestjs/typeorm");
 const user_entity_1 = require("../users/entities/user.entity");
 const role_entity_1 = require("../roles/entities/role.entity");
 const user_role_entity_1 = require("../roles/entities/user-role.entity");
+const workspace_entity_1 = require("../workspaces/entities/workspace.entity");
+const workspace_member_entity_1 = require("../workspaces/entities/workspace-member.entity");
+const subscription_entity_1 = require("../subscriptions/entities/subscription.entity");
+const pricing_plan_entity_1 = require("../pricing/entities/pricing-plan.entity");
 const auth_controller_1 = require("./auth.controller");
 const auth_service_1 = require("./auth.service");
 const jwt_strategy_1 = require("./strategies/jwt.strategy");
@@ -30,7 +34,7 @@ exports.AuthModule = AuthModule = __decorate([
                     signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? '7d' },
                 }),
             }),
-            typeorm_1.TypeOrmModule.forFeature([user_entity_1.User, role_entity_1.Role, user_role_entity_1.UserRole]),
+            typeorm_1.TypeOrmModule.forFeature([user_entity_1.User, role_entity_1.Role, user_role_entity_1.UserRole, workspace_entity_1.Workspace, workspace_member_entity_1.WorkspaceMember, subscription_entity_1.Subscription, pricing_plan_entity_1.PricingPlan]),
         ],
         controllers: [auth_controller_1.AuthController],
         providers: [auth_service_1.AuthService, jwt_strategy_1.JwtStrategy],

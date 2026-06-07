@@ -20,8 +20,9 @@ const passport_jwt_1 = require("passport-jwt");
 const typeorm_2 = require("typeorm");
 const user_entity_1 = require("../../users/entities/user.entity");
 const user_role_entity_1 = require("../../roles/entities/user-role.entity");
+const workspace_member_entity_1 = require("../../workspaces/entities/workspace-member.entity");
 let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(passport_jwt_1.Strategy) {
-    constructor(userRepo, userRoleRepo) {
+    constructor(userRepo, userRoleRepo, memberRepo) {
         super({
             jwtFromRequest: passport_jwt_1.ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
@@ -29,6 +30,7 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
         });
         this.userRepo = userRepo;
         this.userRoleRepo = userRoleRepo;
+        this.memberRepo = memberRepo;
     }
     async validate(payload) {
         const user = await this.userRepo.findOne({ where: { id: payload.sub, isActive: true } });
@@ -46,7 +48,21 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
                 accesses.push(`${ra.access.resource}.${ra.access.action}`);
             }
         }
-        return { id: user.id, email: user.email, displayName: user.displayName, roles, accesses };
+        let workspaces = [];
+        try {
+            const memberships = await this.memberRepo.find({
+                where: { user: { id: user.id } },
+                relations: ['workspace'],
+            });
+            workspaces = memberships.map(m => ({
+                id: m.workspace.id,
+                name: m.workspace.name,
+                memberRole: m.memberRole,
+            }));
+        }
+        catch {
+        }
+        return { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, roles, accesses, workspaces };
     }
 };
 exports.JwtStrategy = JwtStrategy;
@@ -54,7 +70,9 @@ exports.JwtStrategy = JwtStrategy = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
     __param(1, (0, typeorm_1.InjectRepository)(user_role_entity_1.UserRole)),
+    __param(2, (0, typeorm_1.InjectRepository)(workspace_member_entity_1.WorkspaceMember)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository,
         typeorm_2.Repository])
 ], JwtStrategy);
 //# sourceMappingURL=jwt.strategy.js.map

@@ -9,6 +9,10 @@ const access_entity_1 = require("../../modules/roles/entities/access.entity");
 const role_access_entity_1 = require("../../modules/roles/entities/role-access.entity");
 const user_entity_1 = require("../../modules/users/entities/user.entity");
 const user_role_entity_1 = require("../../modules/roles/entities/user-role.entity");
+const workspace_entity_1 = require("../../modules/workspaces/entities/workspace.entity");
+const workspace_member_entity_1 = require("../../modules/workspaces/entities/workspace-member.entity");
+const subscription_entity_1 = require("../../modules/subscriptions/entities/subscription.entity");
+const pricing_plan_entity_1 = require("../../modules/pricing/entities/pricing-plan.entity");
 (0, dotenv_1.config)();
 const DEFAULT_ACCESSES = [
     { resource: 'users', action: 'create', description: 'Create users' },
@@ -51,6 +55,8 @@ const DEFAULT_ACCESSES = [
     { resource: 'cors', action: 'create', description: 'Add CORS origins' },
     { resource: 'cors', action: 'update', description: 'Enable/disable CORS origins' },
     { resource: 'cors', action: 'delete', description: 'Remove CORS origins' },
+    { resource: 'workspaces', action: 'read', description: 'List all workspaces (admin)' },
+    { resource: 'workspaces', action: 'update', description: 'Change workspace subscription (admin)' },
 ];
 const ROLES = [
     {
@@ -78,6 +84,10 @@ async function run() {
     const roleAccessRepo = data_source_1.AppDataSource.getRepository(role_access_entity_1.RoleAccess);
     const userRepo = data_source_1.AppDataSource.getRepository(user_entity_1.User);
     const userRoleRepo = data_source_1.AppDataSource.getRepository(user_role_entity_1.UserRole);
+    const wsRepo = data_source_1.AppDataSource.getRepository(workspace_entity_1.Workspace);
+    const memRepo = data_source_1.AppDataSource.getRepository(workspace_member_entity_1.WorkspaceMember);
+    const subRepo = data_source_1.AppDataSource.getRepository(subscription_entity_1.Subscription);
+    const planRepo = data_source_1.AppDataSource.getRepository(pricing_plan_entity_1.PricingPlan);
     const accessMap = new Map();
     for (const a of DEFAULT_ACCESSES) {
         let entity = await accessRepo.findOneBy({ resource: a.resource, action: a.action });
@@ -116,7 +126,8 @@ async function run() {
         const hash = await bcrypt.hash(adminPassword, 12);
         adminUser = userRepo.create({
             email: adminEmail,
-            displayName: 'Vindicter Admin',
+            firstName: 'Vindicter',
+            lastName: 'Admin',
             passwordHash: hash,
             isActive: true,
         });
@@ -130,6 +141,25 @@ async function run() {
     if (!hasAdminRole) {
         await userRoleRepo.save(userRoleRepo.create({ user: adminUser, role: adminRole }));
         console.log(`  + user_role: ${adminEmail} → admin`);
+    }
+    const existingMembership = await memRepo.findOne({
+        where: { user: { id: adminUser.id } },
+    });
+    if (!existingMembership) {
+        const freePlan = await planRepo.findOneBy({ name: 'Free' });
+        const ws = await wsRepo.save(wsRepo.create({
+            name: 'Admin Workspace',
+            ownerId: adminUser.id,
+        }));
+        await memRepo.save(memRepo.create({ workspace: ws, user: adminUser, memberRole: 'owner' }));
+        await subRepo.save(subRepo.create({
+            workspace: ws,
+            plan: freePlan ?? null,
+            status: 'active',
+            seatLimit: freePlan?.seatLimit ?? 1,
+            projectLimit: freePlan?.projectLimit ?? 3,
+        }));
+        console.log(`  + workspace: Admin Workspace`);
     }
     await data_source_1.AppDataSource.destroy();
     console.log('✓ Seed complete');

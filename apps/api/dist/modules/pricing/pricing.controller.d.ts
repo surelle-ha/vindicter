@@ -8,6 +8,8 @@ export declare class PricingController {
         name: string;
         description?: string;
         tokenLimit: number;
+        seatLimit?: number;
+        projectLimit?: number;
         priceUsd: number;
         sortOrder?: number;
     }): Promise<import("./entities/pricing-plan.entity").PricingPlan>;
@@ -15,6 +17,8 @@ export declare class PricingController {
         name: string;
         description: string | null;
         tokenLimit: number;
+        seatLimit: number;
+        projectLimit: number;
         priceUsd: number;
         isActive: boolean;
         sortOrder: number;

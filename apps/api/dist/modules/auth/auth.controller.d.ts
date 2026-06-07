@@ -2,7 +2,8 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 declare class UpdateProfileDto {
-    displayName?: string;
+    firstName?: string;
+    lastName?: string;
     jobRole?: string;
     experienceLevel?: string;
     onboardingComplete?: boolean;
@@ -21,7 +22,8 @@ export declare class AuthController {
         accesses: any;
         id?: string | undefined;
         email?: string | undefined;
-        displayName?: string | null | undefined;
+        firstName?: string | null | undefined;
+        lastName?: string | null | undefined;
         passwordHash?: string | undefined;
         jobRole?: string | null | undefined;
         experienceLevel?: string | null | undefined;

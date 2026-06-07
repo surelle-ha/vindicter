@@ -25,6 +25,9 @@ const marketing_module_1 = require("./modules/marketing/marketing.module");
 const academy_module_1 = require("./modules/academy/academy.module");
 const defendcore_module_1 = require("./modules/defendcore/defendcore.module");
 const cors_module_1 = require("./modules/cors/cors.module");
+const pricing_module_1 = require("./modules/pricing/pricing.module");
+const workspaces_module_1 = require("./modules/workspaces/workspaces.module");
+const subscriptions_module_1 = require("./modules/subscriptions/subscriptions.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -47,6 +50,9 @@ exports.AppModule = AppModule = __decorate([
             academy_module_1.AcademyModule,
             defendcore_module_1.DefendCoreModule,
             cors_module_1.CorsModule,
+            pricing_module_1.PricingModule,
+            workspaces_module_1.WorkspacesModule,
+            subscriptions_module_1.SubscriptionsModule,
         ],
         providers: [
             { provide: core_1.APP_GUARD, useClass: throttler_1.ThrottlerGuard },

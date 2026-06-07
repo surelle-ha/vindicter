@@ -23,6 +23,11 @@ const academy_chat_session_entity_1 = require("../modules/academy/entities/acade
 const defendcore_config_entity_1 = require("../modules/defendcore/entities/defendcore-config.entity");
 const knowledge_document_entity_1 = require("../modules/defendcore/entities/knowledge-document.entity");
 const cors_origin_entity_1 = require("../modules/cors/entities/cors-origin.entity");
+const pricing_plan_entity_1 = require("../modules/pricing/entities/pricing-plan.entity");
+const workspace_entity_1 = require("../modules/workspaces/entities/workspace.entity");
+const workspace_member_entity_1 = require("../modules/workspaces/entities/workspace-member.entity");
+const workspace_invitation_entity_1 = require("../modules/workspaces/entities/workspace-invitation.entity");
+const subscription_entity_1 = require("../modules/subscriptions/entities/subscription.entity");
 const databaseConfig = () => {
     const url = process.env.DATABASE_URL ?? '';
     if (!url.startsWith('postgres://') && !url.startsWith('postgresql://')) {
@@ -41,6 +46,7 @@ const databaseConfig = () => {
             marketing_template_entity_1.MarketingTemplate, marketing_send_event_entity_1.MarketingSendEvent,
             academy_progress_entity_1.AcademyProgress, academy_chat_session_entity_1.AcademyChatSession,
             defendcore_config_entity_1.DefendCoreConfig, knowledge_document_entity_1.KnowledgeDocument, cors_origin_entity_1.CorsOrigin,
+            pricing_plan_entity_1.PricingPlan, workspace_entity_1.Workspace, workspace_member_entity_1.WorkspaceMember, workspace_invitation_entity_1.WorkspaceInvitation, subscription_entity_1.Subscription,
         ],
         migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
         synchronize: false,

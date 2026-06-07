@@ -21,6 +21,11 @@ import { AcademyChatSession } from '../modules/academy/entities/academy-chat-ses
 import { DefendCoreConfig } from '../modules/defendcore/entities/defendcore-config.entity'
 import { KnowledgeDocument } from '../modules/defendcore/entities/knowledge-document.entity'
 import { CorsOrigin } from '../modules/cors/entities/cors-origin.entity'
+import { PricingPlan } from '../modules/pricing/entities/pricing-plan.entity'
+import { Workspace } from '../modules/workspaces/entities/workspace.entity'
+import { WorkspaceMember } from '../modules/workspaces/entities/workspace-member.entity'
+import { WorkspaceInvitation } from '../modules/workspaces/entities/workspace-invitation.entity'
+import { Subscription } from '../modules/subscriptions/entities/subscription.entity'
 
 export const databaseConfig = (): TypeOrmModuleOptions => {
   const url = process.env.DATABASE_URL ?? ''
@@ -43,6 +48,7 @@ export const databaseConfig = (): TypeOrmModuleOptions => {
       MarketingTemplate, MarketingSendEvent,
       AcademyProgress, AcademyChatSession,
       DefendCoreConfig, KnowledgeDocument, CorsOrigin,
+      PricingPlan, Workspace, WorkspaceMember, WorkspaceInvitation, Subscription,
     ],
     migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
     synchronize: false,

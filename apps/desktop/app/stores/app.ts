@@ -25,6 +25,7 @@ export interface OpenRouterSettings {
 }
 
 export interface OllamaSettings {
+  enabled: boolean
   url: string
   model: string
 }
@@ -84,6 +85,7 @@ const DEFAULT_OPENROUTER: OpenRouterSettings = {
 }
 
 const DEFAULT_OLLAMA: OllamaSettings = {
+  enabled: false,
   url: 'http://localhost:11434',
   model: 'llama3.2',
 }

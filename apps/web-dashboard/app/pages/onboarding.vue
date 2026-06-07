@@ -1,17 +1,14 @@
 <script setup lang="ts">
-import { ArrowRight, Loader2, User, Briefcase, Shield } from 'lucide-vue-next'
+import { Loader2, Briefcase, Shield } from 'lucide-vue-next'
 
 definePageMeta({ layout: false })
 useHead({ title: 'Welcome — Vindicter' })
 
-const { user, updateProfile } = useAuth()
+const { updateProfile } = useAuth()
 const router = useRouter()
 
-const step = ref(1)
 const saving = ref(false)
 const err = ref('')
-
-const displayName = ref((user.value as any)?.user_metadata?.display_name ?? '')
 const jobRole = ref('')
 const experience = ref('')
 
@@ -26,28 +23,25 @@ const jobRoles = [
 ]
 
 const experienceLevels = [
-  { value: 'beginner',      label: 'Beginner',      desc: 'New to security, learning the basics' },
-  { value: 'intermediate',  label: 'Intermediate',   desc: 'Familiar with security concepts and tools' },
-  { value: 'advanced',      label: 'Advanced',       desc: 'Professional experience in security' },
+  { value: 'beginner',     label: 'Beginner',     desc: 'New to security, learning the basics' },
+  { value: 'intermediate', label: 'Intermediate',  desc: 'Familiar with security concepts and tools' },
+  { value: 'advanced',     label: 'Advanced',      desc: 'Professional experience in security' },
 ]
 
 async function finish() {
-  if (!jobRole.value || !experience.value) { err.value = 'Please complete all fields.'; return }
+  if (!jobRole.value || !experience.value) { err.value = 'Please select both a role and experience level.'; return }
   saving.value = true
   err.value = ''
   try {
     await updateProfile({
-      displayName:       displayName.value.trim() || undefined,
       jobRole:           jobRole.value,
       experienceLevel:   experience.value,
       onboardingComplete: true,
     })
     await router.push('/news')
-  }
-  catch (e: any) {
+  } catch (e: any) {
     err.value = e?.message ?? 'Something went wrong. Please try again.'
-  }
-  finally {
+  } finally {
     saving.value = false
   }
 }
@@ -68,51 +62,13 @@ async function finish() {
         <span class="font-display text-[20px] font-black uppercase tracking-widest" style="color:rgba(255,255,255,0.90);">Vindicter</span>
       </div>
 
-      <!-- Step indicators -->
-      <div class="flex items-center justify-center gap-2 mb-8">
-        <div v-for="s in 2" :key="s"
-          class="h-1.5 rounded-full transition-all duration-300"
-          :style="s <= step
-            ? 'background:rgba(139,92,246,0.80);width:28px;'
-            : 'background:rgba(255,255,255,0.12);width:16px;'"
-        />
-      </div>
-
-      <!-- Step 1: Who are you -->
-      <div v-if="step === 1" class="space-y-6">
-        <div class="text-center mb-8">
-          <div class="mx-auto mb-4 h-14 w-14 flex items-center justify-center rounded-2xl" style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.22);">
-            <User class="h-7 w-7" style="color:rgba(167,139,250,0.85);" />
-          </div>
-          <h1 class="font-display text-[28px] font-black uppercase" style="color:rgba(255,255,255,0.92);">Welcome aboard</h1>
-          <p class="mt-2 text-[13px] leading-relaxed" style="color:rgba(255,255,255,0.40);">Let's personalise your experience. This takes under a minute.</p>
-        </div>
-
-        <div>
-          <label class="block mb-2 text-[10px] font-semibold uppercase tracking-wider" style="color:rgba(255,255,255,0.35);">Your name</label>
-          <input
-            v-model="displayName"
-            placeholder="Jane Smith"
-            class="w-full rounded-xl px-4 py-3 text-[13px] text-white outline-none transition-colors border border-white/8 bg-white/[0.04] focus:border-accent/45"
-          />
-        </div>
-
-        <button
-          class="w-full rounded-xl py-3 text-[13px] font-bold flex items-center justify-center gap-2 transition-colors bg-accent hover:bg-accent/90 text-white cursor-pointer"
-          @click="step = 2"
-        >
-          Next <ArrowRight class="h-4 w-4" />
-        </button>
-      </div>
-
-      <!-- Step 2: Role & experience -->
-      <div v-else class="space-y-6">
+      <div class="space-y-6">
         <div class="text-center mb-8">
           <div class="mx-auto mb-4 h-14 w-14 flex items-center justify-center rounded-2xl" style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.22);">
             <Shield class="h-7 w-7" style="color:rgba(167,139,250,0.85);" />
           </div>
           <h1 class="font-display text-[28px] font-black uppercase" style="color:rgba(255,255,255,0.92);">Your background</h1>
-          <p class="mt-2 text-[13px] leading-relaxed" style="color:rgba(255,255,255,0.40);">Helps us tailor your security learning path.</p>
+          <p class="mt-2 text-[13px] leading-relaxed" style="color:rgba(255,255,255,0.40);">Helps us tailor your security experience. Takes under a minute.</p>
         </div>
 
         <!-- Job role -->
@@ -152,21 +108,14 @@ async function finish() {
 
         <p v-if="err" class="text-[11px] text-center" style="color:rgba(242,63,66,0.80);">{{ err }}</p>
 
-        <div class="flex gap-3">
-          <button
-            class="flex-1 rounded-xl py-3 text-[13px] font-semibold transition-colors cursor-pointer"
-            style="border:1px solid rgba(255,255,255,0.10);color:rgba(255,255,255,0.40);"
-            @click="step = 1"
-          >Back</button>
-          <button
-            :disabled="saving || !jobRole || !experience"
-            class="flex-1 rounded-xl py-3 text-[13px] font-bold flex items-center justify-center gap-2 transition-colors bg-accent hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed text-white cursor-pointer"
-            @click="finish"
-          >
-            <Loader2 v-if="saving" class="h-4 w-4 animate-spin" />
-            {{ saving ? 'Saving…' : 'Get started' }}
-          </button>
-        </div>
+        <button
+          :disabled="saving || !jobRole || !experience"
+          class="w-full rounded-xl py-3 text-[13px] font-bold flex items-center justify-center gap-2 transition-colors bg-accent hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed text-white cursor-pointer"
+          @click="finish"
+        >
+          <Loader2 v-if="saving" class="h-4 w-4 animate-spin" />
+          {{ saving ? 'Saving…' : 'Get started' }}
+        </button>
       </div>
 
     </div>

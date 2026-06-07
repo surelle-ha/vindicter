@@ -21,13 +21,21 @@ const bcrypt = require("bcryptjs");
 const user_entity_1 = require("../users/entities/user.entity");
 const user_role_entity_1 = require("../roles/entities/user-role.entity");
 const role_entity_1 = require("../roles/entities/role.entity");
+const workspace_entity_1 = require("../workspaces/entities/workspace.entity");
+const workspace_member_entity_1 = require("../workspaces/entities/workspace-member.entity");
+const subscription_entity_1 = require("../subscriptions/entities/subscription.entity");
+const pricing_plan_entity_1 = require("../pricing/entities/pricing-plan.entity");
 const TURNSTILE_DUMMY_PASS_SECRET = '1x0000000000000000000000000000000AA';
 const TURNSTILE_DUMMY_PASS_TOKEN = 'XXXX.DUMMY.TOKEN.XXXX';
 let AuthService = class AuthService {
-    constructor(userRepo, userRoleRepo, roleRepo, jwt) {
+    constructor(userRepo, userRoleRepo, roleRepo, wsRepo, memRepo, subRepo, planRepo, jwt) {
         this.userRepo = userRepo;
         this.userRoleRepo = userRoleRepo;
         this.roleRepo = roleRepo;
+        this.wsRepo = wsRepo;
+        this.memRepo = memRepo;
+        this.subRepo = subRepo;
+        this.planRepo = planRepo;
         this.jwt = jwt;
     }
     async login(dto) {
@@ -58,10 +66,7 @@ let AuthService = class AuthService {
         if (secret === TURNSTILE_DUMMY_PASS_SECRET && dto.turnstileToken === TURNSTILE_DUMMY_PASS_TOKEN) {
             return;
         }
-        const body = new URLSearchParams({
-            secret,
-            response: dto.turnstileToken,
-        });
+        const body = new URLSearchParams({ secret, response: dto.turnstileToken });
         const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -79,7 +84,8 @@ let AuthService = class AuthService {
         const hash = await bcrypt.hash(dto.password, 12);
         const user = this.userRepo.create({
             email: dto.email.toLowerCase(),
-            displayName: dto.displayName ?? null,
+            firstName: dto.firstName ?? null,
+            lastName: dto.lastName ?? null,
             passwordHash: hash,
         });
         await this.userRepo.save(user);
@@ -87,18 +93,32 @@ let AuthService = class AuthService {
         if (memberRole) {
             await this.userRoleRepo.save(this.userRoleRepo.create({ user, role: memberRole }));
         }
+        const slug = dto.firstName ?? dto.email.split('@')[0];
+        const wsName = `${slug}'s Workspace`;
+        const workspace = await this.wsRepo.save(this.wsRepo.create({ name: wsName, ownerId: user.id }));
+        await this.memRepo.save(this.memRepo.create({ workspace, user, memberRole: 'owner' }));
+        const freePlan = await this.planRepo.findOneBy({ name: 'Free' }).catch(() => null);
+        await this.subRepo.save(this.subRepo.create({
+            workspace,
+            plan: freePlan ?? null,
+            status: 'active',
+            seatLimit: freePlan?.seatLimit ?? 1,
+            projectLimit: freePlan?.projectLimit ?? 3,
+        }));
         return { access_token: this.jwt.sign({ sub: user.id, email: user.email }) };
     }
     async me(userId) {
         return this.userRepo.findOne({
             where: { id: userId },
-            select: ['id', 'email', 'displayName', 'jobRole', 'experienceLevel', 'onboardingComplete', 'createdAt'],
+            select: ['id', 'email', 'firstName', 'lastName', 'jobRole', 'experienceLevel', 'onboardingComplete', 'createdAt'],
         });
     }
     async updateProfile(userId, dto) {
         const patch = {};
-        if (dto.displayName !== undefined)
-            patch.displayName = dto.displayName;
+        if (dto.firstName !== undefined)
+            patch.firstName = dto.firstName;
+        if (dto.lastName !== undefined)
+            patch.lastName = dto.lastName;
         if (dto.jobRole !== undefined)
             patch.jobRole = dto.jobRole;
         if (dto.experienceLevel !== undefined)
@@ -116,7 +136,15 @@ exports.AuthService = AuthService = __decorate([
     __param(0, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
     __param(1, (0, typeorm_1.InjectRepository)(user_role_entity_1.UserRole)),
     __param(2, (0, typeorm_1.InjectRepository)(role_entity_1.Role)),
+    __param(3, (0, typeorm_1.InjectRepository)(workspace_entity_1.Workspace)),
+    __param(4, (0, typeorm_1.InjectRepository)(workspace_member_entity_1.WorkspaceMember)),
+    __param(5, (0, typeorm_1.InjectRepository)(subscription_entity_1.Subscription)),
+    __param(6, (0, typeorm_1.InjectRepository)(pricing_plan_entity_1.PricingPlan)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository,
+        typeorm_2.Repository,
+        typeorm_2.Repository,
+        typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,
         jwt_1.JwtService])

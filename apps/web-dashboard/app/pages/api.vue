@@ -98,7 +98,7 @@ onMounted(fetchTokens)
 </script>
 
 <template>
-  <div class="-m-5 mb-0">
+  <div class="-m-5 mb-6">
     <PageCover title="API &amp; Keys" subtitle="Manage your DefendCore API access tokens. Keep your tokens secure and never share them." :icon="Key"
       icon-bg="rgba(139,92,246,0.25)" icon-color="rgba(167,139,250,0.95)">
       <template #actions>

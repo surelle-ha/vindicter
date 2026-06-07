@@ -9,7 +9,8 @@ export class Initial1749000000000 implements MigrationInterface {
       CREATE TABLE "api_users" (
         "id"            UUID          DEFAULT gen_random_uuid() PRIMARY KEY,
         "email"         VARCHAR(255)  NOT NULL UNIQUE,
-        "display_name"  VARCHAR(100),
+        "first_name"    VARCHAR(100),
+        "last_name"     VARCHAR(100),
         "password_hash" VARCHAR(255)  NOT NULL,
         "is_active"     BOOLEAN       NOT NULL DEFAULT true,
         "created_at"    TIMESTAMPTZ   NOT NULL DEFAULT now(),

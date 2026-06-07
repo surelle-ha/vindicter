@@ -1,8 +1,8 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { Star, Search, Loader2, ShieldAlert, RefreshCw, ChevronDown, Building2 } from 'lucide-vue-next'
 
 definePageMeta({ layout: 'dashboard' })
-useHead({ title: 'Beta Requests — Vindicter' })
+useHead({ title: 'Beta Requests â€” Vindicter' })
 
 const api = useApi()
 const { isAdmin } = useAuth()
@@ -85,12 +85,12 @@ const statusMeta: Record<string, { label: string; style: string }> = {
 }
 
 const partnerMeta: Record<string, { label: string; style: string }> = {
-  partner: { label: 'Partner',  style: 'background:rgba(139,92,246,0.10);border:1px solid rgba(139,92,246,0.20);color:rgba(167,139,250,0.80);' },
+  partner: { label: 'Partner',  style: 'background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.20);color:rgba(251,191,36,0.80);' },
   trusted: { label: 'Trusted',  style: 'background:rgba(79,70,229,0.10);border:1px solid rgba(79,70,229,0.20);color:rgba(129,140,248,0.80);' },
 }
 
 const orgSizeLabel: Record<string, string> = {
-  '1-10': '1–10', '11-50': '11–50', '51-200': '51–200', '201-500': '201–500', '501+': '500+',
+  '1-10': '1â€“10', '11-50': '11â€“50', '51-200': '51â€“200', '201-500': '201â€“500', '501+': '500+',
 }
 
 function fmt(iso: string) {
@@ -148,7 +148,7 @@ function fmt(iso: string) {
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none" style="color:rgba(255,255,255,0.22);" />
         <input
           v-model="search"
-          placeholder="Search by org, contact, country…"
+          placeholder="Search by org, contact, countryâ€¦"
           class="w-full rounded-xl pl-8 pr-4 py-2 text-[12px] text-white outline-none border border-white/8 bg-white/[0.03] focus:border-accent/40"
         />
       </div>
@@ -182,12 +182,12 @@ function fmt(iso: string) {
         <!-- Row -->
         <button
           class="w-full flex items-center gap-4 px-4 py-3.5 text-left transition-colors cursor-pointer"
-          :style="expanded === a.id ? 'background:rgba(139,92,246,0.06);' : 'background:rgba(255,255,255,0.02);'"
+          :style="expanded === a.id ? 'background:rgba(245,158,11,0.06);' : 'background:rgba(255,255,255,0.02);'"
           @click="expanded = expanded === a.id ? null : a.id"
         >
           <!-- Org icon -->
-          <div class="shrink-0 h-7 w-7 rounded-lg flex items-center justify-center" style="background:rgba(139,92,246,0.10);border:1px solid rgba(139,92,246,0.18);">
-            <Building2 class="h-3.5 w-3.5" style="color:rgba(167,139,250,0.65);" />
+          <div class="shrink-0 h-7 w-7 rounded-lg flex items-center justify-center" style="background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.18);">
+            <Building2 class="h-3.5 w-3.5" style="color:rgba(251,191,36,0.65);" />
           </div>
 
           <!-- Info -->
@@ -202,7 +202,7 @@ function fmt(iso: string) {
               </span>
             </div>
             <p class="text-[11px] mt-0.5" style="color:rgba(255,255,255,0.30);">
-              {{ a.contact_name }} · {{ a.contact_email }} · {{ a.country }}
+              {{ a.contact_name }} Â· {{ a.contact_email }} Â· {{ a.country }}
               <span v-if="a.org_size" class="ml-1">({{ orgSizeLabel[a.org_size] ?? a.org_size }} employees)</span>
             </p>
           </div>
@@ -225,7 +225,7 @@ function fmt(iso: string) {
         </button>
 
         <!-- Expanded detail -->
-        <div v-if="expanded === a.id" class="px-4 pb-4 pt-3" style="background:rgba(139,92,246,0.03);border-top:1px solid rgba(139,92,246,0.10);">
+        <div v-if="expanded === a.id" class="px-4 pb-4 pt-3" style="background:rgba(245,158,11,0.03);border-top:1px solid rgba(245,158,11,0.10);">
 
           <!-- Detail grid -->
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
@@ -234,7 +234,7 @@ function fmt(iso: string) {
                 { label: 'Org size',      value: orgSizeLabel[a.org_size] ?? a.org_size },
                 { label: 'Country',       value: a.country },
                 { label: 'Partner type',  value: partnerMeta[a.partner_type]?.label ?? a.partner_type },
-                { label: 'Referral',      value: a.referral ?? '—' },
+                { label: 'Referral',      value: a.referral ?? 'â€”' },
               ]"
               :key="field.label"
               class="rounded-lg px-3 py-2"
@@ -290,3 +290,4 @@ function fmt(iso: string) {
 
   </div>
 </template>
+

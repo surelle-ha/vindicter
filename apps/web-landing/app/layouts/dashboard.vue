@@ -283,7 +283,7 @@ const currentYear = new Date().getFullYear()
           class="shrink-0 flex items-center justify-between px-5 py-2"
           style="border-top:1px solid rgba(255,255,255,0.05);"
         >
-          <p class="text-[10px]" style="color:rgba(255,255,255,0.15);">&copy; {{ currentYear }} Vindicter. Local-first security review.</p>
+          <p class="text-[10px]" style="color:rgba(255,255,255,0.15);">&copy; {{ currentYear }} Vindicter. Professional security platform.</p>
           <div class="flex items-center gap-4">
             <NuxtLink to="/docs" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Docs</NuxtLink>
             <NuxtLink to="/support" class="text-[10px] transition-colors hover:text-white/40 cursor-pointer" style="color:rgba(255,255,255,0.18);">Support</NuxtLink>

@@ -1,34 +1,39 @@
 <script setup lang="ts">
-import { Loader2, Save, User, Mail, Shield, Calendar, KeyRound, Pencil, X } from 'lucide-vue-next'
+import { Loader2, Save, User, Mail, Calendar, KeyRound, Pencil, X } from 'lucide-vue-next'
 
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'Profile — Vindicter' })
 
-const { user, isAdmin, updateProfile } = useAuth()
+const { user, updateProfile } = useAuth()
 
-const editing   = ref(false)
-const saving    = ref(false)
-const resetting = ref(false)
-const saveMsg   = ref('')
-const saveErr   = ref('')
-const newName   = ref('')
+const editing      = ref(false)
+const saving       = ref(false)
+const resetting    = ref(false)
+const saveMsg      = ref('')
+const saveErr      = ref('')
+const newFirstName = ref('')
+const newLastName  = ref('')
 
 const profile = computed(() => {
   if (!user.value) return null
   const u = user.value
+  const parts = [u.firstName, u.lastName].filter(Boolean)
   return {
-    id:          u.id,
-    email:       u.email,
-    displayName: u.displayName ?? u.email ?? 'User',
-    createdAt:   u.createdAt,
+    id:        u.id,
+    email:     u.email,
+    fullName:  parts.length ? parts.join(' ') : (u.email ?? 'User'),
+    firstName: u.firstName ?? '',
+    lastName:  u.lastName ?? '',
+    createdAt: u.createdAt,
   }
 })
 
 function startEdit() {
-  newName.value  = profile.value?.displayName ?? ''
-  saveMsg.value  = ''
-  saveErr.value  = ''
-  editing.value  = true
+  newFirstName.value = profile.value?.firstName ?? ''
+  newLastName.value  = profile.value?.lastName ?? ''
+  saveMsg.value = ''
+  saveErr.value = ''
+  editing.value = true
 }
 
 function cancelEdit() {
@@ -40,10 +45,13 @@ function cancelEdit() {
 async function saveProfile() {
   saveErr.value = ''
   saveMsg.value = ''
-  if (!newName.value.trim()) { saveErr.value = 'Name cannot be empty.'; return }
+  if (!newFirstName.value.trim()) { saveErr.value = 'First name is required.'; return }
   saving.value = true
   try {
-    await updateProfile({ displayName: newName.value.trim() })
+    await updateProfile({
+      firstName: newFirstName.value.trim(),
+      lastName:  newLastName.value.trim() || undefined,
+    })
     editing.value = false
     saveMsg.value = 'Profile updated successfully.'
   } catch (e) {
@@ -74,7 +82,7 @@ function fmt(iso: string) {
 </script>
 
 <template>
-  <div class="-m-5 mb-0">
+  <div class="-m-5 mb-6">
     <PageCover title="My Profile" subtitle="Manage your account information and security settings." :icon="User"
       icon-bg="rgba(139,92,246,0.25)" icon-color="rgba(167,139,250,0.95)" />
   </div>
@@ -95,22 +103,28 @@ function fmt(iso: string) {
 
       <div class="space-y-4">
 
-        <!-- Display name -->
+        <!-- Full name -->
         <div class="flex items-start justify-between gap-4">
           <div class="flex items-start gap-3 flex-1 min-w-0">
             <div class="shrink-0 mt-0.5 h-7 w-7 rounded-lg flex items-center justify-center" style="background:rgba(139,92,246,0.10);border:1px solid rgba(139,92,246,0.18);">
               <User class="h-3.5 w-3.5" style="color:rgba(167,139,250,0.70);" />
             </div>
             <div class="flex-1 min-w-0">
-              <p class="text-[10px] font-semibold uppercase tracking-wider mb-1" style="color:rgba(255,255,255,0.30);">Display name</p>
+              <p class="text-[10px] font-semibold uppercase tracking-wider mb-1" style="color:rgba(255,255,255,0.30);">Full name</p>
               <div v-if="!editing">
-                <p class="text-[14px] font-medium" style="color:rgba(255,255,255,0.85);">{{ profile?.displayName }}</p>
+                <p class="text-[14px] font-medium" style="color:rgba(255,255,255,0.85);">{{ profile?.fullName }}</p>
               </div>
-              <div v-else class="flex items-center gap-2">
+              <div v-else class="flex flex-col gap-2">
                 <input
-                  v-model="newName"
+                  v-model="newFirstName"
                   class="flex-1 rounded-lg px-3 py-1.5 text-[13px] text-white outline-none transition-colors border border-white/10 bg-white/[0.05] focus:border-accent/45"
-                  placeholder="Your name"
+                  placeholder="First name"
+                  @keydown.escape="cancelEdit"
+                />
+                <input
+                  v-model="newLastName"
+                  class="flex-1 rounded-lg px-3 py-1.5 text-[13px] text-white outline-none transition-colors border border-white/10 bg-white/[0.05] focus:border-accent/45"
+                  placeholder="Last name"
                   @keydown.enter="saveProfile"
                   @keydown.escape="cancelEdit"
                 />
@@ -163,31 +177,6 @@ function fmt(iso: string) {
             <p class="text-[10px] font-semibold uppercase tracking-wider mb-1" style="color:rgba(255,255,255,0.30);">Email address</p>
             <p class="text-[14px] font-medium" style="color:rgba(255,255,255,0.85);">{{ profile?.email }}</p>
             <p class="text-[11px] mt-0.5" style="color:rgba(255,255,255,0.25);">Email cannot be changed here.</p>
-          </div>
-        </div>
-
-        <div class="h-px" style="background:rgba(255,255,255,0.05);" />
-
-        <!-- Role -->
-        <div class="flex items-start gap-3">
-          <div
-            class="shrink-0 mt-0.5 h-7 w-7 rounded-lg flex items-center justify-center"
-            :style="isAdmin
-              ? 'background:rgba(139,92,246,0.10);border:1px solid rgba(139,92,246,0.18);'
-              : 'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);'"
-          >
-            <Shield class="h-3.5 w-3.5" :style="isAdmin ? 'color:rgba(167,139,250,0.70);' : 'color:rgba(255,255,255,0.35);'" />
-          </div>
-          <div>
-            <p class="text-[10px] font-semibold uppercase tracking-wider mb-1" style="color:rgba(255,255,255,0.30);">Role</p>
-            <span
-              class="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider"
-              :style="isAdmin
-                ? 'background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.22);color:rgba(167,139,250,0.85);'
-                : 'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);color:rgba(255,255,255,0.45);'"
-            >
-              {{ isAdmin ? 'Administrator' : 'Member' }}
-            </span>
           </div>
         </div>
 

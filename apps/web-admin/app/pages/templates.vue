@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { Braces, Check, FileText, Loader2, Plus, Save, WandSparkles } from 'lucide-vue-next'
 import { useMarketingStore, type CampaignKind } from '~/stores/marketing'
@@ -288,3 +288,4 @@ async function saveTemplate() {
     </div>
   </div>
 </template>
+

@@ -47,7 +47,7 @@ export async function checkAIToolAvailability() {
     checking: false,
   }
   state.ollama = {
-    available: Boolean(app.ollama.url.trim()),
+    available: app.ollama.enabled && Boolean(app.ollama.url.trim()),
     checking: false,
   }
 
@@ -67,15 +67,15 @@ export function useAIToolAvailability() {
   // Sync config-based tools immediately on first use without re-checking CLIs
   if (!checked) {
     state.openrouter.available = app.openRouter.enabled && Boolean(app.openRouter.apiKey.trim())
-    state.ollama.available     = Boolean(app.ollama.url.trim())
+    state.ollama.available     = app.ollama.enabled && Boolean(app.ollama.url.trim())
   }
 
   // Keep config-based tools live-synced with store changes
   watch(
-    () => [app.openRouter.enabled, app.openRouter.apiKey, app.ollama.url],
+    () => [app.openRouter.enabled, app.openRouter.apiKey, app.ollama.enabled, app.ollama.url],
     () => {
       state.openrouter.available = app.openRouter.enabled && Boolean(app.openRouter.apiKey.trim())
-      state.ollama.available     = Boolean(app.ollama.url.trim())
+      state.ollama.available     = app.ollama.enabled && Boolean(app.ollama.url.trim())
     },
   )
 

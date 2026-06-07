@@ -11,8 +11,11 @@ export class User {
   @Column({ unique: true, length: 255 })
   email: string
 
-  @Column({ name: 'display_name', type: 'varchar', nullable: true, length: 100 })
-  displayName: string | null
+  @Column({ name: 'first_name', type: 'varchar', nullable: true, length: 100 })
+  firstName: string | null
+
+  @Column({ name: 'last_name', type: 'varchar', nullable: true, length: 100 })
+  lastName: string | null
 
   @Column({ name: 'password_hash', length: 255 })
   @Exclude()
@@ -41,4 +44,9 @@ export class User {
 
   @OneToMany(() => ApiToken, (t) => t.user, { cascade: true })
   apiTokens: ApiToken[]
+
+  get fullName(): string | null {
+    const parts = [this.firstName, this.lastName].filter(Boolean)
+    return parts.length ? parts.join(' ') : null
+  }
 }

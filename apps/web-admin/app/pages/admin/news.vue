@@ -1,11 +1,11 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import {
   Rss, Plus, Trash2, RefreshCw, Loader2, Globe, CheckCircle2,
   AlertTriangle, ToggleLeft, ToggleRight, ExternalLink,
 } from 'lucide-vue-next'
 
 definePageMeta({ layout: 'dashboard' })
-useHead({ title: 'News Management — Vindicter' })
+useHead({ title: 'News Management â€” Vindicter' })
 
 const api = useApi()
 const { isAdmin } = useAuth()
@@ -167,16 +167,16 @@ onMounted(fetchFeeds)
         </button>
         <button
           class="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold transition-colors cursor-pointer"
-          style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);color:rgba(167,139,250,0.90);"
+          style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);color:rgba(251,191,36,0.90);"
           :disabled="syncing" @click="syncArticles"
         >
           <Loader2 v-if="syncing" class="h-3 w-3 animate-spin" />
           <RefreshCw v-else class="h-3 w-3" />
-          {{ syncing ? 'Syncing…' : 'Sync Now' }}
+          {{ syncing ? 'Syncingâ€¦' : 'Sync Now' }}
         </button>
         <button
           class="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold transition-colors cursor-pointer"
-          style="background:rgba(139,92,246,0.18);border:1px solid rgba(139,92,246,0.30);color:rgba(167,139,250,0.95);"
+          style="background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.30);color:rgba(251,191,36,0.95);"
           @click="showAdd = !showAdd"
         >
           <Plus class="h-3 w-3" /> Add Feed
@@ -191,7 +191,7 @@ onMounted(fetchFeeds)
         : 'background:rgba(242,63,66,0.08);border:1px solid rgba(242,63,66,0.18);color:rgba(242,63,66,0.80);'"
     >{{ msg }}</div>
 
-    <div v-if="syncMsg" class="mb-4 rounded-xl px-4 py-2.5 text-[12px]" style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.18);color:rgba(167,139,250,0.85);">
+    <div v-if="syncMsg" class="mb-4 rounded-xl px-4 py-2.5 text-[12px]" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.18);color:rgba(251,191,36,0.85);">
       {{ syncMsg }}
     </div>
 
@@ -211,7 +211,7 @@ onMounted(fetchFeeds)
         </div>
         <div class="sm:col-span-2">
           <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:rgba(255,255,255,0.30);">RSS URL</label>
-          <input v-model="newFeed.url" placeholder="https://…/rss"
+          <input v-model="newFeed.url" placeholder="https://â€¦/rss"
             class="w-full rounded-xl px-3 py-2 text-[12px] text-white outline-none"
             style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);" />
         </div>
@@ -233,7 +233,7 @@ onMounted(fetchFeeds)
         <button
           :disabled="saving"
           class="flex items-center gap-1.5 rounded-xl px-4 py-2 text-[12px] font-semibold transition-colors disabled:opacity-50 cursor-pointer"
-          style="background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.28);color:rgba(167,139,250,0.90);"
+          style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.28);color:rgba(251,191,36,0.90);"
           @click="addFeed"
         >
           <Loader2 v-if="saving" class="h-3 w-3 animate-spin" />
@@ -284,7 +284,7 @@ onMounted(fetchFeeds)
           </div>
         </div>
         <span class="inline-flex w-max items-center rounded-md px-2 py-0.5 text-[10px] font-semibold capitalize"
-          style="background:rgba(139,92,246,0.10);border:1px solid rgba(139,92,246,0.18);color:rgba(167,139,250,0.75);">
+          style="background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.18);color:rgba(251,191,36,0.75);">
           {{ feed.category }}
         </span>
         <span style="color:rgba(255,255,255,0.25);">{{ fmt(feed.createdAt) }}</span>
@@ -311,3 +311,4 @@ onMounted(fetchFeeds)
 
   </div>
 </template>
+

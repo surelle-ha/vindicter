@@ -89,7 +89,7 @@ async function submit() {
 </script>
 
 <template>
-  <div class="-m-5 mb-0">
+  <div class="-m-5 mb-6">
     <PageCover title="Support" subtitle="We're here to help. Search docs before submitting — most questions are answered there." :icon="LifeBuoy"
       icon-bg="rgba(139,92,246,0.25)" icon-color="rgba(167,139,250,0.95)" />
   </div>

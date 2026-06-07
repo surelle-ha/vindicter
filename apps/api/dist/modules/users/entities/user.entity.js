@@ -15,6 +15,10 @@ const class_transformer_1 = require("class-transformer");
 const user_role_entity_1 = require("../../roles/entities/user-role.entity");
 const api_token_entity_1 = require("../../api-tokens/entities/api-token.entity");
 let User = class User {
+    get fullName() {
+        const parts = [this.firstName, this.lastName].filter(Boolean);
+        return parts.length ? parts.join(' ') : null;
+    }
 };
 exports.User = User;
 __decorate([
@@ -26,9 +30,13 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "email", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'display_name', type: 'varchar', nullable: true, length: 100 }),
+    (0, typeorm_1.Column)({ name: 'first_name', type: 'varchar', nullable: true, length: 100 }),
     __metadata("design:type", Object)
-], User.prototype, "displayName", void 0);
+], User.prototype, "firstName", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'last_name', type: 'varchar', nullable: true, length: 100 }),
+    __metadata("design:type", Object)
+], User.prototype, "lastName", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'password_hash', length: 255 }),
     (0, class_transformer_1.Exclude)(),

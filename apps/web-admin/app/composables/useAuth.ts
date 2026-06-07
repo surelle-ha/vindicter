@@ -3,7 +3,8 @@ import { getStoredToken, setStoredToken } from './useApi'
 interface ApiUser {
   id: string
   email: string
-  displayName: string | null
+  firstName: string | null
+  lastName: string | null
   jobRole: string | null
   experienceLevel: string | null
   onboardingComplete: boolean

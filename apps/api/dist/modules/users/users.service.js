@@ -27,7 +27,7 @@ let UsersService = class UsersService {
     }
     findAll() {
         return this.repo.find({
-            select: ['id', 'email', 'displayName', 'isActive', 'createdAt', 'updatedAt'],
+            select: ['id', 'email', 'firstName', 'lastName', 'isActive', 'createdAt', 'updatedAt'],
             relations: ['userRoles', 'userRoles.role'],
             order: { createdAt: 'DESC' },
         });
@@ -46,8 +46,8 @@ let UsersService = class UsersService {
     async findOne(id) {
         const user = await this.repo.findOne({
             where: { id },
-            select: ['id', 'email', 'displayName', 'isActive', 'createdAt', 'updatedAt'],
-            relations: ['userRoles', 'userRoles.role'],
+            select: ['id', 'email', 'firstName', 'lastName', 'isActive', 'createdAt', 'updatedAt', 'jobRole', 'experienceLevel', 'onboardingComplete'],
+            relations: ['userRoles', 'userRoles.role', 'apiTokens'],
         });
         if (!user)
             throw new common_1.NotFoundException('User not found');

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, Check, Copy, Github, Loader2, RefreshCw, TriangleAlert, X } from 'lucide-vue-next'
+import { Check, Copy, Github, Loader2, RefreshCw, TriangleAlert, X } from 'lucide-vue-next'
 import { useAuthStore } from '~/stores/auth'
 
 const router = useRouter()
@@ -109,24 +109,15 @@ onUnmounted(() => {
 })
 
 onMounted(async () => {
-  await auth.load()
   if (auth.isGitHubConnected) void router.replace('/profile')
 })
 </script>
 
 <template>
   <div class="mx-auto max-w-md py-10 px-6 space-y-5">
-    <button
-      class="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
-      @click="router.push('/profile')"
-    >
-      <ArrowLeft class="size-3.5" />
-      Back to profile
-    </button>
-
     <div>
-      <h2 class="text-sm font-semibold text-[var(--text)] tracking-tight">Sign In with GitHub</h2>
-      <p class="text-xs text-[var(--text-muted)] mt-0.5">Connect your GitHub account to import repositories and create issues.</p>
+      <h2 class="text-sm font-semibold text-[var(--text)] tracking-tight">Connect GitHub</h2>
+      <p class="text-xs text-[var(--text-muted)] mt-0.5">Link your GitHub account to import repositories and create issues.</p>
     </div>
 
     <!-- Success -->
@@ -200,7 +191,8 @@ onMounted(async () => {
 
     <!-- Idle -->
     <template v-else>
-      <div class="rounded-xl bg-[var(--bg-card)] border border-[var(--border)] p-4">
+      <div class="rounded-xl bg-[var(--bg-card)] border border-[var(--border)] p-4 space-y-2">
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">GitHub Device Flow</p>
         <button
           class="w-full flex items-center gap-3 rounded-lg border border-[var(--border)] px-4 py-3 text-left transition-all hover:border-indigo-500/30 hover:bg-indigo-500/[0.05] cursor-pointer"
           :disabled="step === 'requesting'"
@@ -209,8 +201,8 @@ onMounted(async () => {
           <Loader2 v-if="step === 'requesting'" class="size-4 shrink-0 animate-spin text-indigo-300" />
           <Github v-else class="size-4 shrink-0 text-[var(--text-muted)]" />
           <div>
-            <p class="text-sm font-medium text-[var(--text)]">Continue with GitHub</p>
-            <p class="text-xs text-[var(--text-muted)] mt-0.5">Authorizes via GitHub Device Flow — no password shared</p>
+            <p class="text-xs font-medium text-[var(--text)]">Connect with GitHub</p>
+            <p class="text-[10px] text-[var(--text-muted)] mt-0.5">Authorizes via GitHub Device Flow — no password shared</p>
           </div>
         </button>
       </div>

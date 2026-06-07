@@ -17,7 +17,8 @@ onMounted(() => {
 interface UserProfile {
   id: string
   userRoles?: { role: { name: string } }[]
-  displayName?: string
+  firstName?: string | null
+  lastName?: string | null
   email?: string
   createdAt?: string
 }
@@ -59,13 +60,18 @@ async function updateRole(userId: string, newRole: string) {
 
 onMounted(fetchUsers)
 
+function displayName(u: UserProfile) {
+  const parts = [u.firstName, u.lastName].filter(Boolean)
+  return parts.length ? parts.join(' ') : (u.email ?? '—')
+}
+
 const filtered = computed(() => {
   const q = search.value.toLowerCase().trim()
   if (!q) return users.value
   return users.value.filter(u =>
     u.id.toLowerCase().includes(q) ||
     (u.email ?? '').toLowerCase().includes(q) ||
-    (u.displayName ?? '').toLowerCase().includes(q) ||
+    displayName(u).toLowerCase().includes(q) ||
     (u.userRoles?.[0]?.role?.name ?? '').toLowerCase().includes(q)
   )
 })
@@ -157,23 +163,24 @@ function fmt(iso?: string) {
       <div
         v-for="u in filtered"
         :key="u.id"
-        class="grid items-center px-4 py-3 text-[12px] transition-colors hover:bg-white/[0.02]"
+        class="grid items-center px-4 py-3 text-[12px] transition-colors hover:bg-white/[0.03] cursor-pointer"
         style="border-bottom:1px solid rgba(255,255,255,0.04);grid-template-columns:120px 1fr 120px 120px 140px;"
+        @click="router.push('/admin/users/' + u.id)"
       >
         <!-- ID -->
         <span class="font-mono text-[11px]" style="color:rgba(255,255,255,0.25);" :title="u.id">{{ truncId(u.id) }}</span>
 
         <!-- Account -->
         <div class="min-w-0 pr-4">
-          <p class="font-medium truncate" style="color:rgba(255,255,255,0.80);">{{ u.displayName ?? u.email ?? '—' }}</p>
-          <p v-if="u.displayName && u.email" class="text-[11px] truncate mt-0.5" style="color:rgba(255,255,255,0.30);">{{ u.email }}</p>
+          <p class="font-medium truncate" style="color:rgba(255,255,255,0.80);">{{ displayName(u) }}</p>
+          <p v-if="(u.firstName || u.lastName) && u.email" class="text-[11px] truncate mt-0.5" style="color:rgba(255,255,255,0.30);">{{ u.email }}</p>
         </div>
 
         <!-- Role badge -->
         <span
           class="inline-flex w-max items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
           :style="u.userRoles?.[0]?.role?.name === 'admin'
-            ? 'background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.22);color:rgba(167,139,250,0.85);'
+            ? 'background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.22);color:rgba(251,191,36,0.85);'
             : 'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);color:rgba(255,255,255,0.40);'"
         >
           {{ u.userRoles?.[0]?.role?.name ?? 'member' }}
@@ -183,7 +190,7 @@ function fmt(iso?: string) {
         <span style="color:rgba(255,255,255,0.25);">{{ fmt(u.createdAt) }}</span>
 
         <!-- Role select -->
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2" @click.stop>
           <template v-if="u.id === currentUserId">
             <span class="text-[10px]" style="color:rgba(255,255,255,0.20);">—</span>
           </template>
@@ -195,7 +202,7 @@ function fmt(iso?: string) {
               style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);color:rgba(255,255,255,0.60);"
               @change="(e) => updateRole(u.id, (e.target as HTMLSelectElement).value)"
             >
-              <option value="user">User</option>
+              <option value="member">Member</option>
               <option value="admin">Admin</option>
             </select>
             <Loader2 v-if="saving === u.id" class="h-3 w-3 animate-spin" style="color:rgba(255,255,255,0.30);" />

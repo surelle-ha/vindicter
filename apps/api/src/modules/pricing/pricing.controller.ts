@@ -23,7 +23,7 @@ export class PricingController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @RequireRoles('admin')
-  create(@Body() body: { name: string; description?: string; tokenLimit: number; priceUsd: number; sortOrder?: number }) {
+  create(@Body() body: { name: string; description?: string; tokenLimit: number; seatLimit?: number; projectLimit?: number; priceUsd: number; sortOrder?: number }) {
     return this.pricingService.create(body)
   }
 
@@ -32,7 +32,7 @@ export class PricingController {
   @RequireRoles('admin')
   update(
     @Param('id') id: string,
-    @Body() body: Partial<{ name: string; description: string | null; tokenLimit: number; priceUsd: number; isActive: boolean; sortOrder: number }>,
+    @Body() body: Partial<{ name: string; description: string | null; tokenLimit: number; seatLimit: number; projectLimit: number; priceUsd: number; isActive: boolean; sortOrder: number }>,
   ) {
     return this.pricingService.update(id, body)
   }

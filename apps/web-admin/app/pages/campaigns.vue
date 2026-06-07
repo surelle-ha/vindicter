@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { Braces, CalendarClock, Check, FileText, Loader2, Mail, Monitor, RotateCcw, Save, Send, Smartphone } from 'lucide-vue-next'
 import { useMarketingStore } from '~/stores/marketing'
@@ -186,7 +186,7 @@ async function send(testOnly = false) {
             >
               <span class="min-w-0">
                 <span class="block truncate text-[12px] font-medium text-white/78">{{ segment.name }}</span>
-                <span class="mt-0.5 block text-[11px] text-white/30">{{ segment.ownerTeam }} · {{ segment.status }}</span>
+                <span class="mt-0.5 block text-[11px] text-white/30">{{ segment.ownerTeam }} Â· {{ segment.status }}</span>
               </span>
               <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded border" :class="selectedSegmentIds.includes(segment.id) ? 'border-teal bg-teal text-base' : 'border-white/15'">
                 <Check v-if="selectedSegmentIds.includes(segment.id)" class="h-3 w-3" />
@@ -337,3 +337,4 @@ async function send(testOnly = false) {
     </div>
   </div>
 </template>
+

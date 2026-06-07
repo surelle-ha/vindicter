@@ -7,6 +7,10 @@ import { Access } from '../../modules/roles/entities/access.entity'
 import { RoleAccess } from '../../modules/roles/entities/role-access.entity'
 import { User } from '../../modules/users/entities/user.entity'
 import { UserRole } from '../../modules/roles/entities/user-role.entity'
+import { Workspace } from '../../modules/workspaces/entities/workspace.entity'
+import { WorkspaceMember } from '../../modules/workspaces/entities/workspace-member.entity'
+import { Subscription } from '../../modules/subscriptions/entities/subscription.entity'
+import { PricingPlan } from '../../modules/pricing/entities/pricing-plan.entity'
 
 config()
 
@@ -62,6 +66,9 @@ const DEFAULT_ACCESSES: { resource: string; action: string; description: string 
   { resource: 'cors',        action: 'create',  description: 'Add CORS origins' },
   { resource: 'cors',        action: 'update',  description: 'Enable/disable CORS origins' },
   { resource: 'cors',        action: 'delete',  description: 'Remove CORS origins' },
+  // workspaces
+  { resource: 'workspaces',  action: 'read',    description: 'List all workspaces (admin)' },
+  { resource: 'workspaces',  action: 'update',  description: 'Change workspace subscription (admin)' },
 ]
 
 // ── Default roles ────────────────────────────────────────────────────────────
@@ -93,6 +100,10 @@ async function run() {
   const roleAccessRepo = AppDataSource.getRepository(RoleAccess)
   const userRepo       = AppDataSource.getRepository(User)
   const userRoleRepo   = AppDataSource.getRepository(UserRole)
+  const wsRepo         = AppDataSource.getRepository(Workspace)
+  const memRepo        = AppDataSource.getRepository(WorkspaceMember)
+  const subRepo        = AppDataSource.getRepository(Subscription)
+  const planRepo       = AppDataSource.getRepository(PricingPlan)
 
   // ── Seed accesses ──────────────────────────────────────────────────────────
   const accessMap = new Map<string, Access>()
@@ -138,7 +149,8 @@ async function run() {
     const hash = await bcrypt.hash(adminPassword, 12)
     adminUser = userRepo.create({
       email:        adminEmail,
-      displayName:  'Vindicter Admin',
+      firstName:    'Vindicter',
+      lastName:     'Admin',
       passwordHash: hash,
       isActive:     true,
     })
@@ -153,6 +165,27 @@ async function run() {
   if (!hasAdminRole) {
     await userRoleRepo.save(userRoleRepo.create({ user: adminUser, role: adminRole }))
     console.log(`  + user_role: ${adminEmail} → admin`)
+  }
+
+  // ── Ensure admin has a workspace ───────────────────────────────────────────
+  const existingMembership = await memRepo.findOne({
+    where: { user: { id: adminUser.id } },
+  })
+  if (!existingMembership) {
+    const freePlan = await planRepo.findOneBy({ name: 'Free' })
+    const ws = await wsRepo.save(wsRepo.create({
+      name:    'Admin Workspace',
+      ownerId: adminUser.id,
+    }))
+    await memRepo.save(memRepo.create({ workspace: ws, user: adminUser, memberRole: 'owner' }))
+    await subRepo.save(subRepo.create({
+      workspace:    ws,
+      plan:         freePlan ?? null,
+      status:       'active',
+      seatLimit:    freePlan?.seatLimit    ?? 1,
+      projectLimit: freePlan?.projectLimit ?? 3,
+    }))
+    console.log(`  + workspace: Admin Workspace`)
   }
 
   await AppDataSource.destroy()

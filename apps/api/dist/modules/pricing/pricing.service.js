@@ -36,6 +36,8 @@ let PricingService = class PricingService {
             name: dto.name,
             description: dto.description ?? null,
             tokenLimit: dto.tokenLimit,
+            seatLimit: dto.seatLimit ?? 1,
+            projectLimit: dto.projectLimit ?? 3,
             priceUsd: dto.priceUsd,
             sortOrder: dto.sortOrder ?? 0,
         }));

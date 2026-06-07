@@ -8,7 +8,8 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
 
 class UpdateProfileDto {
-  @IsOptional() @IsString() @MaxLength(100) displayName?: string
+  @IsOptional() @IsString() @MaxLength(100) firstName?: string
+  @IsOptional() @IsString() @MaxLength(100) lastName?: string
   @IsOptional() @IsString() @MaxLength(100) jobRole?: string
   @IsOptional() @IsString() @MaxLength(100) experienceLevel?: string
   @IsOptional() @IsBoolean() onboardingComplete?: boolean

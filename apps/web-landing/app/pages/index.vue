@@ -1,7 +1,7 @@
 <script setup lang="ts">
 useLandingSeo({
-  title: 'Vindicter - Local-First Security Workspace',
-  description: 'Download Vindicter, a free local-first desktop security workspace for AI code review, vulnerability tracking, dependency inventory, secret checks, and security lessons.',
+  title: 'Vindicter - AI-Powered Security Platform',
+  description: 'Vindicter is an AI-powered security platform for teams. Automate vulnerability scanning, track findings, inspect dependencies, detect secrets, and level up with the built-in security Academy.',
   path: '/',
 })
 
@@ -66,9 +66,9 @@ const features = [
   },
   {
     title: 'Portable Security Record',
-    badge: 'No account',
+    badge: 'Workspace',
     badgeColor: 'ok',
-    desc: 'Store scans, findings, and history in a local vindicter.json file. Offline-first, readable, no account required.',
+    desc: 'Store scans, findings, and history tied to your workspace. Export or review your security record anytime.',
     icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
   },
   {
@@ -79,10 +79,10 @@ const features = [
     icon: 'M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z',
   },
   {
-    title: 'No Subscription',
+    title: 'Free to Start',
     badge: 'Free',
     badgeColor: 'ok',
-    desc: 'Free to download, free to use forever. No accounts, no telemetry, no data ever leaves your machine.',
+    desc: 'Sign up and start scanning for free. Upgrade to Pro or Enterprise when your team grows.',
     icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
   },
 ]
@@ -251,8 +251,8 @@ const badgeClass: Record<string, string> = {
           class="animate-fade-up mt-7 max-w-lg text-[15px] sm:text-[17px] leading-relaxed text-white/60"
           style="animation-delay:0.45s"
         >
-          AI security workspace and learning platform.<br class="hidden sm:inline" />
-          Scan codebases, track findings, and master security — all on your machine.
+          AI security platform and learning hub for teams.<br class="hidden sm:inline" />
+          Scan codebases, track findings, and master security — together.
         </p>
 
         <!-- CTA buttons -->
@@ -272,7 +272,7 @@ const badgeClass: Record<string, string> = {
         </div>
 
         <p class="animate-fade-up mt-5 text-[11px] text-white/25" style="animation-delay:0.65s">
-          Free · No account required · No telemetry
+          Free tier available · Team workspaces · Windows 10/11
         </p>
       </div>
 
@@ -652,10 +652,10 @@ const badgeClass: Record<string, string> = {
         <img src="/icon.png" alt="Vindicter" class="h-14 w-14 icon-glow" />
         <h2 class="text-[40px] sm:text-[52px] font-display font-black uppercase tracking-wider leading-tight">
           Start securing.<br/>
-          <span class="text-white/30">Without the cloud.</span>
+          <span class="text-white/30">With your team.</span>
         </h2>
         <p class="max-w-md text-[14px] text-white/40 leading-relaxed">
-          Sign up for the open beta, open a project, and run your first scan — offline, no account, forever free.
+          Sign up for the open beta, invite your team, and run your first scan — free to start.
         </p>
         <div class="flex flex-col sm:flex-row items-center gap-4">
           <NuxtLink
@@ -668,7 +668,7 @@ const badgeClass: Record<string, string> = {
             Join the Open Beta
           </NuxtLink>
         </div>
-        <p class="text-[11px] text-white/20">No account · No telemetry · Windows 10/11 · Free</p>
+        <p class="text-[11px] text-white/20">Free tier · Team workspaces · Windows 10/11</p>
       </div>
     </section>
   </div>

@@ -1292,7 +1292,7 @@ onMounted(() => {
           <div class="min-w-0">
             <p class="text-sm font-semibold text-[var(--text)]">Made by Harold Eustaquio</p>
             <p class="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-              Vindicter is a local-first security workspace for scanning projects, tracking remediation, and keeping AI-assisted review grounded in the files you actually ship.
+              Vindicter is an AI-powered security platform for scanning projects, tracking remediation, and keeping your team's security posture sharp.
             </p>
           </div>
         </div>

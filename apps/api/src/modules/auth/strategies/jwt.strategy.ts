@@ -5,6 +5,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt'
 import { Repository } from 'typeorm'
 import { User } from '../../users/entities/user.entity'
 import { UserRole } from '../../roles/entities/user-role.entity'
+import { WorkspaceMember } from '../../workspaces/entities/workspace-member.entity'
 
 interface JwtPayload { sub: string; email: string }
 
@@ -13,6 +14,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(UserRole) private userRoleRepo: Repository<UserRole>,
+    @InjectRepository(WorkspaceMember) private memberRepo: Repository<WorkspaceMember>,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -39,6 +41,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
-    return { id: user.id, email: user.email, displayName: user.displayName, roles, accesses }
+    let workspaces: { id: string; name: string; memberRole: string }[] = []
+    try {
+      const memberships = await this.memberRepo.find({
+        where: { user: { id: user.id } },
+        relations: ['workspace'],
+      })
+      workspaces = memberships.map(m => ({
+        id: m.workspace.id,
+        name: m.workspace.name,
+        memberRole: m.memberRole,
+      }))
+    } catch {
+      // workspace_members table may not exist yet — migration pending
+    }
+
+    return { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, roles, accesses, workspaces }
   }
 }

@@ -1,8 +1,8 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { MessageCircle, Search, Loader2, ShieldAlert, RefreshCw, ChevronDown } from 'lucide-vue-next'
 
 definePageMeta({ layout: 'dashboard' })
-useHead({ title: 'Support Tickets — Vindicter' })
+useHead({ title: 'Support Tickets â€” Vindicter' })
 
 const api = useApi()
 const { isAdmin } = useAuth()
@@ -49,7 +49,7 @@ async function setStatus(ticketId: string, newStatus: string) {
     await api.patch(`/support/tickets/${ticketId}/status`, { status: newStatus })
     const t = tickets.value.find(t => t.id === ticketId)
     if (t) t.status = newStatus
-  } catch { /* silent — table may not have status column */ }
+  } catch { /* silent â€” table may not have status column */ }
   finally { saving.value = null }
 }
 
@@ -142,7 +142,7 @@ function fmt(iso: string) {
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none" style="color:rgba(255,255,255,0.22);" />
         <input
           v-model="search"
-          placeholder="Search tickets…"
+          placeholder="Search ticketsâ€¦"
           class="w-full rounded-xl pl-8 pr-4 py-2 text-[12px] text-white outline-none border border-white/8 bg-white/[0.03] focus:border-accent/40"
         />
       </div>
@@ -200,7 +200,7 @@ function fmt(iso: string) {
                 {{ categoryLabel[t.category] ?? t.category }}
               </span>
             </div>
-            <p class="text-[11px] mt-0.5" style="color:rgba(255,255,255,0.30);">{{ t.name }} · {{ t.email }}</p>
+            <p class="text-[11px] mt-0.5" style="color:rgba(255,255,255,0.30);">{{ t.name }} Â· {{ t.email }}</p>
           </div>
 
           <!-- Date + status badge + chevron -->
@@ -249,3 +249,4 @@ function fmt(iso: string) {
 
   </div>
 </template>
+

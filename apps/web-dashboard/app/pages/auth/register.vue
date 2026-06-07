@@ -9,7 +9,8 @@ const router = useRouter()
 const loading = ref(false)
 const errorMessage = ref('')
 const notice = ref('')
-const displayName = ref('')
+const firstName = ref('')
+const lastName = ref('')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
@@ -40,7 +41,9 @@ async function register() {
   loading.value = true
   try {
     const { signUp } = useAuth()
-    await signUp(email.value.trim(), password.value, displayName.value.trim() || undefined, {
+    await signUp(email.value.trim(), password.value, {
+      firstName: firstName.value.trim() || undefined,
+      lastName:  lastName.value.trim()  || undefined,
       turnstileToken: tsToken.value,
     })
     await router.push('/onboarding')
@@ -67,17 +70,27 @@ async function register() {
     <div class="rounded-2xl p-6 space-y-4" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);">
       <form class="space-y-4" @submit.prevent="register">
 
-        <!-- Display name -->
-        <div>
-          <label class="block mb-2 text-[10px] font-semibold uppercase tracking-wider" style="color:rgba(255,255,255,0.35);">Full name</label>
-          <div class="relative">
-            <User class="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none" style="color:rgba(255,255,255,0.22);" />
+        <!-- Name fields -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block mb-2 text-[10px] font-semibold uppercase tracking-wider" style="color:rgba(255,255,255,0.35);">First name</label>
+            <div class="relative">
+              <User class="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none" style="color:rgba(255,255,255,0.22);" />
+              <input
+                v-model="firstName"
+                autocomplete="given-name"
+                placeholder="Jane"
+                class="w-full rounded-xl pl-9 pr-4 py-2.5 text-[13px] text-white outline-none transition-colors border border-white/8 bg-white/[0.04] focus:border-accent/45"
+              />
+            </div>
+          </div>
+          <div>
+            <label class="block mb-2 text-[10px] font-semibold uppercase tracking-wider" style="color:rgba(255,255,255,0.35);">Last name</label>
             <input
-              v-model="displayName"
-              required
-              autocomplete="name"
-              placeholder="Jane Smith"
-              class="w-full rounded-xl pl-9 pr-4 py-2.5 text-[13px] text-white outline-none transition-colors border border-white/8 bg-white/[0.04] focus:border-accent/45"
+              v-model="lastName"
+              autocomplete="family-name"
+              placeholder="Smith"
+              class="w-full rounded-xl px-4 py-2.5 text-[13px] text-white outline-none transition-colors border border-white/8 bg-white/[0.04] focus:border-accent/45"
             />
           </div>
         </div>

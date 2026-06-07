@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import {
   BookOpen, CheckCircle2, Eye, Globe, Loader2, Plus, RefreshCw,
   Settings, Trash2, Upload, X, FileText, FileCode, ToggleLeft,
@@ -6,7 +6,7 @@ import {
 } from 'lucide-vue-next'
 
 definePageMeta({ layout: 'dashboard' })
-useHead({ title: 'DefendCore — Knowledge Base' })
+useHead({ title: 'DefendCore â€” Knowledge Base' })
 
 const api = useApi()
 const { isAdmin } = useAuth()
@@ -14,15 +14,15 @@ const router = useRouter()
 
 onMounted(() => { if (!isAdmin.value) router.push('/campaigns') })
 
-// ── Types ─────────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface DefendCoreConfig { desktopEnabled: boolean }
 interface KnowledgeDoc { id: string; title: string; chunkCount: number; createdAt: string }
 
-// ── Tabs ──────────────────────────────────────────────────────────────────
+// â”€â”€ Tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type Tab = 'config' | 'knowledge' | 'crawl' | 'upload'
 const activeTab = ref<Tab>('config')
 
-// ── Configuration ─────────────────────────────────────────────────────────
+// â”€â”€ Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const desktopEnabled = ref(false)
 const configLoading  = ref(false)
 const configSaving   = ref(false)
@@ -48,7 +48,7 @@ async function saveConfig() {
   } finally { configSaving.value = false }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function flash(ref: Ref<string>, ok: Ref<boolean>, text: string, isOk: boolean) {
   ref.value = text; ok.value = isOk
   setTimeout(() => { ref.value = '' }, 4000)
@@ -58,7 +58,7 @@ function fmtDate(iso: string) {
 }
 function fmtSize(n: number) { return `${n} chunk${n !== 1 ? 's' : ''}` }
 
-// ── Knowledge base ─────────────────────────────────────────────────────────
+// â”€â”€ Knowledge base â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const docs = ref<KnowledgeDoc[]>([])
 const docsLoading = ref(false)
 const docsErr  = ref('')
@@ -122,7 +122,7 @@ async function reindex() {
   finally   { reindexing.value = false }
 }
 
-// ── Web Crawl ──────────────────────────────────────────────────────────────
+// â”€â”€ Web Crawl â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const crawlUrl    = ref('')
 const crawlTitle  = ref('')
 const crawlMsg    = ref('')
@@ -147,7 +147,7 @@ async function runCrawl() {
   } finally { crawling.value = false }
 }
 
-// ── File Upload ────────────────────────────────────────────────────────────
+// â”€â”€ File Upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const uploadTitle    = ref('')
 const uploadFiles    = ref<File[]>([])
 const uploadMsg      = ref('')
@@ -172,7 +172,7 @@ function fileIcon(name: string) {
 
 function fileLabel(f: File) {
   const kb = (f.size / 1024).toFixed(0)
-  return `${f.name} · ${kb} KB`
+  return `${f.name} Â· ${kb} KB`
 }
 
 async function uploadAll() {
@@ -214,7 +214,7 @@ function fileToBase64(file: File): Promise<string> {
   })
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────
+// â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 onMounted(fetchConfig)
 watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
 </script>
@@ -231,7 +231,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
       <h1 class="text-[26px] font-display font-black uppercase tracking-wide" style="color:rgba(255,255,255,0.90);">DefendCore</h1>
       <p class="mt-1 text-[13px]" style="color:rgba(255,255,255,0.40);">
         Security knowledge base engine. Index documents, crawl URLs, and upload files (PDF, DOCX, TXT, MD).
-        Desktop AI models fetch relevant chunks and use them as context — no LLM runs server-side.
+        Desktop AI models fetch relevant chunks and use them as context â€” no LLM runs server-side.
       </p>
     </div>
 
@@ -243,7 +243,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
         :key="key"
         class="flex items-center gap-1.5 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors cursor-pointer whitespace-nowrap"
         :style="activeTab === key
-          ? 'background:rgba(139,92,246,0.18);border:1px solid rgba(139,92,246,0.28);color:rgba(167,139,250,0.90);'
+          ? 'background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.28);color:rgba(251,191,36,0.90);'
           : 'color:rgba(255,255,255,0.38);'"
         @click="activeTab = key as Tab">
         <Settings v-if="key === 'config'" class="h-3.5 w-3.5" />
@@ -283,8 +283,8 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
         </div>
 
         <!-- Architecture note -->
-        <div class="rounded-xl p-4 space-y-2" style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.14);">
-          <p class="text-[11px] font-semibold" style="color:rgba(167,139,250,0.80);">How RAG retrieval works</p>
+        <div class="rounded-xl p-4 space-y-2" style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.14);">
+          <p class="text-[11px] font-semibold" style="color:rgba(251,191,36,0.80);">How RAG retrieval works</p>
           <div class="space-y-2">
             <div v-for="(step,i) in [
               'Index your security knowledge (CVEs, OWASP, playbooks, threat intel)',
@@ -292,7 +292,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
               'Chunks are prepended to the prompt sent to Claude, Codex, OpenRouter, or Ollama',
               'The local model reasons over your knowledge base without any server-side LLM call',
             ]" :key="i" class="flex items-start gap-2.5">
-              <span class="shrink-0 h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-bold" style="background:rgba(139,92,246,0.15);color:rgba(167,139,250,0.80);">{{ i+1 }}</span>
+              <span class="shrink-0 h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-bold" style="background:rgba(245,158,11,0.15);color:rgba(251,191,36,0.80);">{{ i+1 }}</span>
               <p class="text-[11px] leading-relaxed" style="color:rgba(255,255,255,0.38);">{{ step }}</p>
             </div>
           </div>
@@ -303,7 +303,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
 
         <button :disabled="configSaving" @click="saveConfig"
           class="flex items-center gap-1.5 rounded-xl px-4 py-2 text-[12px] font-semibold cursor-pointer disabled:opacity-50"
-          style="background:rgba(139,92,246,0.18);border:1px solid rgba(139,92,246,0.30);color:rgba(167,139,250,0.90);">
+          style="background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.30);color:rgba(251,191,36,0.90);">
           <Loader2 v-if="configSaving" class="h-3.5 w-3.5 animate-spin" />
           Save Configuration
         </button>
@@ -323,13 +323,13 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
           <div class="flex items-center justify-between mb-4">
             <p class="text-[13px] font-semibold" style="color:rgba(255,255,255,0.75);">
               Indexed Documents
-              <span v-if="docs.length" class="ml-2 rounded-full px-2 py-0.5 text-[10px]" style="background:rgba(139,92,246,0.15);color:rgba(167,139,250,0.70);">{{ docs.length }}</span>
+              <span v-if="docs.length" class="ml-2 rounded-full px-2 py-0.5 text-[10px]" style="background:rgba(245,158,11,0.15);color:rgba(251,191,36,0.70);">{{ docs.length }}</span>
             </p>
             <div class="flex gap-2">
               <button :disabled="docsLoading" @click="fetchDocs" class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] cursor-pointer hover:bg-white/[0.06]" style="border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.35);">
                 <RefreshCw class="h-3 w-3" :class="docsLoading ? 'animate-spin' : ''" /> Refresh
               </button>
-              <button :disabled="reindexing" @click="reindex" class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold cursor-pointer disabled:opacity-50" style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.22);color:rgba(167,139,250,0.85);">
+              <button :disabled="reindexing" @click="reindex" class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold cursor-pointer disabled:opacity-50" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.22);color:rgba(251,191,36,0.85);">
                 <Loader2 v-if="reindexing" class="h-3 w-3 animate-spin" /><RefreshCw v-else class="h-3 w-3" /> Reindex
               </button>
             </div>
@@ -347,10 +347,10 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
               style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.07);">
               <div class="min-w-0">
                 <p class="font-medium truncate text-[13px]" style="color:rgba(255,255,255,0.80);">{{ doc.title }}</p>
-                <p class="text-[11px] mt-0.5" style="color:rgba(255,255,255,0.28);">{{ fmtSize(doc.chunkCount) }} · {{ fmtDate(doc.createdAt) }}</p>
+                <p class="text-[11px] mt-0.5" style="color:rgba(255,255,255,0.28);">{{ fmtSize(doc.chunkCount) }} Â· {{ fmtDate(doc.createdAt) }}</p>
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
-                <button @click="openDocViewer(doc.id)" class="h-7 w-7 flex items-center justify-center rounded-lg cursor-pointer hover:bg-white/[0.07]" style="color:rgba(139,92,246,0.60);" title="View chunks"><Eye class="h-3.5 w-3.5" /></button>
+                <button @click="openDocViewer(doc.id)" class="h-7 w-7 flex items-center justify-center rounded-lg cursor-pointer hover:bg-white/[0.07]" style="color:rgba(245,158,11,0.60);" title="View chunks"><Eye class="h-3.5 w-3.5" /></button>
                 <button @click="deleteDoc(doc.id)"    class="h-7 w-7 flex items-center justify-center rounded-lg cursor-pointer hover:bg-red-500/10" style="color:rgba(248,113,113,0.40);" title="Remove"><Trash2 class="h-3.5 w-3.5" /></button>
               </div>
             </div>
@@ -360,7 +360,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
         <!-- Manual text add -->
         <div class="rounded-xl p-5 space-y-4" style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.08);">
           <div class="flex items-center gap-2">
-            <Plus class="h-4 w-4" style="color:rgba(139,92,246,0.65);" />
+            <Plus class="h-4 w-4" style="color:rgba(245,158,11,0.65);" />
             <p class="text-[12px] font-semibold" style="color:rgba(255,255,255,0.70);">Add Text Document</p>
           </div>
           <div>
@@ -372,7 +372,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
             <textarea v-model="newContent" rows="8" placeholder="Paste CVE descriptions, playbooks, threat intel..." class="w-full resize-y rounded-xl px-3 py-2 text-[12px] leading-6 text-white outline-none" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);" />
           </div>
           <p v-if="addDocErr" class="text-[11px]" style="color:rgba(242,63,66,0.80);">{{ addDocErr }}</p>
-          <button :disabled="addingDoc" @click="addDoc" class="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-semibold cursor-pointer disabled:opacity-50" style="background:rgba(139,92,246,0.18);border:1px solid rgba(139,92,246,0.30);color:rgba(167,139,250,0.90);">
+          <button :disabled="addingDoc" @click="addDoc" class="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-semibold cursor-pointer disabled:opacity-50" style="background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.30);color:rgba(251,191,36,0.90);">
             <Loader2 v-if="addingDoc" class="h-3.5 w-3.5 animate-spin" /><Plus v-else class="h-3.5 w-3.5" />
             Index Document
           </button>
@@ -388,7 +388,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
         <div class="flex items-start gap-2">
           <Globe class="h-3.5 w-3.5 shrink-0 mt-0.5" style="color:rgba(129,140,248,0.60);" />
           <p class="text-[12px] leading-relaxed" style="color:rgba(255,255,255,0.42);">
-            Crawl a public URL — the page text is extracted, chunked, and indexed. Useful for NVD CVE pages, OWASP guides, vendor advisories, and public security writeups.
+            Crawl a public URL â€” the page text is extracted, chunked, and indexed. Useful for NVD CVE pages, OWASP guides, vendor advisories, and public security writeups.
           </p>
         </div>
       </div>
@@ -399,7 +399,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
           <input v-model="crawlUrl" placeholder="https://owasp.org/www-project-top-ten/" class="w-full rounded-xl px-3 py-2.5 font-mono text-[12px] text-white outline-none" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);" @keydown.enter="runCrawl" />
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:rgba(255,255,255,0.30);">Document Title <span style="color:rgba(255,255,255,0.18);">(optional — defaults to URL)</span></label>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:rgba(255,255,255,0.30);">Document Title <span style="color:rgba(255,255,255,0.18);">(optional â€” defaults to URL)</span></label>
           <input v-model="crawlTitle" placeholder="e.g. OWASP Top 10 2024" class="w-full rounded-xl px-3 py-2.5 text-[12px] text-white outline-none" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);" @keydown.enter="runCrawl" />
         </div>
 
@@ -410,7 +410,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
           class="flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-[12px] font-semibold cursor-pointer disabled:opacity-50"
           style="background:rgba(99,102,241,0.18);border:1px solid rgba(99,102,241,0.30);color:rgba(129,140,248,0.90);">
           <Loader2 v-if="crawling" class="h-3.5 w-3.5 animate-spin" /><Link v-else class="h-3.5 w-3.5" />
-          {{ crawling ? 'Crawling…' : 'Crawl & Index' }}
+          {{ crawling ? 'Crawlingâ€¦' : 'Crawl & Index' }}
         </button>
       </div>
 
@@ -418,7 +418,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
         <div class="flex items-start gap-2">
           <AlertTriangle class="h-3.5 w-3.5 shrink-0 mt-0.5" style="color:rgba(251,191,36,0.55);" />
           <div class="text-[11px] leading-relaxed space-y-1" style="color:rgba(255,255,255,0.38);">
-            <p>Only crawls the given URL — does not follow links. For multi-page sites, crawl each page individually.</p>
+            <p>Only crawls the given URL â€” does not follow links. For multi-page sites, crawl each page individually.</p>
             <p>Pages behind authentication, Cloudflare, or JavaScript-rendered SPAs may not extract cleanly.</p>
           </div>
         </div>
@@ -433,7 +433,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
         <div class="flex items-start gap-2">
           <Upload class="h-3.5 w-3.5 shrink-0 mt-0.5" style="color:rgba(34,197,94,0.60);" />
           <p class="text-[12px] leading-relaxed" style="color:rgba(255,255,255,0.42);">
-            Upload and index documents in PDF, DOCX, DOC, TXT, MD, or CSV format. Files are parsed server-side — text is extracted, chunked, and stored. Original files are not retained.
+            Upload and index documents in PDF, DOCX, DOC, TXT, MD, or CSV format. Files are parsed server-side â€” text is extracted, chunked, and stored. Original files are not retained.
           </p>
         </div>
       </div>
@@ -442,8 +442,8 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
 
         <!-- Drop zone -->
         <label class="flex flex-col items-center justify-center gap-2 rounded-xl py-8 cursor-pointer transition-colors hover:bg-white/[0.04]"
-          style="background:rgba(255,255,255,0.02);border:2px dashed rgba(139,92,246,0.28);">
-          <Upload class="h-7 w-7" style="color:rgba(139,92,246,0.45);" />
+          style="background:rgba(255,255,255,0.02);border:2px dashed rgba(245,158,11,0.28);">
+          <Upload class="h-7 w-7" style="color:rgba(245,158,11,0.45);" />
           <p class="text-[12px]" style="color:rgba(255,255,255,0.50);">Click to browse files</p>
           <p class="text-[10px]" style="color:rgba(255,255,255,0.22);">PDF, DOCX, DOC, TXT, MD, CSV</p>
           <input type="file" :accept="ACCEPTED_TYPES" multiple class="hidden" @change="onFilePick" />
@@ -451,7 +451,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
 
         <!-- Optional title override -->
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:rgba(255,255,255,0.30);">Document Title Override <span style="color:rgba(255,255,255,0.18);">(optional — defaults to filename)</span></label>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:rgba(255,255,255,0.30);">Document Title Override <span style="color:rgba(255,255,255,0.18);">(optional â€” defaults to filename)</span></label>
           <input v-model="uploadTitle" placeholder="Leave blank to use filename" class="w-full rounded-xl px-3 py-2 text-[12px] text-white outline-none" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);" />
         </div>
 
@@ -461,7 +461,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
           <div v-for="(f,i) in uploadFiles" :key="i"
             class="flex items-center gap-2.5 rounded-lg px-3 py-2"
             style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);">
-            <component :is="fileIcon(f.name)" class="h-3.5 w-3.5 shrink-0" style="color:rgba(139,92,246,0.55);" />
+            <component :is="fileIcon(f.name)" class="h-3.5 w-3.5 shrink-0" style="color:rgba(245,158,11,0.55);" />
             <p class="flex-1 min-w-0 truncate text-[11px]" style="color:rgba(255,255,255,0.65);">{{ fileLabel(f) }}</p>
             <button @click="removeFile(i)" class="h-5 w-5 flex items-center justify-center rounded cursor-pointer hover:bg-red-500/10" style="color:rgba(248,113,113,0.40);"><X class="h-3 w-3" /></button>
           </div>
@@ -469,7 +469,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
 
         <!-- Progress -->
         <div v-if="uploading" class="rounded-lg overflow-hidden" style="background:rgba(255,255,255,0.06);">
-          <div class="h-1.5 transition-all duration-300" :style="`width:${uploadProgress}%;background:rgba(139,92,246,0.70);`" />
+          <div class="h-1.5 transition-all duration-300" :style="`width:${uploadProgress}%;background:rgba(245,158,11,0.70);`" />
         </div>
 
         <div v-if="uploadMsg" class="rounded-xl px-4 py-2.5 text-[12px]"
@@ -479,7 +479,7 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
           class="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-semibold cursor-pointer disabled:opacity-50"
           style="background:rgba(35,165,90,0.18);border:1px solid rgba(35,165,90,0.28);color:rgba(34,197,94,0.90);">
           <Loader2 v-if="uploading" class="h-3.5 w-3.5 animate-spin" /><Upload v-else class="h-3.5 w-3.5" />
-          {{ uploading ? `Uploading… ${uploadProgress}%` : `Upload & Index ${uploadFiles.length || ''} File${uploadFiles.length !== 1 ? 's' : ''}` }}
+          {{ uploading ? `Uploadingâ€¦ ${uploadProgress}%` : `Upload & Index ${uploadFiles.length || ''} File${uploadFiles.length !== 1 ? 's' : ''}` }}
         </button>
       </div>
     </div>
@@ -492,8 +492,8 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
       <div class="w-full max-w-2xl rounded-2xl overflow-hidden" style="background:#16171a;border:1px solid rgba(255,255,255,0.10);max-height:80vh;display:flex;flex-direction:column;">
         <div class="flex items-center justify-between px-5 py-4" style="border-bottom:1px solid rgba(255,255,255,0.08);">
           <div class="flex items-center gap-2">
-            <BookOpen class="h-4 w-4" style="color:rgba(139,92,246,0.65);" />
-            <p class="text-[13px] font-semibold" style="color:rgba(255,255,255,0.85);">{{ viewDoc?.title ?? 'Loading…' }}</p>
+            <BookOpen class="h-4 w-4" style="color:rgba(245,158,11,0.65);" />
+            <p class="text-[13px] font-semibold" style="color:rgba(255,255,255,0.85);">{{ viewDoc?.title ?? 'Loadingâ€¦' }}</p>
           </div>
           <button @click="viewDoc = null" class="cursor-pointer" style="color:rgba(255,255,255,0.30);"><X class="h-4 w-4" /></button>
         </div>
@@ -510,3 +510,4 @@ watch(activeTab, t => { if (t === 'knowledge') fetchDocs() })
     </div>
   </Teleport>
 </template>
+

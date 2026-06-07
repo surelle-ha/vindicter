@@ -272,7 +272,7 @@ onMounted(() => {
     </Transition>
   </Teleport>
 
-  <div class="-m-5">
+  <div class="-m-5 mb-6">
     <PageCover title="Academy" subtitle="AI-guided security bootcamp. Complete all modules to earn your certificate." :icon="GraduationCap"
       icon-bg="rgba(139,92,246,0.25)" icon-color="rgba(167,139,250,0.95)" />
   </div>

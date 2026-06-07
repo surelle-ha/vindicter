@@ -3,7 +3,8 @@ import { ApiToken } from '../../api-tokens/entities/api-token.entity';
 export declare class User {
     id: string;
     email: string;
-    displayName: string | null;
+    firstName: string | null;
+    lastName: string | null;
     passwordHash: string;
     jobRole: string | null;
     experienceLevel: string | null;
@@ -13,4 +14,5 @@ export declare class User {
     updatedAt: Date;
     userRoles: UserRole[];
     apiTokens: ApiToken[];
+    get fullName(): string | null;
 }

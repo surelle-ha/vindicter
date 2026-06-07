@@ -3,6 +3,8 @@ export declare class PricingPlan {
     name: string;
     description: string | null;
     tokenLimit: number;
+    seatLimit: number;
+    projectLimit: number;
     priceUsd: number;
     isActive: boolean;
     sortOrder: number;
