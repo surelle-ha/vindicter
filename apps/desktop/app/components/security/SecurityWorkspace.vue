@@ -297,9 +297,11 @@ async function copyFixPrompt(finding: SecurityFinding) {
 }
 
 function openValidateModal(finding: SecurityFinding) {
+  if (validateFinding.value?.id !== finding.id) {
+    validateResult.value = null
+    validateError.value = ''
+  }
   validateFinding.value = finding
-  validateResult.value = null
-  validateError.value = ''
   showValidateModal.value = true
 }
 
@@ -369,6 +371,7 @@ async function runValidation() {
   validateRunning.value = true
   validateResult.value = null
   validateError.value = ''
+  showValidateModal.value = false
 
   const tool = validateAITool.value
   const prompt = buildValidationPrompt(finding)
@@ -407,9 +410,14 @@ async function runValidation() {
 
     if (!responseText) throw new Error('AI returned no output.')
     validateResult.value = parseValidationResponse(responseText)
+    const statusLabel: Record<string, string> = { resolved: 'Fix confirmed', present: 'Still present', regressed: 'Regressed', new_issue: 'New issue found' }
+    notify(`Validation complete — ${statusLabel[validateResult.value.status] ?? validateResult.value.status}. Open the finding to review.`, 'success')
+    showValidateModal.value = true
   }
   catch (e: any) {
     validateError.value = e?.message ?? 'Validation failed.'
+    notify('Validation failed. Open the finding to see the error.', 'error')
+    showValidateModal.value = true
   }
   finally {
     validateRunning.value = false
@@ -2850,9 +2858,10 @@ async function clearScanHistory() {
                     <Clipboard class="size-3.5" />
                     Copy Fix Prompt
                   </button>
-                  <button class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2 text-xs font-medium text-violet-300 transition-colors hover:border-violet-500/35 hover:bg-violet-500/10" @click="openValidateModal(finding)">
-                    <FlaskConical class="size-3.5" />
-                    Validate Fix
+                  <button class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2 text-xs font-medium text-violet-300 transition-colors hover:border-violet-500/35 hover:bg-violet-500/10 disabled:opacity-50 disabled:cursor-not-allowed" :disabled="validateRunning && validateFinding?.id === finding.id" @click="openValidateModal(finding)">
+                    <Loader2 v-if="validateRunning && validateFinding?.id === finding.id" class="size-3.5 animate-spin" />
+                    <FlaskConical v-else class="size-3.5" />
+                    {{ validateRunning && validateFinding?.id === finding.id ? 'Validating…' : 'Validate Fix' }}
                   </button>
                 </div>
               </div>

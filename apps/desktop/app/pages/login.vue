@@ -108,8 +108,17 @@ onUnmounted(() => {
   if (pollTimer) clearTimeout(pollTimer)
 })
 
+function onWindowKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' && step.value === 'idle') startGitHubLogin()
+}
+
 onMounted(async () => {
   if (auth.isGitHubConnected) void router.replace('/profile')
+  window.addEventListener('keydown', onWindowKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onWindowKeydown)
 })
 </script>
 

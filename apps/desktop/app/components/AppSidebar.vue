@@ -146,7 +146,7 @@ watch(() => route.fullPath, () => {
 async function handleLogout() {
   await auth.logoutApi()
   await auth.logoutGitHub()
-  void router.push('/login')
+  await router.push('/login')
 }
 </script>
 
@@ -433,9 +433,9 @@ async function handleLogout() {
       <span v-if="!collapsed" class="text-xs">Settings</span>
     </NuxtLink>
 
-    <!-- Sign out (only when API auth is active) -->
+    <!-- Sign out (when any auth is active) -->
     <button
-      v-if="auth.isApiAuthenticated"
+      v-if="auth.isApiAuthenticated || auth.isGitHubConnected"
       class="h-9 flex items-center gap-2 px-3 border-t border-[var(--border)] text-[var(--text-faint)] hover:text-red-400 hover:bg-red-500/[0.04] transition-colors cursor-pointer"
       :class="collapsed ? 'justify-center' : ''"
       title="Sign out"

@@ -6,6 +6,6 @@ export default defineNuxtRouteMiddleware((to) => {
   if (!auth.isApiAuthenticated) {
     const app = useAppStore()
     app.launched = false
-    return abortNavigation()
+    return navigateTo('/login')
   }
 })
