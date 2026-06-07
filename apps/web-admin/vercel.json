@@ -1,0 +1,7 @@
+{
+  "framework": "nuxtjs",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "buildCommand": "nuxt build",
+  "outputDirectory": ".vercel/output",
+  "devCommand": "nuxt dev --port 3005"
+}
