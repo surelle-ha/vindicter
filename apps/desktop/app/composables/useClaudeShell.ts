@@ -16,6 +16,7 @@ interface ClaudeRunOptions {
 }
 
 export async function runClaude(opts: ClaudeRunOptions): Promise<void> {
+  const { registerScanKillHandler } = await import('~/composables/useScanAbort')
   const { prompt, projectPath, onLine, onClose, onError } = opts
   const cmdName = 'claude-run'
   const cmdArgs = ['--output-format', 'stream-json', '--verbose', '--print', prompt]
@@ -23,6 +24,8 @@ export async function runClaude(opts: ClaudeRunOptions): Promise<void> {
   let stdoutBuf = ''
   let allStdout = ''
   let stderrBuf = ''
+  let aborted = false
+  let childProcess: any = null
 
   const command = Command.create(cmdName, cmdArgs, { cwd: projectPath })
 
@@ -37,6 +40,7 @@ export async function runClaude(opts: ClaudeRunOptions): Promise<void> {
   command.stderr.on('data', (data: string) => { stderrBuf += data })
 
   command.on('close', () => {
+    unregister()
     if (stdoutBuf.trim()) onLine(stdoutBuf)
     useUserStore().recordTokenUsage({
       tool: 'Claude',
@@ -45,17 +49,28 @@ export async function runClaude(opts: ClaudeRunOptions): Promise<void> {
       inputTokens: estimateTokens(prompt),
       outputTokens: estimateTokens(allStdout || stderrBuf),
     }).catch(() => {})
-    onClose(stderrBuf)
+    if (aborted) {
+      onError('Claude scan was cancelled.')
+    } else {
+      onClose(stderrBuf)
+    }
   })
 
   command.on('error', (err: string) => {
+    unregister()
     onError(err)
   })
 
+  const unregister = registerScanKillHandler(() => {
+    aborted = true
+    try { childProcess?.kill() } catch { /* ignore */ }
+  })
+
   try {
-    await command.spawn()
+    childProcess = await command.spawn()
   }
   catch (e: any) {
+    unregister()
     onError(e?.message ?? 'Failed to spawn claude process')
   }
 }

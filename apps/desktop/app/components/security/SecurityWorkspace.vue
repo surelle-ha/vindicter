@@ -548,6 +548,13 @@ async function cancelScan() {
   abortAllScans()
 }
 
+async function cancelValidation() {
+  const { abortAllScans } = await import('~/composables/useScanAbort')
+  abortAllScans()
+  validateRunning.value = false
+  validateError.value = 'Validation cancelled.'
+}
+
 function startScanCheckpoint() {
   stopScanCheckpoint()
   scanCheckpointTimer = setInterval(() => {
@@ -2858,10 +2865,18 @@ async function clearScanHistory() {
                     <Clipboard class="size-3.5" />
                     Copy Fix Prompt
                   </button>
-                  <button class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2 text-xs font-medium text-violet-300 transition-colors hover:border-violet-500/35 hover:bg-violet-500/10 disabled:opacity-50 disabled:cursor-not-allowed" :disabled="validateRunning && validateFinding?.id === finding.id" @click="openValidateModal(finding)">
-                    <Loader2 v-if="validateRunning && validateFinding?.id === finding.id" class="size-3.5 animate-spin" />
-                    <FlaskConical v-else class="size-3.5" />
-                    {{ validateRunning && validateFinding?.id === finding.id ? 'Validating…' : 'Validate Fix' }}
+                  <template v-if="validateRunning && validateFinding?.id === finding.id">
+                    <button class="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2 text-xs font-medium text-violet-300 opacity-60 cursor-not-allowed">
+                      <Loader2 class="size-3.5 animate-spin" />
+                      Validating…
+                    </button>
+                    <button class="flex items-center justify-center gap-1 rounded-lg border border-red-500/25 bg-red-500/[0.08] px-2.5 py-2 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/15 cursor-pointer" title="Cancel validation" @click="cancelValidation">
+                      <X class="size-3.5" />
+                    </button>
+                  </template>
+                  <button v-else class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2 text-xs font-medium text-violet-300 transition-colors hover:border-violet-500/35 hover:bg-violet-500/10" @click="openValidateModal(finding)">
+                    <FlaskConical class="size-3.5" />
+                    Validate Fix
                   </button>
                 </div>
               </div>
