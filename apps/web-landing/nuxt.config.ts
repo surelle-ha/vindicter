@@ -29,8 +29,8 @@ export default defineNuxtConfig({
       titleTemplate: (chunk) => chunk ? `${chunk} — ${SITE_NAME}` : TITLE,
       link: [
         { rel: 'canonical',        href: SITE_URL },
-        { rel: 'icon',             href: '/favicon.ico' },
         { rel: 'icon',             type: 'image/png', sizes: '32x32',  href: '/icon.png' },
+        { rel: 'icon',             type: 'image/png', sizes: '192x192', href: '/icon.png' },
         { rel: 'apple-touch-icon', href: '/icon.png' },
         { rel: 'preconnect',       href: 'https://fonts.googleapis.com' },
         { rel: 'preconnect',       href: 'https://fonts.gstatic.com', crossorigin: '' },

@@ -100,7 +100,7 @@ const academyPhases = [
     topics: ['Course orientation', 'How the AI Professor works', 'Terminal & lab setup', 'Setting your goals'],
   },
   {
-    label: 'Week 1',
+    label: 'Phase 1',
     theme: 'Security Foundations',
     lessons: 7,
     color: 'text-indigo-300',
@@ -110,7 +110,7 @@ const academyPhases = [
     topics: ['CIA triad & threat modelling', 'Auth & access control', 'Cryptography basics', 'Secure SDLC', 'OWASP Top 10 intro'],
   },
   {
-    label: 'Week 2',
+    label: 'Phase 2',
     theme: 'Web App Security',
     lessons: 7,
     color: 'text-violet-300',
@@ -120,7 +120,7 @@ const academyPhases = [
     topics: ['SQL injection & XSS', 'CSRF & SSRF', 'Insecure deserialization', 'API security', 'Burp Suite basics'],
   },
   {
-    label: 'Week 3',
+    label: 'Phase 3',
     theme: 'Penetration Testing',
     lessons: 7,
     color: 'text-rose-300',
@@ -130,7 +130,7 @@ const academyPhases = [
     topics: ['Recon & footprinting', 'Network scanning', 'Exploitation basics', 'Privilege escalation', 'Report writing'],
   },
   {
-    label: 'Week 4',
+    label: 'Phase 4',
     theme: 'Defensive Security',
     lessons: 7,
     color: 'text-emerald-300',
@@ -156,7 +156,7 @@ const scanTypes = [
   {
     name: 'Quick Scan',
     subtitle: 'Surface-level · Fast results',
-    badge: 'Default',
+    badge: 'Fast',
     badgeColor: '#23a55a',
     badgeBg: 'rgba(35,165,90,0.15)',
     desc: 'Rapid triage of obvious vulnerabilities. Great for routine checks after commits or dependency updates.',
@@ -165,6 +165,20 @@ const scanTypes = [
       { label: 'Finding limit', value: '~20 items',   color: 'rgba(255,255,255,0.6)' },
       { label: 'Depth',         value: 'Surface',     color: 'rgba(255,255,255,0.6)' },
       { label: 'Best for',      value: 'Daily checks',color: 'rgba(255,255,255,0.6)' },
+    ],
+  },
+  {
+    name: 'Balanced',
+    subtitle: 'Standard depth · Recommended',
+    badge: 'Default',
+    badgeColor: '#3b82f6',
+    badgeBg: 'rgba(59,130,246,0.15)',
+    desc: 'Default review depth for routine project checks. Covers core source, API boundaries, config, dependency risks, and trust boundaries.',
+    stats: [
+      { label: 'Speed',         value: 'Medium',          color: '#3b82f6' },
+      { label: 'Finding limit', value: 'Moderate',        color: 'rgba(255,255,255,0.6)' },
+      { label: 'Depth',         value: 'Core paths',      color: '#3b82f6' },
+      { label: 'Best for',      value: 'Regular reviews', color: 'rgba(255,255,255,0.6)' },
     ],
   },
   {
@@ -228,7 +242,7 @@ const badgeClass: Record<string, string> = {
           </div>
           <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-1.5 text-[11px] font-medium uppercase tracking-widest text-white/50 backdrop-blur-sm">
             <span class="h-1.5 w-1.5 rounded-full bg-ok animate-pulse" />
-            Scan · Learn · Defend · Offline · Free
+            Scan · Learn · Defend · Collaborate · Free
           </div>
         </div>
 
@@ -298,7 +312,7 @@ const badgeClass: Record<string, string> = {
           <span>Security Academy</span><span class="text-accent/40">·</span>
           <span>30 Lessons</span><span class="text-accent/40">·</span>
           <span>AI Professor</span><span class="text-accent/40">·</span>
-          <span>100% Offline</span><span class="text-accent/40">·</span>
+          <span>Team Workspaces</span><span class="text-accent/40">·</span>
           <span>Free Forever</span><span class="text-accent/40">·</span>
         </template>
       </div>
@@ -314,7 +328,7 @@ const badgeClass: Record<string, string> = {
         <p class="text-[11px] font-semibold uppercase tracking-[0.3em] text-accent/70 mb-3">Everything you need</p>
         <h2 class="text-[36px] sm:text-[44px] font-display font-black uppercase leading-tight">
           Built for security review.<br/>
-          <span class="text-white/30">Runs without the cloud.</span>
+          <span class="text-white/30">Works with your team.</span>
         </h2>
       </div>
 
@@ -359,13 +373,12 @@ const badgeClass: Record<string, string> = {
           <p class="mt-3 text-[13px] text-white/40 max-w-lg mx-auto">Choose any supported provider — scans run through whichever model you configure in settings.</p>
         </div>
 
-        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div
             v-for="(provider, i) in [
-              { name: 'Claude',      sub: 'Anthropic',      badge: 'Live', badgeCls: 'bg-ok/15 text-ok',         link: null, icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z', glow: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.20)' },
-              { name: 'OpenRouter',  sub: 'Multi-model',    badge: 'Live', badgeCls: 'bg-ok/15 text-ok',         link: null, icon: 'M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z', glow: 'rgba(14,165,233,0.10)', border: 'rgba(14,165,233,0.20)' },
-              { name: 'Ollama',      sub: 'Local / Offline', badge: 'Live', badgeCls: 'bg-ok/15 text-ok',        link: null, icon: 'M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 15V5.25m19.5 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 7.409a2.25 2.25 0 01-1.07-1.916V5.25', glow: 'rgba(249,115,22,0.10)', border: 'rgba(249,115,22,0.20)' },
-              { name: 'DefendCore',  sub: 'Security Engine', badge: 'Soon', badgeCls: 'bg-white/8 text-white/40', link: '/defendcore', icon: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z', glow: 'rgba(139,92,246,0.07)', border: 'rgba(139,92,246,0.12)' },
+              { name: 'Claude',      sub: 'Anthropic',      badge: 'Live', badgeCls: 'bg-ok/15 text-ok',  link: null, icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z', glow: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.20)' },
+              { name: 'OpenRouter',  sub: 'Multi-model',    badge: 'Live', badgeCls: 'bg-ok/15 text-ok',  link: null, icon: 'M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z', glow: 'rgba(14,165,233,0.10)', border: 'rgba(14,165,233,0.20)' },
+              { name: 'Ollama',      sub: 'Local / Private', badge: 'Live', badgeCls: 'bg-ok/15 text-ok', link: null, icon: 'M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 15V5.25m19.5 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 7.409a2.25 2.25 0 01-1.07-1.916V5.25', glow: 'rgba(249,115,22,0.10)', border: 'rgba(249,115,22,0.20)' },
             ]"
             :key="provider.name"
             :data-reveal="`provider-${i}`"
@@ -404,6 +417,51 @@ const badgeClass: Record<string, string> = {
       </div>
     </section>
 
+    <!-- ── Integrations ─────────────────────────────────────────────────────── -->
+    <section id="integrations" class="px-6 py-20 border-t border-white/5">
+      <div class="max-w-5xl mx-auto">
+        <div
+          data-reveal="integrations-header"
+          :class="['transition-all duration-700 text-center mb-10', isRevealed('integrations-header') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6']"
+        >
+          <p class="text-[11px] font-semibold uppercase tracking-[0.3em] text-accent/70 mb-3">Integrations</p>
+          <h2 class="text-[32px] font-display font-black uppercase leading-tight">Works with tools you already trust</h2>
+          <p class="mt-3 text-[13px] text-white/40 max-w-lg mx-auto">Connect Vindicter to your existing workflow — from issue tracking to repository platforms.</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
+          <div
+            v-for="(integration, i) in [
+              { name: 'GitHub',    sub: 'Issues & Auth',        badge: 'Live', badgeCls: 'bg-ok/15 text-ok',        icon: 'M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22', glow: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.12)' },
+              { name: 'Trivy',     sub: 'Container & IaC',      badge: 'Soon', badgeCls: 'bg-white/8 text-white/40', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', glow: 'rgba(59,130,246,0.06)', border: 'rgba(59,130,246,0.15)' },
+              { name: 'Snyk',      sub: 'Dep & code security',  badge: 'Soon', badgeCls: 'bg-white/8 text-white/40', icon: 'M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2zM7 11V7a5 5 0 0110 0v4', glow: 'rgba(139,92,246,0.06)', border: 'rgba(139,92,246,0.15)' },
+              { name: 'GitLab',    sub: 'Issues & CI',          badge: 'Soon', badgeCls: 'bg-white/8 text-white/40', icon: 'M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5', glow: 'rgba(249,115,22,0.06)', border: 'rgba(249,115,22,0.15)' },
+              { name: 'Bitbucket', sub: 'Repo & pipelines',     badge: 'Soon', badgeCls: 'bg-white/8 text-white/40', icon: 'M6 3v18M18 6a3 3 0 100-6 3 3 0 000 6zM6 21a3 3 0 100-6 3 3 0 000 6zm12-15v6a6 6 0 01-6 6H6', glow: 'rgba(59,130,246,0.06)', border: 'rgba(59,130,246,0.15)' },
+            ]"
+            :key="integration.name"
+            :data-reveal="`integration-${i}`"
+            :class="['transition-all duration-700', isRevealed(`integration-${i}`) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8']"
+            :style="{ transitionDelay: `${i * 80}ms`, borderColor: integration.border, background: 'rgba(30,31,34,0.6)' }"
+            class="relative rounded-2xl border p-5 flex flex-col gap-3 overflow-hidden hover:-translate-y-0.5 transition-transform duration-200"
+          >
+            <div class="absolute -top-8 -right-8 h-28 w-28 rounded-full blur-3xl pointer-events-none opacity-70" :style="{ backgroundColor: integration.glow }" />
+            <div class="relative z-10 flex items-start justify-between">
+              <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.05] border border-white/8">
+                <svg class="h-4 w-4 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" :d="integration.icon" />
+                </svg>
+              </div>
+              <span class="text-[9px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5" :class="integration.badgeCls">{{ integration.badge }}</span>
+            </div>
+            <div class="relative z-10">
+              <p class="text-[13px] font-semibold text-white">{{ integration.name }}</p>
+              <p class="text-[11px] text-white/35 mt-0.5">{{ integration.sub }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ── Scan types ────────────────────────────────────────────────────────── -->
     <section id="scans" class="px-6 py-20 border-t border-white/5">
       <div class="max-w-4xl mx-auto">
@@ -411,12 +469,12 @@ const badgeClass: Record<string, string> = {
           data-reveal="scans-header"
           :class="['transition-all duration-700 text-center mb-12', isRevealed('scans-header') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6']"
         >
-          <p class="text-[11px] font-semibold uppercase tracking-[0.3em] text-accent/70 mb-3">Two scan depths, one workspace</p>
+          <p class="text-[11px] font-semibold uppercase tracking-[0.3em] text-accent/70 mb-3">Three scan depths, one workspace</p>
           <h2 class="text-[36px] font-display font-black uppercase leading-tight">Choose your depth</h2>
           <p class="mt-3 text-[14px] text-white/40">Switch between scan modes anytime from the scan panel.</p>
         </div>
 
-        <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
             v-for="(s, i) in scanTypes"
             :key="s.name"
@@ -476,7 +534,7 @@ const badgeClass: Record<string, string> = {
                 <span class="text-white/30">From zero to pentest.</span>
               </h2>
               <p class="mt-4 max-w-xl text-[14px] leading-relaxed text-white/45">
-                A structured 30-lesson security bootcamp built right into the app. Learn security fundamentals, web attack vectors, penetration testing, and defensive tactics — guided by an AI professor.
+                A structured security curriculum built right into the app. Learn security fundamentals, web attack vectors, penetration testing, and defensive tactics — guided by an AI professor.
               </p>
             </div>
             <!-- CTA -->
@@ -564,7 +622,6 @@ const badgeClass: Record<string, string> = {
                 <div class="mt-3 flex flex-wrap gap-2">
                   <span class="rounded-full bg-accent/10 border border-accent/20 px-2.5 py-0.5 text-[10px] font-semibold text-accent">OpenRouter</span>
                   <span class="rounded-full bg-white/5 border border-white/10 px-2.5 py-0.5 text-[10px] font-semibold text-white/40">Ollama</span>
-                  <span class="rounded-full bg-white/5 border border-white/10 px-2.5 py-0.5 text-[10px] font-semibold text-white/40 opacity-50">DefendCore <span class="text-[8px]">Soon</span></span>
                   <span class="rounded-full bg-ok/10 border border-ok/20 px-2.5 py-0.5 text-[10px] font-semibold text-ok">Professor-gated completion</span>
                 </div>
               </div>
