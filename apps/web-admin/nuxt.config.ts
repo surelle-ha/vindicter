@@ -6,11 +6,8 @@ const DESC     = 'Internal admin and marketing panel for Vindicter.'
 
 export default defineNuxtConfig({
   compatibilityDate: '2025-05-12',
-  ssr: true,
+  ssr: false,
   modules: [],
-  nitro: {
-    preset: 'vercel',
-  },
   runtimeConfig: {
     public: {
       apiBaseUrl:       process.env.NUXT_PUBLIC_API_BASE_URL       ?? 'http://localhost:4000/api/v1',
