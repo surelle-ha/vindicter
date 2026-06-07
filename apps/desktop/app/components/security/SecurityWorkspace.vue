@@ -1614,8 +1614,9 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
   parseWarning.value = null
   if (!automatic) emit('changeTab', 'scanner')
 
-  // Start OSS scanners in parallel with the AI scan
-  const ossPromise = runOssScanners()
+  // Start OSS scanners in parallel with the AI scan (120s timeout prevents hanging)
+  const ossTimeout = new Promise<SecurityScanFinding[]>(resolve => setTimeout(() => resolve([]), 120_000))
+  const ossPromise = Promise.race([runOssScanners(), ossTimeout])
 
   try {
     const scopeConstraint = automatic ? '' : buildScopeConstraint()

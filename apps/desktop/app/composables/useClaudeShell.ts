@@ -36,18 +36,15 @@ export async function runClaude(opts: ClaudeRunOptions): Promise<void> {
 
   command.stderr.on('data', (data: string) => { stderrBuf += data })
 
-  command.on('close', async () => {
+  command.on('close', () => {
     if (stdoutBuf.trim()) onLine(stdoutBuf)
-    try {
-      await useUserStore().recordTokenUsage({
-        tool: 'Claude',
-        model: opts.model || 'Claude CLI default',
-        prompt,
-        inputTokens: estimateTokens(prompt),
-        outputTokens: estimateTokens(allStdout || stderrBuf),
-      })
-    }
-    catch { /* usage tracking should never block Claude work */ }
+    useUserStore().recordTokenUsage({
+      tool: 'Claude',
+      model: opts.model || 'Claude CLI default',
+      prompt,
+      inputTokens: estimateTokens(prompt),
+      outputTokens: estimateTokens(allStdout || stderrBuf),
+    }).catch(() => {})
     onClose(stderrBuf)
   })
 

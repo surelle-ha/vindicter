@@ -8,7 +8,8 @@ import {
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'Workspace — Vindicter' })
 
-const api = useApi()
+const api  = useApi()
+const auth = useAuth()
 
 interface WorkspaceMember {
   id: string
@@ -269,11 +270,11 @@ onMounted(fetchWorkspaces)
               </button>
             </div>
             <!-- View mode -->
-            <div v-else class="flex items-center gap-2 group">
+            <div v-else class="flex items-center gap-2">
               <h2 class="text-[18px] font-display font-black uppercase tracking-wide" style="color:rgba(255,255,255,0.88);">{{ active.name }}</h2>
               <button
-                v-if="active.memberRole && ['owner','admin'].includes(active.memberRole)"
-                class="opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-md p-1 transition-all cursor-pointer"
+                v-if="(active.memberRole && ['owner','admin'].includes(active.memberRole)) || active.ownerId === auth.user.value?.id"
+                class="flex items-center justify-center rounded-md p-1 transition-all cursor-pointer"
                 style="color:rgba(255,255,255,0.30);"
                 title="Rename workspace"
                 @click="startRename"
@@ -330,7 +331,7 @@ onMounted(fetchWorkspaces)
                 {{ active.members?.length ?? 0 }}
               </span>
               <button
-                v-if="active.memberRole && ['owner','admin'].includes(active.memberRole)"
+                v-if="(active.memberRole && ['owner','admin'].includes(active.memberRole)) || active.ownerId === auth.user.value?.id"
                 class="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium transition-colors cursor-pointer"
                 style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.22);color:rgba(167,139,250,0.80);"
                 @click="showInvite = !showInvite"
