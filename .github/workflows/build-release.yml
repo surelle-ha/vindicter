@@ -44,6 +44,10 @@ jobs:
         run: |
           echo "GITHUB_CLIENT_ID=${{ secrets.GH_CLIENT_ID }}" > apps/desktop/tauri/.env
 
+      - name: Download Trivy sidecar
+        working-directory: apps/desktop
+        run: node scripts/download-trivy.mjs
+
       - name: Build Tauri (release)
         working-directory: apps/desktop
         run: pnpm tauri build --config tauri/tauri.conf.json --config tauri/tauri.release.conf.json
