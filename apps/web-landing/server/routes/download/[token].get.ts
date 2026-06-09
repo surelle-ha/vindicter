@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
     if (!validation.ok) throw new Error('invalid')
     const body = await validation.json().catch(() => null) as any
     const data = body?.data ?? body
-    if (!data?.email) throw new Error('invalid')
+    if (!data?.valid) throw new Error('invalid')
   } catch {
     throw createError({ statusCode: 403, message: 'Invalid or expired download token' })
   }

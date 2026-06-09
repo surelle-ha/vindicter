@@ -1,7 +1,7 @@
 <script setup lang="ts">
 useLandingSeo({
   title: 'Vindicter Terms of Service',
-  description: 'Review the Vindicter terms for responsible security testing, licensing, educational Academy content, AI provider usage, and warranty limits.',
+  description: 'Review the Vindicter terms for responsible security testing, licensing, AI provider usage, and warranty limits.',
   path: '/terms',
 })
 
@@ -75,25 +75,15 @@ const lastUpdated = 'May 28, 2026'
           </section>
 
           <section>
-            <h2>4. Academy & Educational Content</h2>
+            <h2>4. AI Features</h2>
             <p>
-              The Vindicter Academy curriculum covers security concepts including penetration testing techniques. This content is provided for educational purposes only. Applying these techniques to systems without authorisation is illegal and unethical.
-            </p>
-            <p>
-              The Academy completion certificate is issued locally and is not an accredited qualification. It is intended as a personal learning milestone.
-            </p>
-          </section>
-
-          <section>
-            <h2>5. AI Features</h2>
-            <p>
-              Vindicter integrates with third-party AI providers (Anthropic Claude, OpenRouter, Ollama) for security scanning and the Academy professor. When you use these features, your data is sent to the respective provider's API under their own terms of service and privacy policy. Vindicter does not control, store, or review that data.
+              Vindicter integrates with third-party AI providers (Anthropic Claude, OpenRouter, Ollama) for security scanning. When you use these features, your data is sent to the respective provider's API under their own terms of service and privacy policy. Vindicter does not control, store, or review that data.
             </p>
             <p>You are responsible for complying with your AI provider's acceptable use policies.</p>
           </section>
 
           <section>
-            <h2>6. No Warranty</h2>
+            <h2>5. No Warranty</h2>
             <p>
               THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
             </p>
@@ -103,21 +93,21 @@ const lastUpdated = 'May 28, 2026'
           </section>
 
           <section>
-            <h2>7. Limitation of Liability</h2>
+            <h2>6. Limitation of Liability</h2>
             <p>
               IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             </p>
           </section>
 
           <section>
-            <h2>8. Changes to These Terms</h2>
+            <h2>7. Changes to These Terms</h2>
             <p>
               We may update these terms at any time. The "last updated" date at the top of this page reflects the most recent revision. Continued use of the Software after a change constitutes acceptance of the revised terms.
             </p>
           </section>
 
           <section>
-            <h2>9. Contact</h2>
+            <h2>8. Contact</h2>
             <p>
               For questions or concerns about these terms, email us at
               <a href="mailto:legal@vindicter.xyz">legal@vindicter.xyz</a>.

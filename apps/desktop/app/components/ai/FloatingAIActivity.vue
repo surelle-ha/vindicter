@@ -5,7 +5,7 @@ const aiActivity = useAIActivityStore()
 const router = useRouter()
 const ticker = ref(Date.now())
 
-const visibleJobs = computed(() => aiActivity.visibleJobs)
+const visibleJobs = computed(() => aiActivity.visibleJobs.filter(j => j.kind !== 'security-scan'))
 
 let timer: ReturnType<typeof setInterval> | null = null
 

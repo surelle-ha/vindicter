@@ -193,14 +193,11 @@ function removeEvent(id: string) {
           </div>
           <div>
             <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-white/50">Status</label>
-            <select
-              v-model="eventStatus"
-              class="w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-indigo-500/50"
-            >
+            <GlassSelect v-model="eventStatus" class="w-full">
               <option value="planned">Planned</option>
               <option value="active">Active</option>
               <option value="done">Done</option>
-            </select>
+            </GlassSelect>
           </div>
         </div>
         <div>

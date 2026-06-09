@@ -6,9 +6,13 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Clipboard,
   Clock3,
+  Cloud,
+  Code2,
+  Cpu,
   Download,
   ExternalLink,
   Eye,
@@ -19,19 +23,26 @@ import {
   FlaskConical,
   FolderOpen,
   Github,
+  Globe,
+  HelpCircle,
   History,
   KeyRound,
   Loader2,
   LockKeyhole,
+  MapPin,
+  Monitor,
+  Network,
   PackageSearch,
   Plus,
   RotateCcw,
   Search,
   SearchCheck,
+  Server,
   Settings,
   ShieldCheck,
   ShieldMinus,
   ShieldX,
+  Smartphone,
   Terminal,
   Trash2,
   TriangleAlert,
@@ -42,7 +53,9 @@ import { runClaudeExec } from '~/composables/useClaudeAI'
 import { runOpenRouterChat } from '~/composables/useOpenRouterAI'
 import { runOllamaChat } from '~/composables/useOllamaAI'
 import type {
+  EnvironmentEntry,
   ProjectMeta,
+  ProjectType,
   SecurityFinding,
   SecurityFindingStatus,
   SecurityScan,
@@ -50,10 +63,15 @@ import type {
   SecurityScanFinding,
   SecuritySeverity,
 } from '~/types/vindicta'
-import { createVindicterSecurityDocx, createVindicterRawReportDocx, buildFixPromptsMarkdown, buildSecurityReviewMarkdown, buildRawReportMarkdown } from '~/utils/docx'
+import { PROJECT_TYPE_LABELS } from '~/types/vindicta'
+import { VAPT_CHECK_CATALOG } from '~/utils/vapt-checks'
+import { sendDesktopNotification } from '~/composables/useDesktopNotification'
+import { useScanProgress } from '~/composables/useScanProgress'
+import { createVindicterSecurityDocx, createVindicterRawReportDocx, buildFixPromptsMarkdown, buildSecurityReviewMarkdown, buildRawReportMarkdown, createVindicterSignOffDocx, buildSignOffMarkdown } from '~/utils/docx'
+import type { VindicterSignOffDocxReport } from '~/utils/docx'
 
 type SecurityAITool = 'codex' | 'claude' | 'openrouter' | 'ollama'
-type SecurityWorkspaceTab = 'overview' | 'scanner' | 'findings' | 'whitelist' | 'dependencies' | 'secrets' | 'reports' | 'settings' | 'github_issues'
+type SecurityWorkspaceTab = 'overview' | 'scanner' | 'findings' | 'whitelist' | 'dependencies' | 'secrets' | 'environment' | 'reports' | 'settings' | 'github_issues'
 type ScanActivityStatus = 'pending' | 'running' | 'done' | 'warning' | 'error'
 
 interface ParsedScanResult {
@@ -74,6 +92,10 @@ interface DependencyInventoryItem {
   name: string
   version: string
   type: string
+  latestVersion?: string
+  latestStatus?: 'up-to-date' | 'outdated' | 'unknown'
+  vulns?: { id: string; severity: string }[]
+  vulnStatus?: 'idle' | 'checking' | 'clean' | 'vulnerable' | 'error'
 }
 
 interface ConfigCheck {
@@ -98,12 +120,16 @@ const app = useAppStore()
 const auth = useAuthStore()
 const projects = useProjectsStore()
 const { notify } = useNotifications()
+const scanProgress = useScanProgress()
 
 const query = ref('')
 const activeScanId = ref<string | null>(null)
 const scanError = ref<string | null>(null)
 const parseWarning = ref<string | null>(null)
 const selectedAITool = ref<SecurityAITool>('codex')
+const selectedAITool2 = ref<SecurityAITool>('claude')
+type ScanMode = 'single' | 'multi_aggregate' | 'multi_collaborative'
+const scanMode = ref<ScanMode>('single')
 const selectedScanEffort = ref<SecurityScanEffort>('medium')
 const selectedFindingLimit = ref(10)
 const metricsCollapsed = ref(false)
@@ -113,11 +139,15 @@ const showScanConfirm = ref(false)
 const scopeScanAll = ref(true)
 const scopeEntries = ref<{ path: string; name: string; isDir: boolean; depth: number; selected: boolean }[]>([])
 const scopeLoading = ref(false)
-const isGitRepo       = ref(false)
-const gitBranches     = ref<string[]>([])
-const gitCurrentBranch = ref<string | null>(null)
-const selectedBranch  = ref<string | null>(null)
+const isGitRepo          = ref(false)
+const gitBranches        = ref<string[]>([])
+const gitLocalBranches   = ref<string[]>([])
+const gitRemoteBranches  = ref<string[]>([])
+const gitCurrentBranch   = ref<string | null>(null)
+const selectedBranch     = ref<string | null>(null)
+const selectedVaptChecks = ref<string[]>([])
 const aiScanRunning = ref(false)
+const scanAborted = ref(false)
 const creatingRemediation = ref(false)
 const exportingDocs = ref(false)
 const showExportModal = ref(false)
@@ -125,7 +155,7 @@ const showExportFormatModal = ref(false)
 const exportingFormat = ref<'review' | 'raw' | 'prompts' | null>(null)
 const pendingExportType = ref<'review' | 'raw' | 'prompts' | null>(null)
 const confirmClearFindings = ref(false)
-const showHistoryDrawer    = ref(false)
+const showHistoryDrawer    = ref(true)
 
 // ── Finding validation ────────────────────────────────────────────────────────
 interface ValidationResult {
@@ -148,6 +178,23 @@ const validateAITool = ref<SecurityAITool>('codex')
 const validateRunning = ref(false)
 const validateResult = ref<ValidationResult | null>(null)
 const validateError = ref('')
+const showValidateExtraInfo = ref(false)
+const validateExtraInfo = ref('')
+
+// ── Bulk validate ──────────────────────────────────────────────────────────────
+interface BulkValidateEntry {
+  id: string
+  title: string
+  severity: SecuritySeverity
+  result: ValidationResult | null
+  error: string
+}
+const showBulkValidateModal = ref(false)
+const bulkValidateRunning = ref(false)
+const bulkValidateCurrent = ref(0)
+const bulkValidateTotal = ref(0)
+const bulkValidateCurrentTitle = ref('')
+const bulkValidateResults = ref<BulkValidateEntry[]>([])
 
 // ── AI tool availability (shared composable) ─────────────────────────────────
 const { toolStatus: toolAvailability, checkAIToolAvailability } = useAIToolAvailability()
@@ -165,9 +212,8 @@ async function checkToolAvailability() {
 const detectedStack = ref<Awaited<ReturnType<typeof detectProjectStack>>>([])
 
 // ── OSS scanner state ─────────────────────────────────────────────────────────
-interface OssToolStatus { name: string; status: 'idle' | 'running' | 'done' | 'skipped' | 'error'; count: number; error?: string }
+interface OssToolStatus { name: string; status: 'idle' | 'running' | 'done' | 'not_found' | 'error'; count: number; error?: string }
 const ossTools = ref<OssToolStatus[]>([
-  { name: 'npm audit', status: 'idle', count: 0 },
   { name: 'Trivy', status: 'idle', count: 0 },
   { name: 'Semgrep', status: 'idle', count: 0 },
 ])
@@ -183,6 +229,49 @@ const ghRepoInput = ref(props.project.githubRepo ?? '')
 const ghRepoSaving = ref(false)
 
 watch(() => props.project.githubRepo, (v) => { ghRepoInput.value = v ?? '' })
+
+// ── Environment configs ────────────────────────────────────────────────────────
+function makeEnv(partial: Partial<EnvironmentEntry> = {}): EnvironmentEntry {
+  return {
+    id:         partial.id         ?? crypto.randomUUID(),
+    name:       partial.name       ?? '',
+    url:        partial.url        ?? '',
+    sshHost:    partial.sshHost    ?? '',
+    sshUser:    partial.sshUser    ?? '',
+    sshKeyPath: partial.sshKeyPath ?? '',
+  }
+}
+
+const environments = ref<EnvironmentEntry[]>(
+  (props.project.environments ?? []).map(makeEnv)
+)
+const envSaving = ref(false)
+
+watch(() => props.project.environments, (v) => {
+  environments.value = (v ?? []).map(makeEnv)
+})
+
+function addEnvironment() {
+  environments.value.push(makeEnv())
+}
+
+function removeEnvironment(id: string) {
+  environments.value = environments.value.filter(e => e.id !== id)
+}
+
+async function saveEnvironments() {
+  envSaving.value = true
+  try {
+    await projects.updateProjectMeta(props.project.id, {
+      environments: environments.value.map(e => ({ ...e })),
+    })
+    notify('Environments saved.', 'success')
+  } catch (e: any) {
+    notify(e?.message ?? 'Could not save environments.', 'error')
+  } finally {
+    envSaving.value = false
+  }
+}
 
 async function saveGitHubRepo() {
   ghRepoSaving.value = true
@@ -300,12 +389,15 @@ function openValidateModal(finding: SecurityFinding) {
   if (validateFinding.value?.id !== finding.id) {
     validateResult.value = null
     validateError.value = ''
+    showValidateExtraInfo.value = false
+    validateExtraInfo.value = ''
   }
   validateFinding.value = finding
   showValidateModal.value = true
 }
 
 function buildValidationPrompt(finding: SecurityFinding): string {
+  const extra = validateExtraInfo.value.trim()
   return `You are a security validation agent for the project "${props.project.name}".
 
 A security finding was previously identified. Inspect the codebase and determine whether it has been resolved, is still present, has regressed, or whether a new related issue has emerged.
@@ -317,7 +409,7 @@ Finding to validate:
   Affected area: ${finding.area}
   Description: ${finding.detail}
 ${finding.evidence ? `  Evidence: ${finding.evidence}\n` : ''}  Recommended fix: ${finding.recommendation}
-
+${extra ? `\nAdditional context from developer:\n${extra}\n` : ''}
 Inspect the relevant source files, configuration, and logic paths. Look for:
 - Evidence the fix described in the recommendation was applied
 - Any remaining instances of the vulnerable pattern
@@ -341,7 +433,7 @@ Return ONLY valid JSON — no markdown fences, no extra text:
 Include "newFinding" only when status is "new_issue". Omit it otherwise.`
 }
 
-function parseValidationResponse(text: string): ValidationResult {
+function parseValidationResponse(text: string, finding: SecurityFinding): ValidationResult {
   const raw = parseJsonPayload(text) as Record<string, unknown>
   const status = ['resolved', 'present', 'regressed', 'new_issue'].includes(String(raw?.status))
     ? (raw.status as ValidationResult['status'])
@@ -372,6 +464,15 @@ async function runValidation() {
   validateResult.value = null
   validateError.value = ''
   showValidateModal.value = false
+  scanProgress.value = {
+    running: true,
+    kind: 'validation',
+    label: 'Validating fix',
+    detail: finding.title,
+    tool: validateAITool.value,
+    effort: 'medium',
+    startedAt: new Date().toISOString(),
+  }
 
   const tool = validateAITool.value
   const prompt = buildValidationPrompt(finding)
@@ -409,7 +510,7 @@ async function runValidation() {
     }
 
     if (!responseText) throw new Error('AI returned no output.')
-    validateResult.value = parseValidationResponse(responseText)
+    validateResult.value = parseValidationResponse(responseText, finding)
     const statusLabel: Record<string, string> = { resolved: 'Fix confirmed', present: 'Still present', regressed: 'Regressed', new_issue: 'New issue found' }
     notify(`Validation complete — ${statusLabel[validateResult.value.status] ?? validateResult.value.status}. Open the finding to review.`, 'success')
     showValidateModal.value = true
@@ -421,15 +522,17 @@ async function runValidation() {
   }
   finally {
     validateRunning.value = false
+    scanProgress.value.running = false
   }
 }
 
 async function applyValidationResolved() {
   const finding = validateFinding.value
   if (!finding) return
-  await security.updateFindingStatus(finding.id, 'resolved')
+  const persist = security.updateFindingStatus(finding.id, 'resolved')
   notify(`"${finding.title}" marked as resolved.`, 'success')
   showValidateModal.value = false
+  await persist
 }
 
 async function addValidationNewFinding() {
@@ -477,6 +580,11 @@ interface EnvFile { path: string; relPath: string; vars: EnvVar[] }
 const envFiles = ref<EnvFile[]>([])
 const envLoading = ref(false)
 const redactAll = ref(true)
+
+// ── Findings filters + expand ─────────────────────────────────────────────────
+const filterStatus   = ref<SecurityFindingStatus | 'all'>('all')
+const filterSeverity = ref<SecuritySeverity | 'all'>('all')
+const expandedFindingId = ref<string | null>(null)
 
 // ── Bulk selection ────────────────────────────────────────────────────────────
 const selectedFindingIds = ref(new Set<string>())
@@ -532,6 +640,114 @@ function copyBulkFixPrompts() {
   selectedFindingIds.value = new Set()
 }
 const dependencyInventory = ref<DependencyInventoryItem[]>([])
+const depEnriching = ref(false)
+const depQuery = ref('')
+const showCvePanel = ref(false)
+const selectedCveItem = ref<DependencyInventoryItem | null>(null)
+
+const depEcosystem = (item: DependencyInventoryItem): string => {
+  const t = item.type.toLowerCase()
+  if (['dependencies', 'devdependencies', 'optionaldependencies', 'peerdependencies', 'require', 'require-dev'].some(x => t === x)) return 'npm'
+  if (t === 'python') return 'PyPI'
+  if (t === 'ruby') return 'RubyGems'
+  if (t === 'go') return 'Go'
+  if (t === 'maven' || t === 'gradle') return 'Maven'
+  if (t === '.net') return 'NuGet'
+  if (item.manifest.toLowerCase().includes('cargo')) return 'crates.io'
+  return ''
+}
+
+const depTypeColor: Record<string, string> = {
+  npm: 'border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300',
+  PyPI: 'border-blue-500/30 bg-blue-500/[0.08] text-blue-300',
+  RubyGems: 'border-red-400/30 bg-red-400/[0.06] text-red-300',
+  Go: 'border-cyan-500/30 bg-cyan-500/[0.08] text-cyan-300',
+  Maven: 'border-amber-500/30 bg-amber-500/[0.08] text-amber-300',
+  NuGet: 'border-violet-500/30 bg-violet-500/[0.08] text-violet-300',
+  'crates.io': 'border-orange-500/30 bg-orange-500/[0.08] text-orange-300',
+}
+
+const filteredDepInventory = computed(() => {
+  const q = depQuery.value.trim().toLowerCase()
+  if (!q) return dependencyInventory.value
+  return dependencyInventory.value.filter(d =>
+    d.name.toLowerCase().includes(q) || d.version.toLowerCase().includes(q) || d.manifest.toLowerCase().includes(q),
+  )
+})
+
+const depsByManifest = computed(() => {
+  const map = new Map<string, DependencyInventoryItem[]>()
+  for (const item of filteredDepInventory.value) {
+    const key = item.manifest.split(/[\\/]/).slice(-2).join('/')
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(item)
+  }
+  return map
+})
+
+async function enrichDependencies() {
+  if (depEnriching.value || !dependencyInventory.value.length) return
+  depEnriching.value = true
+  try {
+    const items = dependencyInventory.value
+    const osvQueries = items.map(item => {
+      const eco = depEcosystem(item)
+      if (!eco) return null
+      return { package: { name: item.name, ecosystem: eco } }
+    })
+
+    // Fetch latest npm versions
+    const npmItems = items.filter(i => depEcosystem(i) === 'npm')
+    const npmBatch = npmItems.slice(0, 60)
+    await Promise.allSettled(npmBatch.map(async (item) => {
+      try {
+        const res = await fetch(`https://registry.npmjs.org/${encodeURIComponent(item.name)}/latest`, { signal: AbortSignal.timeout(5000) })
+        if (res.ok) {
+          const data = await res.json() as { version?: string }
+          if (data.version) {
+            const clean = item.version.replace(/^[\^~>=<*]+/, '').trim()
+            item.latestVersion = data.version
+            item.latestStatus = clean === data.version ? 'up-to-date' : (clean && clean !== 'unspecified' ? 'outdated' : 'unknown')
+          }
+        }
+      } catch { item.latestStatus = 'unknown' }
+    }))
+
+    // Batch CVE check via OSV.dev
+    const validQueries = osvQueries.filter(Boolean).slice(0, 100)
+    if (validQueries.length) {
+      try {
+        const res = await fetch('https://api.osv.dev/v1/querybatch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ queries: validQueries }),
+          signal: AbortSignal.timeout(10000),
+        })
+        if (res.ok) {
+          const data = await res.json() as { results: { vulns?: { id: string; severity?: { type: string; score: number }[] }[] }[] }
+          let idx = 0
+          for (let i = 0; i < items.length; i++) {
+            if (!osvQueries[i]) continue
+            const result = data.results[idx++]
+            if (result?.vulns?.length) {
+              items[i]!.vulns = result.vulns.map(v => ({
+                id: v.id,
+                severity: v.severity?.[0]?.type ?? 'UNKNOWN',
+              }))
+              items[i]!.vulnStatus = 'vulnerable'
+            } else {
+              items[i]!.vulnStatus = 'clean'
+            }
+          }
+        }
+      } catch { /* OSV unavailable — silently skip */ }
+    }
+
+    dependencyInventory.value = [...items]
+  } finally {
+    depEnriching.value = false
+  }
+}
 const configChecks = ref<ConfigCheck[]>([])
 const reportSection = ref<HTMLElement | null>(null)
 const scanStartedAt = ref<string | null>(null)
@@ -544,6 +760,14 @@ let activeSecurityJobId: string | null = null
 let autoScanStartedForProject: string | null = null
 
 async function cancelScan() {
+  scanAborted.value = true
+  aiScanRunning.value = false
+  stopScanActivityTimer()
+  stopScanCheckpoint()
+  if (activeSecurityJobId) {
+    aiActivity.finishJob(activeSecurityJobId, 'interrupted', 'Scan cancelled by user.')
+    activeSecurityJobId = null
+  }
   const { abortAllScans } = await import('~/composables/useScanAbort')
   abortAllScans()
 }
@@ -553,6 +777,106 @@ async function cancelValidation() {
   abortAllScans()
   validateRunning.value = false
   validateError.value = 'Validation cancelled.'
+}
+
+function openBulkValidateModal() {
+  const findings = [...selectedFindingIds.value]
+    .map(id => security.findings.find(f => f.id === id))
+    .filter(Boolean) as SecurityFinding[]
+  if (!findings.length) return
+  bulkValidateResults.value = findings.map(f => ({ id: f.id, title: f.title, severity: f.severity, result: null, error: '' }))
+  bulkValidateRunning.value = false
+  bulkValidateCurrent.value = 0
+  bulkValidateTotal.value = findings.length
+  showBulkValidateModal.value = true
+}
+
+async function runBulkValidation() {
+  if (!props.project.absolutePath) return
+  const findings = bulkValidateResults.value
+    .map(e => security.findings.find(f => f.id === e.id))
+    .filter(Boolean) as SecurityFinding[]
+  if (!findings.length) return
+
+  bulkValidateRunning.value = true
+  bulkValidateCurrent.value = 0
+  bulkValidateTotal.value = findings.length
+
+  scanProgress.value = {
+    running: true,
+    kind: 'validation',
+    label: `Validating 0 of ${findings.length}`,
+    detail: `${findings.length} finding${findings.length !== 1 ? 's' : ''} in parallel`,
+    tool: validateAITool.value,
+    effort: 'medium',
+    startedAt: new Date().toISOString(),
+  }
+
+  const tool = validateAITool.value
+  await Promise.allSettled(
+    findings.map(async (finding, i) => {
+      const prompt = buildValidationPrompt(finding)
+      try {
+        let responseText = ''
+        if (tool === 'openrouter') {
+          responseText = await runOpenRouterChat({
+            apiKey: app.openRouter.apiKey,
+            model: app.openRouter.model,
+            messages: [
+              { role: 'system', content: 'You are Vindicter, an AI security validator. Return only the JSON requested by the user.' },
+              { role: 'user', content: prompt },
+            ],
+          })
+        } else if (tool === 'ollama') {
+          responseText = await runOllamaChat({
+            url: app.ollama.url,
+            model: app.ollama.model,
+            messages: [
+              { role: 'system', content: 'You are Vindicter, an AI security validator. Return only the JSON requested by the user.' },
+              { role: 'user', content: prompt },
+            ],
+          })
+        } else if (tool === 'claude') {
+          const r = await runClaudeExec({ projectPath: props.project.absolutePath!, prompt, model: 'Claude CLI default', reasoningEffort: 'medium' })
+          responseText = [r.stdout, r.stderr].filter(Boolean).join('\n').trim()
+        } else {
+          const r = await runCodexExec({ projectPath: props.project.absolutePath!, prompt, model: 'Codex CLI default', reasoningEffort: 'medium' })
+          responseText = [r.stdout, r.stderr].filter(Boolean).join('\n').trim()
+        }
+        if (!responseText) throw new Error('AI returned no output.')
+        bulkValidateResults.value[i]!.result = parseValidationResponse(responseText, finding)
+      } catch (e: any) {
+        bulkValidateResults.value[i]!.error = e?.message ?? 'Validation failed.'
+      } finally {
+        bulkValidateCurrent.value++
+        scanProgress.value.label = `Validating ${bulkValidateCurrent.value} of ${findings.length}`
+      }
+    }),
+  )
+
+  bulkValidateRunning.value = false
+  scanProgress.value.running = false
+  const resolved = bulkValidateResults.value.filter(e => e.result?.status === 'resolved').length
+  notify(`Bulk validation complete — ${resolved} of ${findings.length} finding${findings.length !== 1 ? 's' : ''} resolved.`, 'success')
+}
+
+async function bulkMarkAllResolved() {
+  const toResolve = bulkValidateResults.value.filter(e => e.result?.status === 'resolved')
+  // Fire all in-memory updates synchronously (async function executes synchronously to first await)
+  const persists = toResolve.map(entry => security.updateFindingStatus(entry.id, 'resolved'))
+  // Close modal and notify immediately — UI reflects in-memory updates at next tick
+  notify(`${toResolve.length} finding${toResolve.length !== 1 ? 's' : ''} marked as resolved.`, 'success')
+  showBulkValidateModal.value = false
+  selectedFindingIds.value = new Set()
+  // Drain persists in the background
+  await Promise.allSettled(persists)
+}
+
+async function cancelBulkValidation() {
+  const { abortAllScans } = await import('~/composables/useScanAbort')
+  abortAllScans()
+  bulkValidateRunning.value = false
+  scanProgress.value.running = false
 }
 
 function startScanCheckpoint() {
@@ -708,6 +1032,25 @@ const severityClasses: Record<SecuritySeverity, string> = {
   low: 'border-sky-500/25 bg-sky-500/10 text-sky-300',
 }
 
+const severityLeftBorder: Record<SecuritySeverity, string> = {
+  critical: 'border-l-red-500',
+  high: 'border-l-orange-500',
+  medium: 'border-l-amber-400',
+  low: 'border-l-sky-400',
+}
+
+const findingCountByStatus = computed(() => {
+  const counts: Record<string, number> = { all: security.findings.length }
+  for (const f of security.findings) counts[f.status] = (counts[f.status] ?? 0) + 1
+  return counts
+})
+
+const findingCountBySeverity = computed(() => {
+  const counts: Record<string, number> = { all: security.findings.length }
+  for (const f of security.findings) counts[f.severity] = (counts[f.severity] ?? 0) + 1
+  return counts
+})
+
 const statusClasses: Record<SecurityFindingStatus, string> = {
   open: 'border-red-500/20 bg-red-500/10 text-red-300',
   triaged: 'border-indigo-500/20 bg-indigo-500/10 text-indigo-300',
@@ -734,7 +1077,11 @@ const canUseSelectedAITool = computed(() => {
   return true
 })
 const latestScan = computed(() => security.latestScan)
-const activeScan = computed(() => security.scans.find(scan => scan.id === activeScanId.value) ?? latestScan.value)
+const scanViewEmpty = ref(false)
+const activeScan = computed(() => {
+  if (scanViewEmpty.value) return undefined
+  return security.scans.find(scan => scan.id === activeScanId.value) ?? latestScan.value
+})
 const scanFindings = computed(() => activeScan.value?.findings ?? [])
 const selectedScanFindings = computed(() => scanFindings.value.filter(finding => finding.selected))
 const remediatedTitles = computed(() => new Set(security.findings.map(f => f.title.trim().toLowerCase())))
@@ -751,18 +1098,13 @@ const formattedLastScan = computed(() => latestScan.value ? new Date(latestScan.
 const highRiskScans = computed(() => scanFindings.value.filter(finding => finding.severity === 'critical' || finding.severity === 'high').length)
 const filteredFindings = computed(() => {
   const text = query.value.trim().toLowerCase()
-  if (!text) return security.findings
-  return security.findings.filter(finding =>
-    [
-      finding.title,
-      finding.area,
-      finding.severity,
-      finding.status,
-      finding.detail,
-      finding.category,
-      finding.source,
-    ].some(value => String(value).toLowerCase().includes(text)),
-  )
+  return security.findings.filter(finding => {
+    if (filterStatus.value !== 'all' && finding.status !== filterStatus.value) return false
+    if (filterSeverity.value !== 'all' && finding.severity !== filterSeverity.value) return false
+    if (!text) return true
+    return [finding.title, finding.area, finding.severity, finding.status, finding.detail, finding.category, finding.source]
+      .some(v => String(v).toLowerCase().includes(text))
+  })
 })
 const filteredScanFindings = computed(() => {
   const text = query.value.trim().toLowerCase()
@@ -827,8 +1169,16 @@ watch(() => props.tab, async (tab) => {
     emit('changeTab', 'scanner')
     return
   }
+  if (tab === 'scanner') {
+    // Always open scanner in empty state — user selects from history or starts a new scan
+    scanViewEmpty.value = true
+    activeScanId.value = null
+  }
   if (tab === 'dependencies' && !dependencyLoading.value && !dependencyInventory.value.length) {
     await scanDependencies(false)
+  }
+  if (tab === 'secrets' && !envLoading.value && !envFiles.value.length) {
+    await scanEnvFiles()
   }
   if (tab === 'github_issues') {
     await loadGitHubIssues()
@@ -899,19 +1249,33 @@ async function openScopePicker() {
   showToolPicker.value = false
   scopeScanAll.value = true
   scopeEntries.value = []
+  // Pre-select all checks for the project's type on first open
+  if (props.project.projectType && VAPT_CHECK_CATALOG[props.project.projectType] && !selectedVaptChecks.value.length) {
+    selectedVaptChecks.value = VAPT_CHECK_CATALOG[props.project.projectType]!.flatMap(cat => cat.checks.map(c => c.id))
+  }
   showScopePicker.value = true
   await Promise.all([loadScopeTree(), loadGitBranches()])
 }
 
+async function setProjectClassification(value: string) {
+  const type = (value || undefined) as ProjectType | undefined
+  await projects.updateProjectMeta(props.project.id, { projectType: type })
+  selectedVaptChecks.value = type && VAPT_CHECK_CATALOG[type]
+    ? VAPT_CHECK_CATALOG[type]!.flatMap(cat => cat.checks.map(c => c.id))
+    : []
+}
+
 async function loadGitBranches() {
-  isGitRepo.value    = false
-  gitBranches.value  = []
-  gitCurrentBranch.value = null
-  selectedBranch.value   = null
+  isGitRepo.value         = false
+  gitBranches.value       = []
+  gitLocalBranches.value  = []
+  gitRemoteBranches.value = []
+  gitCurrentBranch.value  = null
+  selectedBranch.value    = null
   if (!props.project.absolutePath) return
   const fs  = useTauriFs()
   const sep = props.project.absolutePath.includes('\\') ? '\\' : '/'
-  const gitDir = props.project.absolutePath + sep + '.git'
+  const gitDir   = props.project.absolutePath + sep + '.git'
   const headFile = gitDir + sep + 'HEAD'
   const exists = await fs.exists(headFile).catch(() => false)
   if (!exists) return
@@ -922,14 +1286,46 @@ async function loadGitBranches() {
     gitCurrentBranch.value = branchMatch[1]!
     selectedBranch.value   = branchMatch[1]!
   }
+
+  // Local branches from refs/heads/
+  const localRefs = new Set<string>()
   const headsDir = gitDir + sep + 'refs' + sep + 'heads'
   const headsDirExists = await fs.exists(headsDir).catch(() => false)
   if (headsDirExists) {
     const items = await fs.readDir(headsDir).catch(() => [] as { name: string; isDir: boolean }[])
-    gitBranches.value = items.filter(i => !i.isDir).map(i => i.name).sort()
-    if (!selectedBranch.value && gitBranches.value.length) {
-      selectedBranch.value = gitBranches.value[0]!
+    items.filter(i => !i.isDir).forEach(i => localRefs.add(i.name))
+  }
+
+  // Remote branches from refs/remotes/<remote>/branch
+  const remoteRefs = new Set<string>()
+  const remotesDir = gitDir + sep + 'refs' + sep + 'remotes'
+  const remotesDirExists = await fs.exists(remotesDir).catch(() => false)
+  if (remotesDirExists) {
+    const remotes = await fs.readDir(remotesDir).catch(() => [] as { name: string; isDir: boolean; path: string }[])
+    for (const remote of remotes.filter(r => r.isDir)) {
+      const branches = await fs.readDir(remote.path).catch(() => [] as { name: string; isDir: boolean }[])
+      branches.filter(b => !b.isDir && b.name !== 'HEAD').forEach(b => remoteRefs.add(`${remote.name}/${b.name}`))
     }
+  }
+
+  // Also parse packed-refs for any packed branches not in loose ref files
+  const packedRefsFile = gitDir + sep + 'packed-refs'
+  const packedExists = await fs.exists(packedRefsFile).catch(() => false)
+  if (packedExists) {
+    const content = await fs.readTextFile(packedRefsFile).catch(() => '')
+    for (const line of content.split('\n')) {
+      const localMatch = line.match(/^[0-9a-f]{40}\s+refs\/heads\/(.+)$/)
+      if (localMatch) localRefs.add(localMatch[1]!)
+      const remoteMatch = line.match(/^[0-9a-f]{40}\s+refs\/remotes\/(.+)$/)
+      if (remoteMatch && !remoteMatch[1]!.endsWith('/HEAD')) remoteRefs.add(remoteMatch[1]!)
+    }
+  }
+
+  gitLocalBranches.value  = [...localRefs].sort()
+  gitRemoteBranches.value = [...remoteRefs].sort()
+  gitBranches.value = [...gitLocalBranches.value, ...gitRemoteBranches.value]
+  if (!selectedBranch.value && gitLocalBranches.value.length) {
+    selectedBranch.value = gitLocalBranches.value[0]!
   }
 }
 
@@ -968,6 +1364,20 @@ function buildScopeConstraint(): string {
       .map(e => e.path.replace(base + sep, '').replace(base + '/', ''))
     if (selected.length) {
       parts.push(`\n\nScope constraint — focus ONLY on these paths:\n${selected.map(p => `- ${p}`).join('\n')}\nIgnore everything else unless it is a direct dependency of the scoped paths.`)
+    }
+  }
+  if (selectedVaptChecks.value.length && props.project.projectType && VAPT_CHECK_CATALOG[props.project.projectType]) {
+    const catalog = VAPT_CHECK_CATALOG[props.project.projectType]!
+    const instructions: string[] = []
+    for (const cat of catalog) {
+      for (const check of cat.checks) {
+        if (selectedVaptChecks.value.includes(check.id)) {
+          instructions.push(`- [${cat.category} / ${check.label}] ${check.promptInstruction}`)
+        }
+      }
+    }
+    if (instructions.length) {
+      parts.push(`\n\nVAPT check instructions — you MUST evaluate each of the following areas:\n${instructions.join('\n')}\nFor each check, report findings even if none are found (state "no issue detected" briefly).`)
     }
   }
   return parts.join('')
@@ -1133,10 +1543,17 @@ function whitelistFinding(finding: SecurityScanFinding) {
   notify(`"${finding.title}" added to whitelist. AI will skip this in future scans.`, 'success')
 }
 
-function buildSecurityScanPrompt(projectName: string, existingFindingContext: string, effort: typeof scanEffortOptions[number], findingLimit: number) {
+function buildSecurityScanPrompt(projectName: string, existingFindingContext: string, effort: typeof scanEffortOptions[number], findingLimit: number, projectType?: string) {
   const limitInstruction = findingLimit > 0
     ? `Return at most ${findingLimit} findings. Prioritize concrete, exploitable risks with specific evidence. Avoid broad speculation.`
     : 'Return every concrete, exploitable risk you can substantiate with specific evidence. Avoid broad speculation.'
+
+  const projectTypeLabel = projectType ? PROJECT_TYPE_LABELS[projectType as keyof typeof PROJECT_TYPE_LABELS] : null
+  const projectTypeContext = projectTypeLabel
+    ? `\nProject type: ${projectTypeLabel} — focus your scope and OWASP mapping on risks most relevant to this type of target.`
+    : ''
+
+  const scopeByType = buildScopeByProjectType(projectType)
 
   return `You are running a read-only security review for the project "${projectName}".
 
@@ -1144,13 +1561,10 @@ Do not edit files. Inspect the application source and configuration for concrete
 
 Effort level: ${effort.label} (${effort.value})
 Effort instructions: ${effort.focus}
-${limitInstruction}
+${limitInstruction}${projectTypeContext}
 
 Scope:
-- OWASP Top 10 style issues, especially injection, broken access control, auth/session mistakes, insecure configuration, SSRF/path traversal, unsafe deserialization, vulnerable dependency patterns, and secrets handling.
-- Desktop app risks such as shell execution, filesystem permissions, command argument handling, and unsafe local privilege boundaries.
-- API/backend risks such as tenant isolation, authorization checks, input validation, CORS, and persistence boundaries.
-- Frontend risks such as unsafe HTML rendering, token exposure, secret leakage, and trust boundary mistakes.
+${scopeByType}
 
 Ignore generated or vendored artifacts unless they create a project risk: node_modules, dist, .nuxt, .output, target, build output, and lockfile noise.
 
@@ -1177,6 +1591,56 @@ Return ONLY valid JSON with this exact shape and no markdown fences:
 }
 
 If no concrete issues are found, return an empty findings array with a brief summary.`
+}
+
+function buildScopeByProjectType(projectType?: string): string {
+  const shared = `- OWASP Top 10 issues: injection, broken access control, auth/session mistakes, insecure configuration, SSRF/path traversal, unsafe deserialization, secrets handling, and vulnerable dependency patterns.`
+  const scopes: Record<string, string> = {
+    web_application: `${shared}
+- XSS, CSRF, clickjacking, insecure cookies/headers, unsafe HTML rendering.
+- Client-side token storage and trust boundary leakage.
+- Server-side input validation, output encoding, and content-type enforcement.`,
+    api: `${shared}
+- Missing or insufficient authentication and authorization on all endpoints (IDOR, BOLA, BFLA).
+- Tenant isolation, rate limiting, pagination abuse, and mass-assignment risks.
+- CORS misconfiguration and API key exposure.
+- Input validation, schema enforcement, and error message verbosity.`,
+    mobile_application: `${shared}
+- Insecure local storage, exposed intents/broadcast receivers, deep link abuse.
+- Certificate pinning bypass, cleartext traffic, and exported components.
+- Hardcoded credentials, API keys embedded in binaries.
+- Improper session management and insecure inter-process communication.`,
+    desktop_application: `${shared}
+- Shell execution, filesystem permission errors, and command argument handling.
+- Unsafe local privilege boundaries and privilege escalation paths.
+- IPC vulnerabilities, auto-update trust, and DLL hijacking.
+- Sensitive data written to disk in plaintext or accessible temp files.`,
+    cloud_infrastructure: `${shared}
+- IAM over-permissioning, public S3 buckets/storage blobs, and unauthenticated endpoints.
+- Secrets in environment variables, config files, or CI/CD pipelines.
+- Network exposure, missing VPC controls, security group misconfigurations.
+- Logging gaps and insufficient audit trail coverage.`,
+    iot_embedded: `${shared}
+- Hardcoded credentials, default passwords, and firmware extraction risks.
+- Insecure update mechanisms and missing firmware signing.
+- Exposed debug interfaces (UART, JTAG, SWD) and unnecessary services.
+- Insufficient encryption for data at rest and in transit.`,
+    network_infrastructure: `${shared}
+- Exposed management interfaces without authentication or over unencrypted protocols.
+- Weak cipher suites, TLS version misconfigurations, and self-signed certificates in production.
+- Missing network segmentation, firewall rule permissiveness.
+- Default service credentials and unnecessary open ports.`,
+    source_code_library: `${shared}
+- Insecure defaults in public APIs, prototype pollution, and type confusion.
+- Dependency confusion and supply chain risks.
+- Missing input validation in public-facing functions.
+- Unsafe use of eval, exec, or dynamic code execution.`,
+    other: `${shared}
+- Desktop app risks: shell execution, filesystem permissions, command argument handling.
+- API/backend risks: tenant isolation, authorization, input validation, CORS.
+- Frontend risks: unsafe HTML rendering, token exposure, secret leakage.`,
+  }
+  return scopes[projectType ?? 'other'] ?? scopes.other
 }
 
 function stringValue(value: unknown, fallback = '') {
@@ -1248,7 +1712,7 @@ function parseJsonPayload(text: string): unknown {
       }
       catch { /* keep looking */ }
     }
-    throw new Error('No valid JSON object or array found in AI response')
+    throw new Error('The AI model returned a response that Vindicter could not parse into findings. This can happen if the model reached its usage limit, returned a refusal, or produced plain text instead of the expected JSON. Check your model\'s quota or API key and try again.')
   }
 }
 
@@ -1288,15 +1752,21 @@ function ossToolStatusClass(tool: OssToolStatus) {
   if (tool.status === 'done') return tool.count > 0 ? 'text-amber-300' : 'text-emerald-300'
   if (tool.status === 'running') return 'text-sky-300'
   if (tool.status === 'error') return 'text-red-400'
-  if (tool.status === 'skipped') return 'text-[var(--text-faint)]'
+  if (tool.status === 'not_found') return 'text-[var(--text-faint)]'
   return 'text-[var(--text-faint)]'
+}
+
+function scanFindingSource(finding: SecurityScanFinding): { label: string; color: string } {
+  if (finding.id.startsWith('TRIVY-')) return { label: 'Trivy', color: 'border-sky-500/20 bg-sky-500/[0.06] text-sky-300' }
+  if (finding.id.startsWith('SEMGREP-')) return { label: 'Semgrep', color: 'border-indigo-500/20 bg-indigo-500/[0.06] text-indigo-300' }
+  return { label: 'AI', color: 'border-violet-500/20 bg-violet-500/[0.06] text-violet-300' }
 }
 
 function ossToolStatusLabel(tool: OssToolStatus) {
   if (tool.status === 'running') return 'Scanning…'
   if (tool.status === 'done') return tool.count > 0 ? `${tool.count} finding${tool.count !== 1 ? 's' : ''}` : 'Clean'
   if (tool.status === 'error') return 'Error'
-  if (tool.status === 'skipped') return 'Not available'
+  if (tool.status === 'not_found') return 'Not installed'
   return 'Idle'
 }
 
@@ -1308,67 +1778,22 @@ function normalizeSeverityOss(raw: string): SecuritySeverity {
   return 'low'
 }
 
-async function runNpmAuditScan(projectPath: string): Promise<SecurityScanFinding[]> {
-  const fs = useTauriFs()
-  const sep = projectPath.includes('\\') ? '\\' : '/'
-  const hasPackageJson = await fs.exists(`${projectPath}${sep}package.json`).catch(() => false)
-  if (!hasPackageJson) return []
-
+async function runTrivyScan(projectPath: string): Promise<SecurityScanFinding[] | null> {
   const { Command } = await import('@tauri-apps/plugin-shell')
-  const isWin = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent)
-  const cmdName = isWin ? 'npm-cmd-audit' : 'npm-audit'
+  // Resolution order: bundled sidecar → system PATH → cmd /c (winget PATH)
+  let mode: 'sidecar' | 'system' | 'cmd' | null = null
+  try { await Command.sidecar('binaries/trivy', ['--version']).execute(); mode = 'sidecar' } catch { /**/ }
+  if (!mode) { try { await Command.create('trivy-version', ['--version']).execute(); mode = 'system' } catch { /**/ } }
+  if (!mode) { try { await Command.create('cmd-trivy-version', ['/c', 'trivy', '--version']).execute(); mode = 'cmd' } catch { /**/ } }
+  if (!mode) return null
 
   let stdout = '', stderr = ''
   try {
-    const res = await Command.create(cmdName, ['audit', '--json', '--prefix', projectPath]).execute()
-    stdout = res.stdout; stderr = res.stderr
-  } catch { return [] }
-
-  const text = (stdout || stderr).trim()
-  if (!text) return []
-
-  let parsed: any
-  try {
-    const start = text.indexOf('{')
-    if (start < 0) return []
-    parsed = JSON.parse(text.slice(start))
-  } catch { return [] }
-
-  const vulns: Record<string, any> = parsed?.vulnerabilities ?? {}
-  const severityOrder = ['critical', 'high', 'moderate', 'low', 'info']
-  const entries = Object.values(vulns)
-    .sort((a, b) => severityOrder.indexOf(a.severity) - severityOrder.indexOf(b.severity))
-    .slice(0, 15)
-
-  return entries.map((v: any) => {
-    const via = Array.isArray(v.via) ? v.via.filter((x: any) => typeof x === 'object') : []
-    const cves: string[] = via.flatMap((x: any) => x.cves ?? [])
-    const cveStr = cves.length ? ` (${cves.slice(0, 3).join(', ')})` : ''
-    const detail = via[0]?.overview ?? `${v.name} has a known ${v.severity} vulnerability.`
-    return {
-      id: `NPM-${String(v.name).replace(/[^a-zA-Z0-9]/g, '-').toUpperCase().slice(0, 18)}`,
-      title: `${String(v.severity).toUpperCase()}: ${v.name}${cveStr}`,
-      severity: normalizeSeverityOss(v.severity),
-      category: 'Vulnerable and outdated components',
-      source: 'dependency' as const,
-      area: `npm · ${v.name}@${v.range ?? 'unknown'}`,
-      detail,
-      evidence: `${v.name} range ${v.range ?? '?'}${cveStr}. Fix available: ${v.fixAvailable ? 'yes' : 'no'}.`,
-      recommendation: v.fixAvailable === true
-        ? `Run \`npm audit fix\` to upgrade ${v.name} to a patched version.`
-        : `Manually upgrade or replace ${v.name}. No automated fix is available.`,
-      selected: true,
-    } satisfies SecurityScanFinding
-  })
-}
-
-async function runTrivyScan(projectPath: string): Promise<SecurityScanFinding[]> {
-  const { Command } = await import('@tauri-apps/plugin-shell')
-  try { await Command.create('trivy-version', ['--version']).execute() } catch { return [] }
-
-  let stdout = '', stderr = ''
-  try {
-    const res = await Command.create('trivy-fs-scan', ['fs', '--format', 'json', '--quiet', '--no-progress', projectPath]).execute()
+    const res = mode === 'sidecar'
+      ? await Command.sidecar('binaries/trivy', ['fs', '--format', 'json', '--quiet', '--no-progress', projectPath]).execute()
+      : mode === 'cmd'
+        ? await Command.create('cmd-trivy-fs-scan', ['/c', 'trivy', 'fs', '--format', 'json', '--quiet', '--no-progress', projectPath]).execute()
+        : await Command.create('trivy-fs-scan', ['fs', '--format', 'json', '--quiet', '--no-progress', projectPath]).execute()
     stdout = res.stdout; stderr = res.stderr
   } catch { return [] }
 
@@ -1410,13 +1835,21 @@ async function runTrivyScan(projectPath: string): Promise<SecurityScanFinding[]>
   return findings
 }
 
-async function runSemgrepScan(projectPath: string): Promise<SecurityScanFinding[]> {
+async function runSemgrepScan(projectPath: string): Promise<SecurityScanFinding[] | null> {
   const { Command } = await import('@tauri-apps/plugin-shell')
-  try { await Command.create('semgrep-version', ['--version']).execute() } catch { return [] }
+  let useCmd = false
+  let semgrepFound = false
+  try { await Command.create('semgrep-version', ['--version']).execute(); semgrepFound = true } catch { /**/ }
+  if (!semgrepFound) {
+    try { await Command.create('cmd-semgrep-version', ['/c', 'semgrep', '--version']).execute(); semgrepFound = true; useCmd = true } catch { /**/ }
+  }
+  if (!semgrepFound) return null
 
   let stdout = '', stderr = ''
   try {
-    const res = await Command.create('semgrep-scan', ['--config=auto', '--json', '--quiet', projectPath]).execute()
+    const res = useCmd
+      ? await Command.create('cmd-semgrep-scan', ['/c', 'semgrep', '--config=auto', '--json', '--quiet', projectPath]).execute()
+      : await Command.create('semgrep-scan', ['--config=auto', '--json', '--quiet', projectPath]).execute()
     stdout = res.stdout; stderr = res.stderr
   } catch { return [] }
 
@@ -1464,81 +1897,29 @@ async function runSemgrepScan(projectPath: string): Promise<SecurityScanFinding[
   return findings
 }
 
-async function runCargoAuditScan(projectPath: string): Promise<SecurityScanFinding[]> {
-  const fs = useTauriFs()
-  const sep = projectPath.includes('\\') ? '\\' : '/'
-  const lockPath = `${projectPath}${sep}Cargo.lock`
-  if (!await fs.exists(lockPath).catch(() => false)) return []
-
-  const { Command } = await import('@tauri-apps/plugin-shell')
-  try { await Command.create('cargo-version', ['--version']).execute() } catch { return [] }
-
-  let stdout = '', stderr = ''
-  try {
-    const res = await Command.create('cargo-audit-scan', ['audit', '--json', '--file', lockPath]).execute()
-    stdout = res.stdout; stderr = res.stderr
-  } catch { return [] }
-
-  let parsed: any
-  try {
-    const text = (stdout || stderr).trim()
-    const start = text.indexOf('{')
-    if (start < 0) return []
-    parsed = JSON.parse(text.slice(start))
-  } catch { return [] }
-
-  const list: any[] = parsed?.vulnerabilities?.list ?? []
-  const sevMap: Record<string, SecuritySeverity> = { critical: 'critical', high: 'high', medium: 'medium', low: 'low' }
-
-  return list.slice(0, 15).map((entry: any) => {
-    const adv = entry.advisory ?? {}
-    const pkg = entry.package ?? {}
-    const patched: string[] = entry.versions?.patched ?? []
-    const aliases: string[] = adv.aliases ?? []
-    const cveStr = aliases.length ? ` (${aliases.slice(0, 2).join(', ')})` : ''
-    return {
-      id: `RUSTSEC-${String(adv.id ?? pkg.name).replace(/[^a-zA-Z0-9]/g, '-').slice(0, 18)}`,
-      title: `${adv.id ?? 'Vulnerability'} in ${pkg.name}${cveStr}`,
-      severity: sevMap[String(adv.severity ?? 'medium').toLowerCase()] ?? 'medium',
-      category: 'Vulnerable and outdated components',
-      source: 'dependency' as const,
-      area: `Cargo · ${pkg.name}@${pkg.version ?? '?'}`,
-      detail: adv.title ?? adv.description ?? `${pkg.name} has a known vulnerability.`,
-      evidence: `${adv.id ?? '?'} in ${pkg.name}@${pkg.version ?? '?'}${cveStr}. Fixed in: ${patched.length ? patched.join(', ') : 'no patch listed'}.`,
-      recommendation: patched.length
-        ? `Upgrade ${pkg.name} to ${patched[0]} or later. See ${adv.url ?? 'https://rustsec.org'}.`
-        : `No patched version listed. Review the advisory at ${adv.url ?? 'https://rustsec.org'}.`,
-      selected: true,
-    } satisfies SecurityScanFinding
-  })
-}
-
 async function runOssScanners(): Promise<SecurityScanFinding[]> {
   const projectPath = props.project.absolutePath
   if (!projectPath) return []
 
   ossTools.value = [
-    { name: 'npm audit',   status: 'running', count: 0 },
-    { name: 'cargo audit', status: 'running', count: 0 },
-    { name: 'Trivy',       status: 'running', count: 0 },
-    { name: 'Semgrep',     status: 'running', count: 0 },
+    { name: 'Trivy',   status: 'running', count: 0 },
+    { name: 'Semgrep', status: 'running', count: 0 },
   ]
   ossRunning.value = true
 
-  const [npmResult, cargoResult, trivyResult, semgrepResult] = await Promise.allSettled([
-    runNpmAuditScan(projectPath),
-    runCargoAuditScan(projectPath),
+  const [trivyResult, semgrepResult] = await Promise.allSettled([
     runTrivyScan(projectPath),
     runSemgrepScan(projectPath),
   ])
 
   const allFindings: SecurityScanFinding[] = []
-  const results = [npmResult, cargoResult, trivyResult, semgrepResult]
+  const results = [trivyResult, semgrepResult]
   ossTools.value = ossTools.value.map((tool, i) => {
     const r = results[i]!
     if (r.status === 'fulfilled') {
+      if (r.value === null) return { ...tool, status: 'not_found' as const, count: 0 }
       allFindings.push(...r.value)
-      return { ...tool, status: r.value.length ? 'done' as const : 'skipped' as const, count: r.value.length }
+      return { ...tool, status: 'done' as const, count: r.value.length }
     }
     return { ...tool, status: 'error' as const, count: 0, error: String((r as any).reason?.message ?? 'failed') }
   })
@@ -1593,6 +1974,56 @@ async function readProjectFilesForScan(projectPath: string): Promise<string> {
   return parts.join('\n\n')
 }
 
+// ── Per-tool scan executor ─────────────────────────────────────────────────────
+async function executeToolScan(
+  tool: SecurityAITool,
+  prompt: string,
+  fileContent: string,
+  effortValue: SecurityScanEffort = 'medium',
+): Promise<{ stdout: string; stderr: string }> {
+  const enrichedPrompt = [
+    prompt,
+    fileContent ? `---\nProject source files for analysis:\n\n${fileContent}` : '',
+  ].filter(Boolean).join('\n\n')
+
+  if (tool === 'openrouter') {
+    const output = await runOpenRouterChat({
+      apiKey: app.openRouter.apiKey,
+      model: app.openRouter.model,
+      messages: [
+        { role: 'system', content: 'You are Vindicter, an AI security reviewer. Return only the JSON requested by the user.' },
+        { role: 'user', content: enrichedPrompt },
+      ],
+    })
+    return { stdout: output, stderr: '' }
+  }
+  if (tool === 'ollama') {
+    const output = await runOllamaChat({
+      url: app.ollama.url,
+      model: app.ollama.model,
+      messages: [
+        { role: 'system', content: 'You are Vindicter, an AI security reviewer. Return only the JSON requested by the user.' },
+        { role: 'user', content: enrichedPrompt },
+      ],
+    })
+    return { stdout: output, stderr: '' }
+  }
+  if (tool === 'claude') {
+    return runClaudeExec({
+      projectPath: props.project.absolutePath,
+      prompt,
+      model: `Claude CLI default (${effortValue} effort)`,
+      reasoningEffort: effortValue,
+    })
+  }
+  return runCodexExec({
+    projectPath: props.project.absolutePath,
+    prompt,
+    model: `Codex CLI default (${effortValue} effort)`,
+    reasoningEffort: effortValue,
+  })
+}
+
 async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false) {
   if (!props.project.absolutePath) {
     notify('Select a project before running an AI security scan.', 'warning')
@@ -1600,9 +2031,12 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
   }
 
   const tool: SecurityAITool = automatic ? (props.project.activeAITool === 'claude_code' ? 'claude' : 'codex') : selectedAITool.value
+  const mode: ScanMode = automatic ? 'single' : scanMode.value
+  const tool2: SecurityAITool = selectedAITool2.value
   const effort = scanEffortOptions.find(option => option.value === (effortOverride ?? selectedEffortOption.value.value)) ?? scanEffortOptions[1]!
   const findingLimit = automatic ? security.settings.aiFindingLimit : normalizedFindingLimit.value
   const toolLabel = securityToolLabel(tool)
+  const tool2Label = securityToolLabel(tool2)
 
   if (tool === 'openrouter' && (!app.openRouter.enabled || !app.openRouter.apiKey.trim())) {
     notify('Configure and enable OpenRouter in AI Models before running this scan.', 'warning')
@@ -1616,13 +2050,32 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
     return
   }
 
+  if (mode !== 'single' && tool2 === 'openrouter' && (!app.openRouter.enabled || !app.openRouter.apiKey.trim())) {
+    notify('Configure and enable OpenRouter for the secondary model.', 'warning')
+    showToolPicker.value = true
+    return
+  }
+
+  if (mode !== 'single' && tool2 === 'ollama' && (!app.ollama.enabled || !app.ollama.url.trim())) {
+    notify('Enable Ollama and configure its URL for the secondary model.', 'warning')
+    showToolPicker.value = true
+    return
+  }
 
   if (!automatic) {
     selectedFindingLimit.value = findingLimit
     await security.updateSettings({ aiFindingLimit: findingLimit })
   }
   showToolPicker.value = false
+  scanAborted.value = false
   aiScanRunning.value = true
+
+  const modeLabel = mode === 'multi_aggregate'
+    ? `${toolLabel} + ${tool2Label} (Aggregate)`
+    : mode === 'multi_collaborative'
+      ? `${toolLabel} + ${tool2Label} (Collaborative)`
+      : toolLabel
+  void sendDesktopNotification(`AI scan started — ${props.project.name}`, `Running ${modeLabel} at ${effort.label} depth.`)
   startScanCheckpoint()
   beginScanActivity(effort, tool)
   scanError.value = null
@@ -1635,55 +2088,134 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
 
   try {
     const scopeConstraint = automatic ? '' : buildScopeConstraint()
-    const prompt = buildSecurityScanPrompt(props.project.name, buildExistingSecurityContext(), effort, findingLimit) + scopeConstraint
+    const prompt = buildSecurityScanPrompt(props.project.name, buildExistingSecurityContext(), effort, findingLimit, props.project.projectType) + scopeConstraint
 
-    const fileContent = (tool === 'openrouter' || tool === 'ollama')
+    const fileContent = (tool === 'openrouter' || tool === 'ollama' || tool2 === 'openrouter' || tool2 === 'ollama')
       ? await readProjectFilesForScan(props.project.absolutePath)
       : ''
-    const enrichedPrompt = [
-      prompt,
-      fileContent ? `---\nProject source files for analysis:\n\n${fileContent}` : '',
-    ].filter(Boolean).join('\n\n')
 
-    let result: { stdout: string; stderr: string }
-    if (tool === 'openrouter') {
-      const output = await runOpenRouterChat({
-        apiKey: app.openRouter.apiKey,
-        model: app.openRouter.model,
-        messages: [
-          { role: 'system', content: 'You are Vindicter, an AI security reviewer. Return only the JSON requested by the user.' },
-          { role: 'user', content: enrichedPrompt },
-        ],
+    // ── Multi-aggregate: both models run in parallel ──────────────────────────
+    if (mode === 'multi_aggregate') {
+      const [result1, result2] = await Promise.all([
+        executeToolScan(tool, prompt, fileContent, effort.value),
+        executeToolScan(tool2, prompt, fileContent, effort.value),
+      ])
+      if (scanAborted.value) return
+      const text1 = [result1.stdout, result1.stderr].filter(Boolean).join('\n').trim()
+      const text2 = [result2.stdout, result2.stderr].filter(Boolean).join('\n').trim()
+      if (!text1 && !text2) throw new Error('Both models returned no output.')
+
+      setScanStage(4)
+      const parsed1 = text1 ? parseAiScanResponse(text1) : { findings: [] as SecurityScanFinding[], summary: '', raw: '' }
+      const parsed2 = text2 ? parseAiScanResponse(text2) : { findings: [] as SecurityScanFinding[], summary: '', raw: '' }
+
+      const ossFindings = await ossPromise
+      const allFindings = [...parsed1.findings, ...parsed2.findings, ...ossFindings]
+      const aiCount = parsed1.findings.length + parsed2.findings.length
+      const ossCount = ossFindings.length
+      const ossNote = ossCount ? ` + ${ossCount} OSS finding${ossCount !== 1 ? 's' : ''}` : ''
+      const combinedSummary = [
+        `${toolLabel}: ${parsed1.findings.length} finding${parsed1.findings.length !== 1 ? 's' : ''}`,
+        `${tool2Label}: ${parsed2.findings.length} finding${parsed2.findings.length !== 1 ? 's' : ''}`,
+        ossCount ? `OSS: ${ossCount}` : '',
+      ].filter(Boolean).join(' | ')
+      const rawCombined = [text1, text2].filter(Boolean).join('\n\n---\n\n')
+
+      const scan = await security.recordScan(props.project, {
+        effort: effort.value,
+        status: 'done',
+        summary: `Aggregate scan (${modeLabel}): ${combinedSummary}${ossNote}`,
+        rawReport: rawCombined,
+        findings: allFindings,
+        parseWarning: null,
       })
-      result = { stdout: output, stderr: '' }
-    }
-    else if (tool === 'ollama') {
-      const output = await runOllamaChat({
-        url: app.ollama.url,
-        model: app.ollama.model,
-        messages: [
-          { role: 'system', content: 'You are Vindicter, an AI security reviewer. Return only the JSON requested by the user.' },
-          { role: 'user', content: enrichedPrompt },
-        ],
+      scanViewEmpty.value = false
+      activeScanId.value = scan.id
+      finishScanActivity('done', `${aiCount} AI finding${aiCount !== 1 ? 's' : ''}${ossNote} from aggregate (${toolLabel} + ${tool2Label}).`, rawCombined)
+      notify(`Aggregate scan complete: ${allFindings.length} finding${allFindings.length !== 1 ? 's' : ''} (${toolLabel} + ${tool2Label}${ossNote}).`, 'success')
+      feed.push({
+        category: 'scan_complete',
+        title: `Aggregate scan complete — ${allFindings.length} finding${allFindings.length !== 1 ? 's' : ''} in ${props.project.name}`,
+        body: combinedSummary,
+        link: '/security',
+        meta: { projectId: props.project.id, tool: modeLabel },
       })
-      result = { stdout: output, stderr: '' }
+      return
     }
-    else if (tool === 'claude') {
-      result = await runClaudeExec({
-        projectPath: props.project.absolutePath,
+
+    // ── Multi-collaborative: Tool1 scans, Tool2 reviews + augments ────────────
+    if (mode === 'multi_collaborative') {
+      // Round 1: primary model scans
+      const result1 = await executeToolScan(tool, prompt, fileContent, effort.value)
+      if (scanAborted.value) return
+      const text1 = [result1.stdout, result1.stderr].filter(Boolean).join('\n').trim()
+      if (!text1) throw new Error(`${toolLabel} returned no output for round 1.`)
+
+      let peerFindings: SecurityScanFinding[] = []
+      try {
+        peerFindings = parseAiScanResponse(text1).findings
+      } catch { /* peer findings will be injected as raw text */ }
+
+      // Round 2: secondary model reviews peer findings + adds its own
+      const collaborativePrompt = [
+        `You are a security reviewer performing a **collaborative** AI security scan.`,
+        ``,
+        `A peer AI reviewer (${toolLabel}) has already analyzed this codebase and found the following security issues:`,
+        ``,
+        `<peer_findings>`,
+        JSON.stringify(peerFindings, null, 2),
+        `</peer_findings>`,
+        ``,
+        `Your tasks for this collaborative review:`,
+        `1. Critically evaluate the peer reviewer's findings — keep valid ones, discard false positives.`,
+        `2. Identify any security issues they overlooked.`,
+        `3. Return a CONSOLIDATED JSON result following the exact same format as the original instructions, containing ALL valid findings (both validated peer findings and your new ones).`,
+        ``,
+        `Original scan instructions:`,
         prompt,
-        model: `Claude CLI default (${effort.value} effort)`,
-        reasoningEffort: effort.value,
+      ].join('\n')
+
+      const result2 = await executeToolScan(tool2, collaborativePrompt, fileContent, effort.value)
+      if (scanAborted.value) return
+      const text2 = [result2.stdout, result2.stderr].filter(Boolean).join('\n').trim()
+      if (!text2) throw new Error(`${tool2Label} returned no output for round 2.`)
+
+      setScanStage(4)
+      const parsed2 = parseAiScanResponse(text2)
+
+      const ossFindings = await ossPromise
+      const allFindings = [...parsed2.findings, ...ossFindings]
+      const aiCount = parsed2.findings.length
+      const ossCount = ossFindings.length
+      const ossNote = ossCount ? ` + ${ossCount} OSS finding${ossCount !== 1 ? 's' : ''}` : ''
+      const rawCombined = `=== Round 1: ${toolLabel} ===\n${text1}\n\n=== Round 2: ${tool2Label} (collaborative) ===\n${text2}`
+
+      const scan = await security.recordScan(props.project, {
+        effort: effort.value,
+        status: 'done',
+        summary: `Collaborative scan (${toolLabel} → ${tool2Label}): ${aiCount} consolidated finding${aiCount !== 1 ? 's' : ''}${ossNote}`,
+        rawReport: rawCombined,
+        findings: allFindings,
+        parseWarning: null,
       })
-    }
-    else {
-      result = await runCodexExec({
-        projectPath: props.project.absolutePath,
-        prompt,
-        model: `Codex CLI default (${effort.value} effort)`,
-        reasoningEffort: effort.value,
+      scanViewEmpty.value = false
+      activeScanId.value = scan.id
+      finishScanActivity('done', `${aiCount} consolidated finding${aiCount !== 1 ? 's' : ''}${ossNote} from collaborative review (${toolLabel} + ${tool2Label}).`, rawCombined)
+      notify(`Collaborative scan complete: ${allFindings.length} finding${allFindings.length !== 1 ? 's' : ''} (${toolLabel} → ${tool2Label}${ossNote}).`, 'success')
+      feed.push({
+        category: 'scan_complete',
+        title: `Collaborative scan complete — ${allFindings.length} finding${allFindings.length !== 1 ? 's' : ''} in ${props.project.name}`,
+        body: `${toolLabel} scanned, ${tool2Label} reviewed and consolidated.`,
+        link: '/security',
+        meta: { projectId: props.project.id, tool: modeLabel },
       })
+      return
     }
+
+    // ── Single model (original flow) ──────────────────────────────────────────
+    const result = await executeToolScan(tool, prompt, fileContent, effort.value)
+
+    if (scanAborted.value || (result as any).aborted) return
 
     const responseText = [result.stdout, result.stderr].filter(Boolean).join('\n').trim()
     if (!responseText) throw new Error(`${toolLabel} completed without returning scan output.`)
@@ -1707,6 +2239,7 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
         findings: allFindings,
         parseWarning: null,
       })
+      scanViewEmpty.value = false
       activeScanId.value = scan.id
       finishScanActivity('done', `${aiCount} AI finding${aiCount !== 1 ? 's' : ''}${ossNote} from the ${toolLabel} report.`, parsed.raw)
       notify(`Security scan complete: ${allFindings.length} finding${allFindings.length !== 1 ? 's' : ''} (AI: ${aiCount}${ossNote}).`, 'success')
@@ -1723,12 +2256,13 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
       parseWarning.value = e?.message ?? `${toolLabel} returned a report, but Vindicter could not parse structured findings.`
       const scan = await security.recordScan(props.project, {
         effort: effort.value,
-        status: ossFindings.length ? 'warning' : 'warning',
+        status: 'warning',
         summary: `${toolLabel} returned a report, but Vindicter could not parse it into structured findings.`,
         rawReport: responseText,
         findings: ossFindings,
         parseWarning: parseWarning.value,
       })
+      scanViewEmpty.value = false
       activeScanId.value = scan.id
       finishScanActivity('warning', `${toolLabel} returned a report, but structured findings could not be parsed.${ossFindings.length ? ` ${ossFindings.length} OSS scanner finding${ossFindings.length !== 1 ? 's' : ''} included.` : ''}`, responseText)
       notify('AI scan parse error. OSS scanner results may still be available.', 'warning')
@@ -1742,6 +2276,7 @@ async function runAIScan(effortOverride?: SecurityScanEffort, automatic = false)
     }
   }
   catch (e: any) {
+    if (scanAborted.value) return
     await ossPromise.catch(() => [])
     scanError.value = e?.message ?? 'AI security scan failed.'
     finishScanActivity('error', scanError.value)
@@ -1969,6 +2504,60 @@ async function exportFixPrompts() {
   }
 }
 
+const exportingSignOff = ref(false)
+
+async function exportValidationSignOff(format: 'docx' | 'md' = 'docx') {
+  const finding = validateFinding.value
+  const result  = validateResult.value
+  if (!finding || !result) return
+  exportingSignOff.value = true
+  try {
+    const dialog = useTauriDialog()
+    const date   = new Date().toISOString().slice(0, 10)
+    const ext    = format === 'md' ? 'md' : 'docx'
+    const defaultName = sanitizeFileName(`Vindicter Sign-Off - ${props.project.code || props.project.name} - ${date}.${ext}`)
+    const selected = await dialog.saveFile({
+      title: 'Export Sign-Off Document',
+      defaultPath: defaultName,
+      filters: format === 'md'
+        ? [{ name: 'Markdown', extensions: ['md'] }]
+        : [{ name: 'Word Document', extensions: ['docx'] }],
+    })
+    if (!selected) return
+    const report: VindicterSignOffDocxReport = {
+      projectName:       props.project.name,
+      projectCode:       props.project.code || '',
+      findingTitle:      finding.title,
+      findingSeverity:   finding.severity,
+      findingCategory:   finding.category,
+      findingArea:       finding.area,
+      findingDetail:     finding.detail || '',
+      validationStatus:  result.status,
+      verdict:           result.verdict,
+      evidence:          result.evidence || '',
+      recommendation:    result.recommendation || '',
+      aiTool:            validateAITool.value,
+      validatedAt:       new Date().toISOString(),
+      generatedAt:       new Date().toISOString(),
+    }
+    const fs = useTauriFs()
+    if (format === 'md') {
+      await fs.writeFile(ensureMdExtension(selected), new TextEncoder().encode(buildSignOffMarkdown(report)))
+      notify('Sign-Off Document exported as Markdown.', 'success')
+    }
+    else {
+      await fs.writeFile(ensureDocxExtension(selected), createVindicterSignOffDocx(report))
+      notify('Sign-Off Document exported as DOCX.', 'success')
+    }
+  }
+  catch (e: any) {
+    notify(e?.message ?? 'Could not export sign-off document.', 'error')
+  }
+  finally {
+    exportingSignOff.value = false
+  }
+}
+
 async function createRemediationItems() {
   const selected = selectedScanFindings.value
   if (!selected.length) return
@@ -2191,6 +2780,7 @@ async function scanDependencies(showNotice = true) {
     }
     await security.upsertLocalFindings('dependency', findings)
     if (showNotice) notify(`Dependency inventory refreshed: ${inventory.length} package${inventory.length === 1 ? '' : 's'}.`, 'success')
+    void enrichDependencies()
   }
   catch (e: any) {
     if (showNotice) notify(e?.message ?? 'Could not inspect dependencies.', 'error')
@@ -2434,17 +3024,19 @@ async function clearScanHistory() {
       <section v-if="tab === 'overview' && !metricsCollapsed" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
           <div class="flex items-center justify-between">
-            <p class="text-xs text-[var(--text-muted)]">Open Findings</p>
+            <p class="text-xs text-[var(--text-muted)]">Scan Findings</p>
             <AlertTriangle class="size-3.5 text-red-300" />
           </div>
-          <p class="mt-2 text-2xl font-semibold text-[var(--text)]">{{ security.openFindings }}</p>
+          <p class="mt-2 text-2xl font-semibold text-[var(--text)]">{{ latestScan ? latestScan.findings.filter(f => !f.whitelisted).length : security.openFindings }}</p>
+          <p class="mt-0.5 text-[10px] text-[var(--text-faint)]">{{ latestScan ? 'from latest scan' : 'in queue' }}</p>
         </div>
         <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
           <div class="flex items-center justify-between">
             <p class="text-xs text-[var(--text-muted)]">High Risk</p>
             <Bug class="size-3.5 text-orange-300" />
           </div>
-          <p class="mt-2 text-2xl font-semibold text-[var(--text)]">{{ security.highRiskFindings + highRiskScans }}</p>
+          <p class="mt-2 text-2xl font-semibold text-[var(--text)]">{{ highRiskScans || security.highRiskFindings }}</p>
+          <p class="mt-0.5 text-[10px] text-[var(--text-faint)]">{{ highRiskScans ? 'critical + high' : 'in queue' }}</p>
         </div>
         <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
           <div class="flex items-center justify-between">
@@ -2521,7 +3113,7 @@ async function clearScanHistory() {
       </aside>
     </section>
 
-    <section v-else-if="tab === 'scanner'" class="grid gap-5" :class="(scanActivity.length || aiScanRunning || ossRunning || showHistoryDrawer) ? 'xl:grid-cols-[1fr_18rem]' : 'xl:grid-cols-1'">
+    <section v-else-if="tab === 'scanner'" class="grid gap-5 xl:grid-cols-[1fr_18rem]">
       <main class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
         <div class="border-b border-[var(--border)] p-4">
           <!-- Title row -->
@@ -2529,31 +3121,31 @@ async function clearScanHistory() {
           <p class="mt-0.5 text-xs text-[var(--text-muted)] leading-relaxed">{{ activeScan?.summary || 'Run an AI scan against this project to collect vulnerability findings.' }}</p>
           <!-- Action buttons — always on their own row so the description is never squished -->
           <div class="mt-3 flex flex-wrap gap-2">
-            <button class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer" :disabled="!canRunAIScan" @click="openAIScanPicker">
+            <!-- Run AI Scan: visible in new-scan mode or when no history scan is selected -->
+            <button
+              v-if="scanViewEmpty || !activeScanId"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              :disabled="!canRunAIScan"
+              @click="openAIScanPicker"
+            >
               <Loader2 v-if="aiScanRunning" class="size-3.5 animate-spin" />
               <Bot v-else class="size-3.5" />
               {{ aiScanRunning ? 'AI Scanning…' : 'Run AI Scan' }}
             </button>
-            <button v-if="aiScanRunning" class="inline-flex items-center gap-1.5 rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 hover:bg-red-500/18 transition-colors cursor-pointer" @click="cancelScan">
-              <X class="size-3.5" />
-              Cancel Scan
-            </button>
-            <button class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-500/15 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer" :disabled="!canExportDocs" @click="openExportModal">
+            <!-- Export: visible when viewing a specific history scan -->
+            <button
+              v-if="activeScanId && !scanViewEmpty"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-500/15 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              :disabled="!canExportDocs"
+              @click="openExportModal"
+            >
               <Loader2 v-if="exportingDocs" class="size-3.5 animate-spin" />
               <Download v-else class="size-3.5" />
               Export
             </button>
-            <button
-              class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors cursor-pointer"
-              :class="showHistoryDrawer
-                ? 'border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/15'
-                : 'border-white/10 bg-white/[0.04] text-[var(--text-muted)] hover:bg-white/[0.07] hover:text-[var(--text)]'"
-              :title="showHistoryDrawer ? 'Hide history' : 'Show scan history'"
-              @click="showHistoryDrawer = !showHistoryDrawer"
-            >
-              <History class="size-3.5" />
-              History
-              <span v-if="security.scans.length" class="ml-0.5 tabular-nums text-[10px] opacity-70">{{ security.scans.length }}</span>
+            <button v-if="aiScanRunning" class="inline-flex items-center gap-1.5 rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 hover:bg-red-500/18 transition-colors cursor-pointer" @click="cancelScan">
+              <X class="size-3.5" />
+              Cancel Scan
             </button>
           </div>
           <!-- Inline scan config + stack + OSS status chips -->
@@ -2575,7 +3167,7 @@ async function clearScanHistory() {
                 :class="tool.status === 'running' ? 'border-sky-500/20 bg-sky-500/[0.06] text-sky-300'
                   : tool.status === 'done' && tool.count > 0 ? 'border-amber-500/20 bg-amber-500/[0.06] text-amber-300'
                   : tool.status === 'done' ? 'border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-300'
-                  : tool.status === 'skipped' ? 'border-[var(--border)] text-[var(--text-faint)]'
+                  : tool.status === 'not_found' ? 'border-[var(--border)] text-[var(--text-faint)]'
                   : 'border-red-500/20 text-red-400'"
               >
                 <Loader2 v-if="tool.status === 'running'" class="size-2.5 animate-spin" />
@@ -2596,75 +3188,125 @@ async function clearScanHistory() {
           </div>
         </div>
 
-        <div class="divide-y divide-[var(--border)]">
-          <article v-for="finding in filteredScanFindings" :key="finding.id" class="px-4 py-4">
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <NuxtLink :to="scanFindingRoute(finding)" class="min-w-0 rounded-lg outline-none transition-colors hover:bg-white/[0.03] focus-visible:ring-2 focus-visible:ring-indigo-500/40">
-                <div class="flex flex-wrap items-center gap-2">
+        <!-- Scanning state -->
+        <div v-if="aiScanRunning" class="px-4 py-14 text-center">
+          <Loader2 class="mx-auto size-5 animate-spin text-emerald-300" />
+          <p class="mt-3 text-sm text-[var(--text-muted)]">{{ scanStatusText }}</p>
+          <p class="mt-1 text-xs text-[var(--text-faint)]">{{ scanActivity[activeScanStage]?.detail ?? 'The AI agent is reviewing the project for security findings.' }}</p>
+        </div>
+
+        <!-- Empty state -->
+        <div v-else-if="!scanFindings.length" class="px-4 py-14 text-center">
+          <SearchCheck class="mx-auto mb-3 size-8 text-[var(--text-faint)]" />
+          <p class="text-sm text-[var(--text-muted)]">No scan results yet.</p>
+          <p class="mt-1 text-xs text-[var(--text-faint)]">Run an AI scan to analyze this project for vulnerabilities.</p>
+        </div>
+
+        <!-- Results card grid -->
+        <div v-else class="grid gap-3 p-4 sm:grid-cols-2">
+          <article
+            v-for="finding in filteredScanFindings"
+            :key="finding.id"
+            class="group relative flex flex-col overflow-hidden rounded-xl border bg-[var(--bg-card)] transition-shadow hover:shadow-lg"
+            :class="{
+              'border-red-500/25':      finding.severity === 'critical',
+              'border-orange-500/20':   finding.severity === 'high',
+              'border-amber-500/20':    finding.severity === 'medium',
+              'border-sky-500/20':      finding.severity === 'low',
+              'border-[var(--border)]': !['critical','high','medium','low'].includes(finding.severity),
+            }"
+          >
+            <!-- Severity strip -->
+            <div
+              class="h-0.5 w-full shrink-0"
+              :class="{
+                'bg-gradient-to-r from-red-500 to-red-400':       finding.severity === 'critical',
+                'bg-gradient-to-r from-orange-500 to-amber-400':  finding.severity === 'high',
+                'bg-gradient-to-r from-amber-500 to-yellow-400':  finding.severity === 'medium',
+                'bg-gradient-to-r from-sky-500 to-cyan-400':      finding.severity === 'low',
+                'bg-[var(--border)]': !['critical','high','medium','low'].includes(finding.severity),
+              }"
+            />
+
+            <div class="flex flex-1 flex-col p-3.5">
+              <!-- Header row: badges + checkbox -->
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex flex-wrap items-center gap-1.5">
                   <span
-                    role="checkbox"
-                    tabindex="0"
-                    :aria-checked="finding.selected"
-                    class="grid size-4 shrink-0 place-items-center rounded-md border transition-colors"
-                    :class="finding.selected ? 'border-indigo-400 bg-indigo-500 text-white shadow-[0_0_14px_rgba(99,102,241,0.3)]' : 'border-white/15 bg-white/[0.04] text-transparent hover:border-indigo-400/50'"
-                    @click.stop.prevent="finding.selected = !finding.selected"
-                    @keydown.space.stop.prevent="finding.selected = !finding.selected"
-                  >
-                    <Check class="size-3" stroke-width="3" />
+                    class="rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize"
+                    :class="severityClasses[finding.severity]"
+                  >{{ finding.severity }}</span>
+                  <span
+                    class="rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                    :class="scanFindingSource(finding).color"
+                  >{{ scanFindingSource(finding).label }}</span>
+                  <span class="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] text-[var(--text-faint)]">{{ finding.category }}</span>
+                  <span v-if="isAlreadyRemediated(finding)" class="flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
+                    <CheckCircle2 class="size-2.5" /> In Findings
                   </span>
-                  <span class="font-mono text-[10px] text-[var(--text-faint)]">{{ finding.id }}</span>
-                  <span class="rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize" :class="severityClasses[finding.severity]">{{ finding.severity }}</span>
-                  <span class="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">{{ finding.category }}</span>
-                  <span v-if="isAlreadyRemediated(finding)" class="flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
-                    <CheckCircle2 class="size-2.5" />
-                    In Findings
-                  </span>
-                  <span v-else-if="isAlreadyWhitelisted(finding)" class="flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400">
-                    <ShieldMinus class="size-2.5" />
-                    Whitelisted
+                  <span v-else-if="isAlreadyWhitelisted(finding)" class="flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
+                    <ShieldMinus class="size-2.5" /> Whitelisted
                   </span>
                 </div>
-                <h3 class="mt-2 text-sm font-semibold text-[var(--text)]">{{ finding.title }}</h3>
-                <p class="mt-1 line-clamp-3 break-words text-xs leading-relaxed text-[var(--text-muted)]">{{ finding.detail }}</p>
-                <p v-if="finding.evidence" class="mt-2 line-clamp-2 break-words text-[11px] leading-relaxed text-[var(--text-faint)]">{{ finding.evidence }}</p>
+                <span
+                  v-if="!isAlreadyRemediated(finding)"
+                  role="checkbox"
+                  tabindex="0"
+                  :aria-checked="finding.selected"
+                  class="grid size-4 shrink-0 place-items-center rounded-md border transition-colors cursor-pointer"
+                  :class="finding.selected ? 'border-indigo-400 bg-indigo-500 text-white shadow-[0_0_12px_rgba(99,102,241,0.3)]' : 'border-white/15 bg-white/[0.04] text-transparent hover:border-indigo-400/50'"
+                  @click.stop.prevent="finding.selected = !finding.selected"
+                  @keydown.space.stop.prevent="finding.selected = !finding.selected"
+                >
+                  <Check class="size-3" stroke-width="3" />
+                </span>
+              </div>
+
+              <!-- Title + detail -->
+              <NuxtLink :to="scanFindingRoute(finding)" class="mt-2.5 flex-1 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40">
+                <h3 class="text-sm font-semibold leading-snug text-[var(--text)] group-hover:text-indigo-200 transition-colors">{{ finding.title }}</h3>
+                <p class="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-[var(--text-muted)]">{{ finding.detail }}</p>
               </NuxtLink>
-              <div class="rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2 lg:w-52">
-                <p class="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">Area</p>
-                <p class="mt-1 truncate text-xs text-[var(--text-muted)]">{{ finding.area }}</p>
+
+              <!-- Area -->
+              <div v-if="finding.area" class="mt-2.5 flex items-center gap-1.5">
+                <MapPin class="size-3 shrink-0 text-[var(--text-faint)]" />
+                <span class="truncate text-[10px] text-[var(--text-faint)]">{{ finding.area }}</span>
               </div>
-            </div>
-            <div class="mt-3 flex items-start gap-2">
-              <div class="flex-1 flex items-start gap-2 rounded-lg border border-indigo-500/15 bg-indigo-500/[0.06] p-3">
-                <CheckCircle2 class="mt-0.5 size-3.5 shrink-0 text-indigo-300" />
-                <p class="text-xs leading-relaxed text-[var(--text-muted)]">{{ finding.recommendation }}</p>
+
+              <!-- Recommendation + actions footer -->
+              <div class="mt-3 border-t border-[var(--border)]/50 pt-2.5 space-y-2">
+                <div class="flex items-start gap-1.5">
+                  <CheckCircle2 class="mt-0.5 size-3 shrink-0 text-indigo-300/70" />
+                  <p class="line-clamp-2 text-[10px] leading-relaxed text-[var(--text-faint)]">{{ finding.recommendation }}</p>
+                </div>
+                <div class="flex items-center justify-between gap-2">
+                  <NuxtLink
+                    :to="scanFindingRoute(finding)"
+                    class="inline-flex items-center gap-1 rounded-md border border-indigo-500/20 bg-indigo-500/10 px-2 py-1 text-[10px] font-medium text-indigo-300 transition-colors hover:bg-indigo-500/20"
+                  >
+                    <ExternalLink class="size-3" /> View detail
+                  </NuxtLink>
+                  <button
+                    class="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-medium transition-colors"
+                    :class="isAlreadyWhitelisted(finding)
+                      ? 'cursor-default border-amber-500/20 bg-amber-500/[0.08] text-amber-400/70'
+                      : 'border-[var(--border)] text-[var(--text-faint)] hover:border-amber-500/30 hover:bg-amber-500/[0.06] hover:text-amber-300'"
+                    :title="isAlreadyWhitelisted(finding) ? 'Already whitelisted' : 'Whitelist — skip in future scans'"
+                    :disabled="isAlreadyWhitelisted(finding)"
+                    @click.stop.prevent="whitelistFinding(finding)"
+                  >
+                    <ShieldMinus class="size-3" />
+                    {{ isAlreadyWhitelisted(finding) ? 'Whitelisted' : 'Whitelist' }}
+                  </button>
+                </div>
               </div>
-              <button
-                class="flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors"
-                :class="isAlreadyWhitelisted(finding)
-                  ? 'cursor-default border-amber-500/20 bg-amber-500/[0.08] text-amber-400 opacity-70'
-                  : 'border-[var(--border)] text-[var(--text-faint)] hover:border-amber-500/30 hover:bg-amber-500/[0.06] hover:text-amber-300'"
-                :title="isAlreadyWhitelisted(finding) ? 'Already whitelisted — AI will skip this finding in future scans' : 'Add to whitelist — AI skips this in future scans'"
-                :disabled="isAlreadyWhitelisted(finding)"
-                @click.stop.prevent="whitelistFinding(finding)"
-              >
-                <ShieldMinus class="size-3.5" />
-                {{ isAlreadyWhitelisted(finding) ? 'Whitelisted' : 'Whitelist' }}
-              </button>
             </div>
           </article>
-
-          <div v-if="aiScanRunning" class="px-4 py-14 text-center">
-            <Loader2 class="mx-auto size-5 animate-spin text-emerald-300" />
-            <p class="mt-3 text-sm text-[var(--text-muted)]">{{ scanStatusText }}</p>
-            <p class="mt-1 text-xs text-[var(--text-faint)]">{{ scanActivity[activeScanStage]?.detail ?? 'The AI agent is reviewing the project for security findings.' }}</p>
-          </div>
-          <div v-else-if="!scanFindings.length" class="px-4 py-14 text-center">
-            <p class="text-sm text-[var(--text-muted)]">No AI scan findings yet. Run AI Scan to analyze this project.</p>
-          </div>
         </div>
       </main>
 
-      <aside v-if="scanActivity.length || aiScanRunning || ossRunning || showHistoryDrawer" class="space-y-4">
+      <aside class="space-y-4">
         <!-- Scan Activity (shows during/after a scan) -->
         <section v-if="scanActivity.length || aiScanRunning || ossRunning" class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
           <div class="flex items-center justify-between gap-3">
@@ -2702,81 +3344,135 @@ async function clearScanHistory() {
           </template>
         </section>
 
-        <!-- History drawer -->
-        <Transition
-          enter-active-class="transition-all duration-200 ease-out"
-          enter-from-class="opacity-0 -translate-y-2"
-          enter-to-class="opacity-100 translate-y-0"
-          leave-active-class="transition-all duration-150 ease-in"
-          leave-from-class="opacity-100 translate-y-0"
-          leave-to-class="opacity-0 -translate-y-2"
-        >
-          <section v-if="showHistoryDrawer" class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
-            <!-- History header -->
-            <div class="flex items-center gap-2 border-b border-[var(--border)] px-4 py-3">
-              <History class="size-3.5 text-indigo-300 shrink-0" />
-              <h2 class="flex-1 text-sm font-semibold text-[var(--text)]">Scan History</h2>
-              <button
-                v-if="security.scans.length"
-                class="size-6 grid place-items-center rounded text-[var(--text-faint)] hover:text-red-300 hover:bg-red-500/10 transition-colors"
-                title="Clear history"
-                @click="clearScanHistory"
-              >
-                <Trash2 class="size-3" />
-              </button>
-              <button
-                class="size-6 grid place-items-center rounded text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-white/[0.06] transition-colors"
-                title="Close history"
-                @click="showHistoryDrawer = false"
-              >
-                <X class="size-3" />
-              </button>
-            </div>
+        <!-- Scan History (always visible) -->
+        <section class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+          <!-- Header -->
+          <div class="flex items-center gap-2 border-b border-[var(--border)] px-4 py-3">
+            <History class="size-3.5 text-indigo-300 shrink-0" />
+            <h2 class="flex-1 text-sm font-semibold text-[var(--text)]">Scan History</h2>
+            <button
+              v-if="security.scans.length"
+              class="size-6 grid place-items-center rounded text-[var(--text-faint)] hover:text-red-300 hover:bg-red-500/10 transition-colors cursor-pointer"
+              title="Clear history"
+              @click="clearScanHistory"
+            >
+              <Trash2 class="size-3" />
+            </button>
+          </div>
 
-            <!-- History list -->
-            <div v-if="security.scans.length" class="divide-y divide-[var(--border)]">
-              <button
+          <!-- History list -->
+          <div class="divide-y divide-[var(--border)]">
+            <!-- New scan slot (always first) -->
+            <button
+              class="group w-full flex items-center justify-center gap-2 px-4 py-4 text-[var(--text-faint)] hover:text-indigo-300 hover:bg-indigo-500/[0.04] transition-colors cursor-pointer border-b border-[var(--border)]"
+              title="Start a new scan"
+              @click="scanViewEmpty = true; activeScanId = null; openAIScanPicker()"
+            >
+              <Plus class="size-3.5" />
+              <span class="text-[11px] font-medium">New scan</span>
+            </button>
+
+            <template v-if="security.scans.length">
+              <div
                 v-for="scan in security.scans"
                 :key="scan.id"
-                class="w-full px-4 py-3 text-left transition-colors hover:bg-white/[0.03]"
-                :class="scan.id === activeScanId ? 'bg-indigo-500/[0.07]' : ''"
-                @click="activeScanId = scan.id"
+                class="group transition-colors hover:bg-white/[0.03]"
+                :class="scan.id === activeScanId && !scanViewEmpty ? 'bg-indigo-500/[0.07]' : ''"
               >
-                <div class="flex items-center justify-between gap-2">
-                  <div
-                    class="size-1.5 rounded-full shrink-0"
-                    :class="scan.id === activeScanId ? 'bg-indigo-400' : 'bg-[var(--border)]'"
-                  />
-                  <span class="flex-1 truncate text-[11px] font-medium text-[var(--text)]">
-                    {{ new Date(scan.scannedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
-                  </span>
-                  <span class="shrink-0 rounded-full border border-[var(--border)] px-1.5 py-px text-[9px] text-[var(--text-faint)] tabular-nums">{{ scan.findings.length }}</span>
-                </div>
-                <p class="mt-1 line-clamp-2 pl-3.5 text-[10px] leading-relaxed text-[var(--text-muted)]">{{ scan.summary || scan.parseWarning || 'No summary captured.' }}</p>
-              </button>
-            </div>
-            <div v-else class="px-4 py-10 text-center">
+                <button
+                  class="w-full px-4 py-3 text-left cursor-pointer"
+                  @click="scanViewEmpty = false; activeScanId = scan.id"
+                >
+                  <div class="flex items-center gap-2">
+                    <div
+                      class="size-1.5 rounded-full shrink-0"
+                      :class="scan.id === activeScanId && !scanViewEmpty ? 'bg-indigo-400' : 'bg-[var(--border)]'"
+                    />
+                    <span class="flex-1 truncate text-[11px] font-medium text-[var(--text)]">
+                      {{ new Date(scan.scannedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
+                    </span>
+                    <span class="shrink-0 rounded-full border border-[var(--border)] px-1.5 py-px text-[9px] text-[var(--text-faint)] tabular-nums">{{ scan.findings.length }}</span>
+                    <!-- Per-scan export -->
+                    <button
+                      class="inline-flex items-center gap-1 rounded border border-indigo-500/15 bg-indigo-500/[0.06] px-1.5 py-0.5 text-[9px] font-medium text-indigo-300/60 opacity-0 group-hover:opacity-100 hover:bg-indigo-500/15 hover:text-indigo-200 transition-all cursor-pointer"
+                      title="Export this scan"
+                      @click.stop="scanViewEmpty = false; activeScanId = scan.id; openExportModal()"
+                    >
+                      <Download class="size-2.5" />
+                    </button>
+                  </div>
+                  <p class="mt-1 line-clamp-2 pl-3.5 text-[10px] leading-relaxed text-[var(--text-muted)]">{{ scan.summary || scan.parseWarning || 'No summary captured.' }}</p>
+                </button>
+              </div>
+            </template>
+            <div v-else class="px-4 py-8 text-center">
               <FileJson class="mx-auto size-5 text-[var(--text-faint)]" />
               <p class="mt-2 text-xs text-[var(--text-muted)]">No saved scans yet.</p>
             </div>
-          </section>
-        </Transition>
+          </div>
+        </section>
       </aside>
     </section>
 
-    <section v-else-if="tab === 'findings'" class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
-      <div class="flex flex-col gap-3 border-b border-[var(--border)] p-4 sm:flex-row sm:items-center sm:justify-between">
+    <section v-else-if="tab === 'findings'" class="space-y-3">
+
+      <!-- ── Header ─────────────────────────────────────────────────────────── -->
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 class="text-sm font-semibold text-[var(--text)]">Security Findings</h2>
-          <p class="mt-0.5 text-xs text-[var(--text-muted)]">Remediation items created from scans and local checks.</p>
+          <p class="text-xs text-[var(--text-muted)]">
+            {{ security.findings.length }} total
+            <template v-if="filteredFindings.length !== security.findings.length">· {{ filteredFindings.length }} shown</template>
+          </p>
         </div>
-        <label class="relative w-full sm:w-72">
+        <label class="relative w-full sm:w-64">
           <Search class="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[var(--text-faint)]" />
-          <input v-model="query" class="h-9 w-full rounded-lg border border-[var(--border)] bg-black/10 pl-9 pr-3 text-xs text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-indigo-500/40" placeholder="Search findings">
+          <input v-model="query" class="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] pl-9 pr-3 text-xs text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-indigo-500/40" placeholder="Search findings…">
         </label>
       </div>
 
-      <!-- Bulk action bar -->
+      <!-- ── Filters ─────────────────────────────────────────────────────────── -->
+      <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] divide-y divide-[var(--border)]">
+        <!-- Status chips -->
+        <div class="flex flex-wrap items-center gap-1.5 px-3 py-2.5">
+          <span class="shrink-0 mr-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">Status</span>
+          <button
+            v-for="s in (['all', ...statusOptions] as const)"
+            :key="s"
+            class="flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-medium capitalize transition-colors cursor-pointer"
+            :class="filterStatus === s
+              ? s === 'all'        ? 'border-indigo-500/40 bg-indigo-500/15 text-indigo-300'
+              : s === 'open'       ? 'border-red-500/30 bg-red-500/10 text-red-300'
+              : s === 'resolved'   ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+              : s === 'triaged'    ? 'border-indigo-500/30 bg-indigo-500/10 text-indigo-300'
+              : s === 'in_progress'? 'border-sky-500/30 bg-sky-500/10 text-sky-300'
+              :                      'border-white/10 bg-white/[0.04] text-[var(--text-muted)]'
+              : 'border-transparent text-[var(--text-faint)] hover:border-[var(--border)] hover:text-[var(--text-muted)]'"
+            @click="filterStatus = s as SecurityFindingStatus | 'all'; selectedFindingIds = new Set()"
+          >
+            {{ s === 'all' ? 'All' : s.replace('_', ' ') }}
+            <span class="opacity-50 font-normal">{{ findingCountByStatus[s] ?? 0 }}</span>
+          </button>
+        </div>
+        <!-- Severity chips -->
+        <div class="flex flex-wrap items-center gap-1.5 px-3 py-2.5">
+          <span class="shrink-0 mr-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">Severity</span>
+          <button
+            v-for="sv in (['all', 'critical', 'high', 'medium', 'low'] as const)"
+            :key="sv"
+            class="flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-medium capitalize transition-colors cursor-pointer"
+            :class="filterSeverity === sv
+              ? sv === 'all' ? 'border-indigo-500/40 bg-indigo-500/15 text-indigo-300' : severityClasses[sv]
+              : 'border-transparent text-[var(--text-faint)] hover:border-[var(--border)] hover:text-[var(--text-muted)]'"
+            @click="filterSeverity = sv as SecuritySeverity | 'all'; selectedFindingIds = new Set()"
+          >
+            {{ sv === 'all' ? 'All' : sv }}
+            <span class="opacity-50 font-normal">{{ findingCountBySeverity[sv] ?? 0 }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Bulk action bar ─────────────────────────────────────────────────── -->
       <Transition
         enter-active-class="transition-all duration-150 ease-out"
         enter-from-class="opacity-0 -translate-y-1"
@@ -2785,135 +3481,344 @@ async function clearScanHistory() {
         leave-from-class="opacity-100 translate-y-0"
         leave-to-class="opacity-0 -translate-y-1"
       >
-        <div v-if="selectedFindingIds.size > 0" class="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-indigo-500/[0.05] px-4 py-2.5">
+        <div v-if="selectedFindingIds.size > 0" class="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.05] px-4 py-2.5">
           <span class="text-xs font-semibold text-indigo-300">{{ selectedFindingIds.size }} selected</span>
           <div class="flex items-center gap-1.5 ml-2">
-            <select
-              v-model="bulkActionStatus"
-              class="h-7 rounded-md border border-[var(--border)] bg-black/20 px-2 text-[11px] text-[var(--text)] outline-none"
-            >
+            <GlassSelect v-model="bulkActionStatus" class="w-40">
               <option value="">Change status…</option>
               <option v-for="s in statusOptions" :key="s" :value="s">{{ s.replace('_', ' ') }}</option>
-            </select>
+            </GlassSelect>
             <button
               :disabled="!bulkActionStatus"
-              class="inline-flex items-center gap-1 rounded-md border border-indigo-500/25 bg-indigo-500/10 px-2.5 py-1 text-[11px] font-medium text-indigo-300 hover:bg-indigo-500/18 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+              class="inline-flex items-center gap-1 rounded-md border border-indigo-500/25 bg-indigo-500/10 px-2.5 py-1 text-[11px] font-medium text-indigo-300 hover:bg-indigo-500/20 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
               @click="applyBulkStatus"
             >
               <Check class="size-3" /> Apply
             </button>
           </div>
-          <button class="inline-flex items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/8 px-2.5 py-1 text-[11px] font-medium text-amber-300 hover:bg-amber-500/15 cursor-pointer transition-colors" @click="applyBulkWhitelist">
+          <button class="inline-flex items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/[0.08] px-2.5 py-1 text-[11px] font-medium text-amber-300 hover:bg-amber-500/15 cursor-pointer transition-colors" @click="applyBulkWhitelist">
             <ShieldMinus class="size-3" /> Whitelist
+          </button>
+          <button class="inline-flex items-center gap-1 rounded-md border border-violet-500/25 bg-violet-500/[0.08] px-2.5 py-1 text-[11px] font-medium text-violet-300 hover:bg-violet-500/15 cursor-pointer transition-colors" @click="openBulkValidateModal">
+            <FlaskConical class="size-3" /> Validate Fix
           </button>
           <button class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-[var(--text-muted)] hover:bg-white/[0.07] cursor-pointer transition-colors" @click="copyBulkFixPrompts">
             <Clipboard class="size-3" /> Copy Prompts
           </button>
-          <button class="ml-auto text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] cursor-pointer" @click="() => { selectedFindingIds = new Set() }">
+          <button class="ml-auto text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] cursor-pointer transition-colors" @click="selectedFindingIds = new Set()">
             Clear selection
           </button>
         </div>
       </Transition>
 
-      <div class="divide-y divide-[var(--border)]">
+      <!-- ── Finding list ────────────────────────────────────────────────────── -->
+      <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+
         <!-- Select-all row -->
-        <div v-if="filteredFindings.length" class="flex items-center gap-2.5 px-4 py-2 bg-black/5">
-          <input
-            type="checkbox"
-            class="rounded border-[var(--border)] accent-indigo-500 cursor-pointer"
+        <div v-if="filteredFindings.length" class="flex items-center gap-2.5 border-b border-[var(--border)] bg-black/5 px-4 py-2">
+          <GlassCheckbox
+            size="sm"
             :checked="selectedFindingIds.size === filteredFindings.length && filteredFindings.length > 0"
             :indeterminate="selectedFindingIds.size > 0 && selectedFindingIds.size < filteredFindings.length"
             @change="toggleSelectAll"
-          />
-          <span class="text-[10px] text-[var(--text-faint)]">Select all</span>
+          >
+            <span class="text-[10px] text-[var(--text-faint)]">Select all</span>
+          </GlassCheckbox>
+          <span class="ml-auto text-[10px] text-[var(--text-faint)]">{{ filteredFindings.length }} finding{{ filteredFindings.length !== 1 ? 's' : '' }}</span>
         </div>
-        <article v-for="finding in filteredFindings" :key="finding.id" class="px-4 py-4" :class="selectedFindingIds.has(finding.id) ? 'bg-indigo-500/[0.04]' : ''">
-          <div class="flex items-start gap-3">
-            <input
-              type="checkbox"
-              class="mt-1 rounded border-[var(--border)] accent-indigo-500 cursor-pointer shrink-0"
+
+        <!-- Finding rows (accordion) -->
+        <article
+          v-for="finding in filteredFindings"
+          :key="finding.id"
+          class="border-b border-[var(--border)] border-l-4 last:border-b-0 transition-colors"
+          :class="[
+            severityLeftBorder[finding.severity],
+            selectedFindingIds.has(finding.id) ? 'bg-indigo-500/[0.03]' : '',
+          ]"
+        >
+          <!-- Always-visible summary row -->
+          <div
+            class="flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors"
+            @click="expandedFindingId = expandedFindingId === finding.id ? null : finding.id"
+          >
+            <GlassCheckbox
+              size="sm"
+              class="mt-0.5 shrink-0"
               :checked="selectedFindingIds.has(finding.id)"
+              @click.stop
               @change="toggleFindingSelect(finding.id)"
             />
             <div class="flex-1 min-w-0">
-              <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <NuxtLink :to="remediationFindingRoute(finding)" class="min-w-0 rounded-lg outline-none transition-colors hover:bg-white/[0.03] focus-visible:ring-2 focus-visible:ring-indigo-500/40">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <span class="font-mono text-[10px] text-[var(--text-faint)]">SEC-{{ finding.number }}</span>
-                    <span class="rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize" :class="severityClasses[finding.severity]">{{ finding.severity }}</span>
-                    <span class="rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize" :class="statusClasses[finding.status]">{{ finding.status.replace('_', ' ') }}</span>
-                    <span class="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">{{ finding.source.replace('_', ' ') }}</span>
-                    <span class="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">{{ finding.category }}</span>
-                  </div>
-                  <h3 class="mt-2 text-sm font-semibold text-[var(--text)]">{{ finding.title }}</h3>
-                  <p class="mt-1 line-clamp-3 break-words text-xs leading-relaxed text-[var(--text-muted)]">{{ finding.detail }}</p>
-                  <p v-if="finding.evidence" class="mt-2 line-clamp-2 break-words text-[11px] leading-relaxed text-[var(--text-faint)]">{{ finding.evidence }}</p>
-                </NuxtLink>
-                <div class="space-y-2 lg:w-56">
-                  <select class="h-9 w-full rounded-lg border border-[var(--border)] bg-black/20 px-2 text-xs text-[var(--text)] outline-none" :value="finding.status" @change="updateFindingStatus(finding, ($event.target as HTMLSelectElement).value as SecurityFindingStatus)">
-                    <option v-for="status in statusOptions" :key="status" :value="status">{{ status.replace('_', ' ') }}</option>
-                  </select>
-                  <div class="rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2">
-                    <p class="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">Area</p>
-                    <p class="mt-1 truncate text-xs text-[var(--text-muted)]">{{ finding.area }}</p>
-                  </div>
-                  <button v-if="auth.isGitHubConnected" class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-[var(--text-muted)] transition-colors hover:border-white/20 hover:bg-white/[0.07] hover:text-[var(--text)]" @click="openGitHubIssueModal(finding)">
-                    <Github class="size-3.5" />
-                    Create Issue
-                  </button>
-                  <button class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-[var(--text-muted)] transition-colors hover:border-white/20 hover:bg-white/[0.07] hover:text-[var(--text)]" @click="copyFixPrompt(finding)">
-                    <Clipboard class="size-3.5" />
-                    Copy Fix Prompt
-                  </button>
-                  <template v-if="validateRunning && validateFinding?.id === finding.id">
-                    <button class="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2 text-xs font-medium text-violet-300 opacity-60 cursor-not-allowed">
-                      <Loader2 class="size-3.5 animate-spin" />
-                      Validating…
-                    </button>
-                    <button class="flex items-center justify-center gap-1 rounded-lg border border-red-500/25 bg-red-500/[0.08] px-2.5 py-2 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/15 cursor-pointer" title="Cancel validation" @click="cancelValidation">
-                      <X class="size-3.5" />
-                    </button>
-                  </template>
-                  <button v-else class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2 text-xs font-medium text-violet-300 transition-colors hover:border-violet-500/35 hover:bg-violet-500/10" @click="openValidateModal(finding)">
-                    <FlaskConical class="size-3.5" />
-                    Validate Fix
-                  </button>
-                </div>
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="font-mono text-[9px] text-[var(--text-faint)]">SEC-{{ finding.number }}</span>
+                <span class="rounded-full border px-1.5 py-px text-[9px] font-semibold capitalize" :class="severityClasses[finding.severity]">{{ finding.severity }}</span>
+                <span class="rounded-full border border-white/8 bg-white/[0.04] px-1.5 py-px text-[9px] text-[var(--text-faint)]">{{ finding.category }}</span>
+                <span class="rounded-full border border-white/8 bg-white/[0.04] px-1.5 py-px text-[9px] text-[var(--text-faint)] capitalize">{{ finding.source.replace('_', ' ') }}</span>
               </div>
-              <div class="mt-3 flex items-start gap-2 rounded-lg border border-indigo-500/15 bg-indigo-500/[0.06] p-3">
+              <p class="mt-1 text-xs font-semibold leading-snug text-[var(--text)]">{{ finding.title }}</p>
+              <p class="mt-0.5 truncate text-[10px] text-[var(--text-faint)]">{{ finding.area }}</p>
+            </div>
+            <!-- Right: status badge + validate running indicator + chevron -->
+            <div class="flex shrink-0 items-center gap-2 ml-2">
+              <span v-if="validateRunning && validateFinding?.id === finding.id" class="hidden sm:flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/[0.08] px-2 py-0.5 text-[9px] font-medium text-violet-300">
+                <Loader2 class="size-2.5 animate-spin" /> Validating…
+              </span>
+              <span v-else class="hidden sm:inline-block rounded-full border px-2 py-0.5 text-[9px] font-medium capitalize" :class="statusClasses[finding.status]">
+                {{ finding.status.replace('_', ' ') }}
+              </span>
+              <ChevronDown v-if="expandedFindingId === finding.id" class="size-3.5 text-[var(--text-faint)]" />
+              <ChevronRight v-else class="size-3.5 text-[var(--text-faint)]" />
+            </div>
+          </div>
+
+          <!-- Expanded detail panel -->
+          <Transition
+            enter-active-class="transition-all duration-200 ease-out overflow-hidden"
+            enter-from-class="opacity-0 max-h-0"
+            enter-to-class="opacity-100 max-h-[600px]"
+            leave-active-class="transition-all duration-150 ease-in overflow-hidden"
+            leave-from-class="opacity-100 max-h-[600px]"
+            leave-to-class="opacity-0 max-h-0"
+          >
+            <div v-if="expandedFindingId === finding.id" class="space-y-3 px-4 pb-4 pt-1">
+
+              <!-- Mobile status badge -->
+              <div class="flex items-center gap-2 sm:hidden">
+                <span class="rounded-full border px-2 py-0.5 text-[9px] font-medium capitalize" :class="statusClasses[finding.status]">{{ finding.status.replace('_', ' ') }}</span>
+              </div>
+
+              <!-- Description -->
+              <p class="text-xs leading-relaxed text-[var(--text-muted)]">{{ finding.detail }}</p>
+
+              <!-- Evidence -->
+              <div v-if="finding.evidence" class="rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2.5">
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">Evidence</p>
+                <p class="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">{{ finding.evidence }}</p>
+              </div>
+
+              <!-- Recommendation -->
+              <div class="flex items-start gap-2 rounded-lg border border-indigo-500/15 bg-indigo-500/[0.06] px-3 py-2.5">
                 <CheckCircle2 class="mt-0.5 size-3.5 shrink-0 text-indigo-300" />
                 <p class="text-xs leading-relaxed text-[var(--text-muted)]">{{ finding.recommendation }}</p>
               </div>
+
+              <!-- Actions row -->
+              <div class="flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-3">
+                <!-- Status dropdown -->
+                <GlassSelect class="w-36" :value="finding.status" @change="updateFindingStatus(finding, ($event.target as HTMLSelectElement).value as SecurityFindingStatus)">
+                  <option v-for="status in statusOptions" :key="status" :value="status">{{ status.replace('_', ' ') }}</option>
+                </GlassSelect>
+
+                <!-- View detail link -->
+                <NuxtLink
+                  :to="remediationFindingRoute(finding)"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white/[0.03] px-3 py-1.5 text-[11px] text-[var(--text-muted)] transition-colors hover:border-white/20 hover:text-[var(--text)]"
+                  @click.stop
+                >
+                  <ExternalLink class="size-3" />
+                  Detail
+                </NuxtLink>
+
+                <!-- Copy fix prompt -->
+                <button
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white/[0.03] px-3 py-1.5 text-[11px] text-[var(--text-muted)] transition-colors hover:border-white/20 hover:text-[var(--text)]"
+                  @click.stop="copyFixPrompt(finding)"
+                >
+                  <Clipboard class="size-3" />
+                  Copy Prompt
+                </button>
+
+                <!-- GitHub issue -->
+                <button
+                  v-if="auth.isGitHubConnected"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white/[0.03] px-3 py-1.5 text-[11px] text-[var(--text-muted)] transition-colors hover:border-white/20 hover:text-[var(--text)]"
+                  @click.stop="openGitHubIssueModal(finding)"
+                >
+                  <Github class="size-3" />
+                  Create Issue
+                </button>
+
+                <!-- Validate fix -->
+                <template v-if="validateRunning && validateFinding?.id === finding.id">
+                  <button class="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-3 py-1.5 text-[11px] font-medium text-violet-300 opacity-60 cursor-not-allowed">
+                    <Loader2 class="size-3 animate-spin" />
+                    Validating…
+                  </button>
+                  <button class="inline-flex items-center gap-1 rounded-lg border border-red-500/25 bg-red-500/[0.08] px-2.5 py-1.5 text-[11px] font-medium text-red-300 transition-colors hover:bg-red-500/15 cursor-pointer" title="Cancel" @click.stop="cancelValidation">
+                    <X class="size-3" />
+                  </button>
+                </template>
+                <button
+                  v-else
+                  class="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-3 py-1.5 text-[11px] font-medium text-violet-300 transition-colors hover:border-violet-500/35 hover:bg-violet-500/10"
+                  @click.stop="openValidateModal(finding)"
+                >
+                  <FlaskConical class="size-3" />
+                  Validate Fix
+                </button>
+              </div>
             </div>
-          </div>
+          </Transition>
         </article>
-        <div v-if="!filteredFindings.length" class="px-4 py-14 text-center text-sm text-[var(--text-muted)]">No remediation items yet.</div>
+
+        <!-- Empty states -->
+        <div v-if="!filteredFindings.length" class="px-4 py-14 text-center">
+          <template v-if="security.findings.length">
+            <p class="text-sm font-medium text-[var(--text-muted)]">No findings match the current filters.</p>
+            <button class="mt-3 text-xs text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer" @click="filterStatus = 'all'; filterSeverity = 'all'">Clear filters</button>
+          </template>
+          <p v-else class="text-sm text-[var(--text-muted)]">No remediation items yet. Run a scan to get started.</p>
+        </div>
       </div>
     </section>
 
-    <section v-else-if="tab === 'dependencies'" class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
-      <div class="flex items-center justify-between gap-3 border-b border-[var(--border)] p-4">
+    <section v-else-if="tab === 'dependencies'" class="space-y-3">
+
+      <!-- ── Header ──────────────────────────────────────────────────────────── -->
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 class="text-sm font-semibold text-[var(--text)]">Dependencies</h2>
-          <p class="mt-0.5 text-xs text-[var(--text-muted)]">Manifest inventory for Node, Rust, .NET, Python, Go, Java, PHP, and Ruby projects.</p>
+          <p class="text-xs text-[var(--text-muted)]">
+            {{ dependencyInventory.length }} packages across {{ depsByManifest.size }} manifest{{ depsByManifest.size !== 1 ? 's' : '' }}
+            <template v-if="depEnriching"> · <span class="text-indigo-300/70">checking latest &amp; CVEs…</span></template>
+          </p>
         </div>
-        <button class="inline-flex items-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/10 px-3 py-2 text-xs font-medium text-violet-200 hover:bg-violet-500/15" @click="scanDependencies()">
-          <Loader2 v-if="dependencyLoading" class="size-3.5 animate-spin" />
-          <PackageSearch v-else class="size-3.5" />
-          Refresh
-        </button>
+        <div class="flex items-center gap-2">
+          <label class="relative w-52">
+            <Search class="pointer-events-none absolute left-3 top-1/2 size-3 -translate-y-1/2 text-[var(--text-faint)]" />
+            <input v-model="depQuery" class="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] pl-8 pr-3 text-xs text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-indigo-500/40" placeholder="Filter packages…">
+          </label>
+          <button
+            class="inline-flex items-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/10 px-3 py-2 text-xs font-medium text-violet-200 hover:bg-violet-500/15 transition-colors cursor-pointer"
+            :disabled="dependencyLoading"
+            @click="scanDependencies()"
+          >
+            <Loader2 v-if="dependencyLoading" class="size-3.5 animate-spin" />
+            <PackageSearch v-else class="size-3.5" />
+            Refresh
+          </button>
+        </div>
       </div>
-      <div class="divide-y divide-[var(--border)]">
-        <article v-for="item in dependencyInventory" :key="`${item.manifest}:${item.name}`" class="grid gap-2 px-4 py-3 text-xs md:grid-cols-[1fr_8rem_9rem]">
-          <div class="min-w-0">
-            <p class="truncate font-medium text-[var(--text)]">{{ item.name }}</p>
-            <p class="mt-0.5 truncate text-[10px] text-[var(--text-faint)]">{{ item.manifest }}</p>
+
+      <!-- ── Stats strip ──────────────────────────────────────────────────────── -->
+      <div v-if="dependencyInventory.length" class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2.5 text-center">
+          <p class="text-lg font-bold text-[var(--text)]">{{ dependencyInventory.length }}</p>
+          <p class="text-[10px] text-[var(--text-faint)]">Total packages</p>
+        </div>
+        <div class="rounded-xl border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2.5 text-center">
+          <p class="text-lg font-bold" :class="dependencyInventory.filter(d => d.latestStatus === 'outdated').length ? 'text-amber-300' : 'text-[var(--text)]'">
+            {{ dependencyInventory.filter(d => d.latestStatus === 'outdated').length }}
+          </p>
+          <p class="text-[10px] text-[var(--text-faint)]">Outdated</p>
+        </div>
+        <div class="rounded-xl border border-red-500/20 bg-red-500/[0.05] px-3 py-2.5 text-center">
+          <p class="text-lg font-bold" :class="dependencyInventory.filter(d => d.vulnStatus === 'vulnerable').length ? 'text-red-300' : 'text-[var(--text)]'">
+            {{ depEnriching ? '…' : dependencyInventory.filter(d => d.vulnStatus === 'vulnerable').length }}
+          </p>
+          <p class="text-[10px] text-[var(--text-faint)]">With CVEs</p>
+        </div>
+        <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2.5 text-center">
+          <p class="text-lg font-bold text-[var(--text)]">{{ depsByManifest.size }}</p>
+          <p class="text-[10px] text-[var(--text-faint)]">Manifests</p>
+        </div>
+      </div>
+
+      <!-- ── Package groups ───────────────────────────────────────────────────── -->
+      <template v-if="dependencyInventory.length">
+        <div
+          v-for="[manifest, items] in depsByManifest"
+          :key="manifest"
+          class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden"
+        >
+          <!-- Manifest header -->
+          <div class="flex items-center gap-2 border-b border-[var(--border)] bg-black/10 px-4 py-2.5">
+            <FileText class="size-3.5 shrink-0 text-[var(--text-faint)]" />
+            <span class="font-mono text-[11px] text-[var(--text-muted)]">{{ manifest }}</span>
+            <span class="ml-auto text-[10px] text-[var(--text-faint)]">{{ items.length }} package{{ items.length !== 1 ? 's' : '' }}</span>
           </div>
-          <p class="font-mono text-[var(--text-muted)]">{{ item.version }}</p>
-          <p class="text-[var(--text-faint)]">{{ item.type }}</p>
-        </article>
-        <div v-if="dependencyLoading && !dependencyInventory.length" class="px-4 py-14 text-center text-sm text-[var(--text-muted)]">Indexing package manifests...</div>
-        <div v-else-if="!dependencyInventory.length" class="px-4 py-14 text-center text-sm text-[var(--text-muted)]">No package manifests indexed yet.</div>
+
+          <!-- Column header -->
+          <div class="grid grid-cols-[1fr_7rem_7rem_6rem] gap-2 border-b border-[var(--border)] px-4 py-1.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">
+            <span>Package</span>
+            <span>Installed</span>
+            <span>Latest</span>
+            <span>CVEs</span>
+          </div>
+
+          <!-- Package rows -->
+          <div class="divide-y divide-[var(--border)]">
+            <div
+              v-for="item in items"
+              :key="`${item.manifest}:${item.name}`"
+              class="grid grid-cols-[1fr_7rem_7rem_6rem] items-center gap-2 px-4 py-2.5 hover:bg-white/[0.02] transition-colors"
+            >
+              <!-- Name + ecosystem badge -->
+              <div class="min-w-0 flex items-center gap-2">
+                <span
+                  class="shrink-0 rounded-full border px-1.5 py-px text-[9px] font-semibold"
+                  :class="depTypeColor[depEcosystem(item)] ?? 'border-white/10 bg-white/[0.04] text-[var(--text-faint)]'"
+                >{{ depEcosystem(item) || item.type }}</span>
+                <p class="truncate text-xs font-medium text-[var(--text)]">{{ item.name }}</p>
+              </div>
+
+              <!-- Installed version -->
+              <p class="font-mono text-[11px] text-[var(--text-muted)] truncate">{{ item.version }}</p>
+
+              <!-- Latest version -->
+              <div class="flex items-center gap-1">
+                <template v-if="depEnriching && !item.latestVersion">
+                  <span class="text-[10px] text-[var(--text-faint)]">…</span>
+                </template>
+                <template v-else-if="item.latestVersion">
+                  <span class="font-mono text-[11px]" :class="item.latestStatus === 'outdated' ? 'text-amber-300' : 'text-emerald-300'">
+                    {{ item.latestVersion }}
+                  </span>
+                  <span v-if="item.latestStatus === 'outdated'" title="Outdated">
+                    <TriangleAlert class="size-3 text-amber-400/70" />
+                  </span>
+                </template>
+                <span v-else class="text-[10px] text-[var(--text-faint)]">—</span>
+              </div>
+
+              <!-- CVE badge -->
+              <div>
+                <template v-if="depEnriching && !item.vulnStatus">
+                  <span class="text-[10px] text-[var(--text-faint)]">…</span>
+                </template>
+                <template v-else-if="item.vulnStatus === 'vulnerable' && item.vulns?.length">
+                  <button
+                    class="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[9px] font-semibold text-red-300 hover:bg-red-500/20 transition-colors cursor-pointer"
+                    @click.stop="selectedCveItem = item; showCvePanel = true"
+                  >
+                    <AlertTriangle class="size-2.5" />
+                    {{ item.vulns.length }} CVE{{ item.vulns.length !== 1 ? 's' : '' }}
+                  </button>
+                </template>
+                <template v-else-if="item.vulnStatus === 'clean'">
+                  <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2 py-0.5 text-[9px] text-emerald-400">
+                    <CheckCircle2 class="size-2.5" /> Clean
+                  </span>
+                </template>
+                <span v-else class="text-[10px] text-[var(--text-faint)]">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Loading / empty -->
+      <div v-else-if="dependencyLoading" class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-14 text-center">
+        <Loader2 class="mx-auto size-5 animate-spin text-violet-300 mb-3" />
+        <p class="text-sm text-[var(--text-muted)]">Indexing package manifests…</p>
+      </div>
+      <div v-else class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-14 text-center">
+        <PackageSearch class="mx-auto size-5 text-[var(--text-faint)] mb-3" />
+        <p class="text-sm text-[var(--text-muted)]">No package manifests found yet.</p>
+        <button class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-200 hover:bg-violet-500/15 transition-colors cursor-pointer" @click="scanDependencies()">
+          <PackageSearch class="size-3.5" /> Scan now
+        </button>
       </div>
     </section>
 
@@ -2987,90 +3892,103 @@ async function clearScanHistory() {
         </div>
       </div>
 
-      <!-- ── Pattern-based Secret Scan ─────────────────────────────────────── -->
-      <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
-        <div class="flex items-center justify-between gap-3 border-b border-[var(--border)] p-4">
-          <div>
-            <h2 class="text-sm font-semibold text-[var(--text)]">Secret Pattern Scan</h2>
-            <p class="mt-0.5 text-xs text-[var(--text-muted)]">Scans source files for leaked credentials, tokens, and private keys.</p>
-          </div>
+    </section>
+
+    <!-- ── Environment Tab ──────────────────────────────────────────────────── -->
+    <section v-else-if="tab === 'environment'" class="space-y-4">
+
+      <!-- Header -->
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-sm font-semibold text-[var(--text)]">Environments</h2>
+          <p class="mt-0.5 text-xs text-[var(--text-muted)]">Target deployment environments for this project. Each entry stores URL and SSH access details.</p>
+        </div>
+        <button
+          class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-500/15 transition-colors cursor-pointer"
+          @click="addEnvironment"
+        >
+          <Plus class="size-3.5" /> Add environment
+        </button>
+      </div>
+
+      <!-- Empty state -->
+      <div v-if="!environments.length" class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-12 text-center">
+        <Globe class="mx-auto size-6 text-[var(--text-faint)]" />
+        <p class="mt-3 text-sm font-medium text-[var(--text-muted)]">No environments added</p>
+        <p class="mt-1 text-xs text-[var(--text-faint)]">Click "Add environment" to define a target (URL, SSH access, etc.).</p>
+      </div>
+
+      <!-- Environment cards -->
+      <div v-for="env in environments" :key="env.id" class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+        <!-- Card header -->
+        <div class="flex items-center gap-3 border-b border-[var(--border)] px-4 py-3">
+          <Globe class="size-3.5 text-indigo-300/60 shrink-0" />
+          <input
+            v-model="env.name"
+            placeholder="Environment name (e.g. Production)"
+            class="flex-1 bg-transparent text-sm font-semibold text-[var(--text)] placeholder-[var(--text-faint)] outline-none"
+          />
           <button
-            class="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-200 hover:bg-amber-500/15 transition-colors cursor-pointer"
-            :disabled="secretsLoading"
-            @click="scanSecrets()"
+            class="size-7 shrink-0 grid place-items-center rounded-lg text-[var(--text-faint)] hover:text-red-300 hover:bg-red-500/[0.06] border border-transparent hover:border-red-500/20 transition-colors cursor-pointer"
+            title="Remove environment"
+            @click="removeEnvironment(env.id)"
           >
-            <Loader2 v-if="secretsLoading" class="size-3.5 animate-spin" />
-            <KeyRound v-else class="size-3.5" />
-            Scan
+            <Trash2 class="size-3.5" />
           </button>
         </div>
 
-        <!-- Pending results with review UI -->
-        <div v-if="secretScanDone && pendingSecretFindings.length" class="p-4 space-y-4">
-          <div class="flex items-center justify-between gap-3">
-            <p class="text-xs text-amber-300 font-medium">
-              {{ pendingSecretFindings.filter(f => f.selected).length }} of {{ pendingSecretFindings.length }} selected — review before adding to Findings.
-            </p>
-            <div class="flex items-center gap-2">
-              <button
-                class="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/25 bg-amber-500/8 px-3 py-1.5 text-xs font-medium text-amber-200 hover:bg-amber-500/15 transition-colors cursor-pointer disabled:opacity-40"
-                :disabled="!pendingSecretFindings.some(f => f.selected)"
-                @click="addPendingSecretsToFindings"
-              >
-                <Plus class="size-3.5" /> Add selected to Findings
-              </button>
-            </div>
+        <div class="p-4 space-y-4">
+          <!-- Target URL -->
+          <div>
+            <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5 text-[var(--text-faint)]">Target URL</label>
+            <input
+              v-model="env.url"
+              type="url"
+              placeholder="https://example.com"
+              class="w-full rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2 text-xs text-[var(--text)] placeholder-[var(--text-faint)] outline-none transition-colors focus:border-indigo-500/40"
+            />
           </div>
 
-          <div class="space-y-3">
-            <div
-              v-for="finding in pendingSecretFindings"
-              :key="finding.id"
-              class="rounded-xl border p-4 transition-colors"
-              :class="finding.selected
-                ? 'border-amber-500/25 bg-amber-500/[0.06]'
-                : 'border-[var(--border)] bg-black/5 opacity-60'"
-            >
-              <div class="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  class="mt-0.5 rounded accent-amber-400 cursor-pointer shrink-0"
-                  :checked="finding.selected"
-                  @change="finding.selected = !finding.selected"
-                />
-                <div class="flex-1 min-w-0">
-                  <div class="flex flex-wrap items-center gap-2 mb-1.5">
-                    <span class="rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize" :class="severityClasses[finding.severity]">{{ finding.severity }}</span>
-                    <span class="text-[10px] text-[var(--text-faint)]">{{ finding.category }}</span>
-                    <span class="text-[10px] font-mono text-[var(--text-faint)]">{{ finding.area }}</span>
-                  </div>
-                  <p class="text-xs font-semibold text-[var(--text)]">{{ finding.title }}</p>
-                  <p class="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">{{ finding.detail }}</p>
-                  <pre class="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-[var(--border)] bg-black/20 p-2.5 text-[10px] text-[var(--text-faint)]">{{ finding.evidence }}</pre>
-                  <p class="mt-2 text-[11px] leading-relaxed text-indigo-300/70">{{ finding.recommendation }}</p>
-                </div>
-                <button
-                  class="shrink-0 inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-[var(--text-faint)] hover:text-amber-300 hover:border-amber-500/25 hover:bg-amber-500/8 transition-colors cursor-pointer"
-                  title="Whitelist — suppress on future scans"
-                  @click="whitelistPendingSecret(finding)"
-                >
-                  <ShieldMinus class="size-3" /> Whitelist
-                </button>
-              </div>
+          <!-- SSH -->
+          <div class="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5 text-[var(--text-faint)]">SSH host</label>
+              <input
+                v-model="env.sshHost"
+                placeholder="192.168.1.1"
+                class="w-full rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2 font-mono text-xs text-[var(--text)] placeholder-[var(--text-faint)] outline-none transition-colors focus:border-sky-500/40"
+              />
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5 text-[var(--text-faint)]">SSH user</label>
+              <input
+                v-model="env.sshUser"
+                placeholder="ubuntu"
+                class="w-full rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2 font-mono text-xs text-[var(--text)] placeholder-[var(--text-faint)] outline-none transition-colors focus:border-sky-500/40"
+              />
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold uppercase tracking-wider mb-1.5 text-[var(--text-faint)]">Key path</label>
+              <input
+                v-model="env.sshKeyPath"
+                placeholder="~/.ssh/id_rsa"
+                class="w-full rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2 font-mono text-xs text-[var(--text)] placeholder-[var(--text-faint)] outline-none transition-colors focus:border-sky-500/40"
+              />
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Clean scan result -->
-        <div v-else-if="secretScanDone && !pendingSecretFindings.length" class="px-4 py-10 text-center">
-          <ShieldCheck class="mx-auto size-5 text-emerald-300 mb-2" />
-          <p class="text-sm text-[var(--text-muted)]">No secret patterns found.</p>
-        </div>
-
-        <!-- Not yet run -->
-        <div v-else class="px-4 py-10 text-center text-sm text-[var(--text-muted)]">
-          Click "Scan" to check source files for leaked credentials, API keys, and private key material.
-        </div>
+      <!-- Save -->
+      <div v-if="environments.length" class="flex justify-end">
+        <button
+          class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-4 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-500/15 transition-colors cursor-pointer disabled:opacity-50"
+          :disabled="envSaving"
+          @click="saveEnvironments"
+        >
+          <Loader2 v-if="envSaving" class="size-3.5 animate-spin" />
+          {{ envSaving ? 'Saving…' : 'Save environments' }}
+        </button>
       </div>
 
     </section>
@@ -3249,11 +4167,11 @@ async function clearScanHistory() {
         </label>
         <label class="rounded-lg border border-[var(--border)] bg-black/10 p-4">
           <span class="text-xs font-medium text-[var(--text)]">Auto effort</span>
-          <select :value="security.settings.autoScanEffort" class="mt-2 h-9 w-full rounded-lg border border-[var(--border)] bg-black/20 px-2 text-xs text-[var(--text)] outline-none" @change="security.updateSettings({ autoScanEffort: ($event.target as HTMLSelectElement).value as SecurityScanEffort })">
+          <GlassSelect class="mt-2 w-full" :value="security.settings.autoScanEffort" @change="security.updateSettings({ autoScanEffort: ($event.target as HTMLSelectElement).value as SecurityScanEffort })">
             <option value="low">Quick</option>
             <option value="medium">Balanced</option>
             <option value="high">Deep</option>
-          </select>
+          </GlassSelect>
         </label>
         <label class="rounded-lg border border-[var(--border)] bg-black/10 p-4 md:col-span-3">
           <span class="text-xs font-medium text-[var(--text)]">Default AI finding limit</span>
@@ -3339,7 +4257,26 @@ async function clearScanHistory() {
 
     <GlassModal v-model="showToolPicker" title="Run AI Scan" max-width="md">
       <div class="space-y-4">
-        <p class="text-sm text-[var(--text-muted)]">Choose the AI tool Vindicter should use for this security review.</p>
+        <!-- Scan mode selector -->
+        <div class="space-y-1.5">
+          <p class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">Scan Mode</p>
+          <GlassSelect v-model="scanMode" class="w-full">
+            <option value="single">Single Model</option>
+            <option value="multi_aggregate">Multi Model — Aggregate Results</option>
+            <option value="multi_collaborative">Multi Model — Collaborative Review</option>
+          </GlassSelect>
+          <p v-if="scanMode === 'multi_aggregate'" class="text-[10px] leading-relaxed text-[var(--text-faint)]">
+            Both models scan independently and in parallel. Their findings are combined into one report.
+          </p>
+          <p v-else-if="scanMode === 'multi_collaborative'" class="text-[10px] leading-relaxed text-[var(--text-faint)]">
+            The primary model scans first. The secondary model then reviews those findings, validates them, and adds any it missed — producing a consolidated result.
+          </p>
+        </div>
+
+        <!-- Primary model label -->
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">
+          {{ scanMode === 'single' ? 'AI Model' : 'Primary Model' }}
+        </p>
         <div class="grid grid-cols-2 gap-2">
           <button
             class="rounded-xl border p-3 text-left transition-colors"
@@ -3412,6 +4349,94 @@ async function clearScanHistory() {
             </p>
           </button>
         </div>
+
+        <!-- Secondary model (multi modes only) -->
+        <template v-if="scanMode !== 'single'">
+          <p class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">
+            {{ scanMode === 'multi_collaborative' ? 'Secondary Model (Reviewer)' : 'Secondary Model' }}
+          </p>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              class="rounded-xl border p-3 text-left transition-colors"
+              :class="[
+                selectedAITool2 === 'codex' ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]',
+                (!toolAvailability.codex.available && !toolAvailability.codex.checking) || selectedAITool === 'codex' ? 'opacity-40 cursor-not-allowed' : '',
+              ]"
+              :disabled="(!toolAvailability.codex.available && !toolAvailability.codex.checking) || selectedAITool === 'codex'"
+              @click="selectedAITool2 = 'codex'"
+            >
+              <div class="flex items-center gap-2 mb-2">
+                <div class="size-6 shrink-0 grid place-items-center rounded-md border border-emerald-500/30 bg-emerald-500/15 text-[11px] font-bold text-emerald-200">C</div>
+                <p class="text-xs font-semibold text-[var(--text)]">Codex</p>
+                <span v-if="selectedAITool === 'codex'" class="ml-auto rounded-full border border-white/10 bg-white/5 px-1.5 py-px text-[8px] text-[var(--text-faint)]">in use</span>
+                <span v-else-if="toolAvailability.codex.checking" class="ml-auto text-[8px] text-[var(--text-faint)]">…</span>
+                <span v-else-if="toolAvailability.codex.available" class="ml-auto rounded-full border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-px text-[8px] font-semibold text-emerald-300">CLI</span>
+                <span v-else class="ml-auto rounded-full border border-red-500/25 bg-red-500/10 px-1.5 py-px text-[8px] font-semibold text-red-300">Not found</span>
+              </div>
+              <p class="text-[10px] text-[var(--text-faint)] leading-relaxed">Read-only local code review via Codex CLI.</p>
+            </button>
+            <button
+              class="rounded-xl border p-3 text-left transition-colors"
+              :class="[
+                selectedAITool2 === 'claude' ? 'border-violet-500/30 bg-violet-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]',
+                (!toolAvailability.claude.available && !toolAvailability.claude.checking) || selectedAITool === 'claude' ? 'opacity-40 cursor-not-allowed' : '',
+              ]"
+              :disabled="(!toolAvailability.claude.available && !toolAvailability.claude.checking) || selectedAITool === 'claude'"
+              @click="selectedAITool2 = 'claude'"
+            >
+              <div class="flex items-center gap-2 mb-2">
+                <div class="size-6 shrink-0 grid place-items-center rounded-md border border-violet-500/30 bg-violet-500/15 text-[11px] font-bold text-violet-200">Cl</div>
+                <p class="text-xs font-semibold text-[var(--text)]">Claude</p>
+                <span v-if="selectedAITool === 'claude'" class="ml-auto rounded-full border border-white/10 bg-white/5 px-1.5 py-px text-[8px] text-[var(--text-faint)]">in use</span>
+                <span v-else-if="toolAvailability.claude.checking" class="ml-auto text-[8px] text-[var(--text-faint)]">…</span>
+                <span v-else-if="toolAvailability.claude.available" class="ml-auto rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-px text-[8px] font-semibold text-violet-300">CLI</span>
+                <span v-else class="ml-auto rounded-full border border-red-500/25 bg-red-500/10 px-1.5 py-px text-[8px] font-semibold text-red-300">Not found</span>
+              </div>
+              <p class="text-[10px] text-[var(--text-faint)] leading-relaxed">Read-only local code review via Claude CLI.</p>
+            </button>
+            <button
+              class="rounded-xl border p-3 text-left transition-colors"
+              :class="[
+                selectedAITool2 === 'openrouter' ? 'border-sky-500/30 bg-sky-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]',
+                !toolAvailability.openrouter.available || selectedAITool === 'openrouter' ? 'opacity-40 cursor-not-allowed' : '',
+              ]"
+              :disabled="!toolAvailability.openrouter.available || selectedAITool === 'openrouter'"
+              @click="selectedAITool2 = 'openrouter'"
+            >
+              <div class="flex items-center gap-2 mb-2">
+                <div class="size-6 shrink-0 grid place-items-center rounded-md border border-sky-500/30 bg-sky-500/15 text-[11px] font-bold text-sky-200">OR</div>
+                <p class="text-xs font-semibold text-[var(--text)]">OpenRouter</p>
+                <span v-if="selectedAITool === 'openrouter'" class="ml-auto rounded-full border border-white/10 bg-white/5 px-1.5 py-px text-[8px] text-[var(--text-faint)]">in use</span>
+              </div>
+              <p class="text-[10px] leading-relaxed" :class="toolAvailability.openrouter.available ? 'text-sky-300' : 'text-amber-300'">
+                {{ toolAvailability.openrouter.available ? app.openRouter.model : 'Configure API key in AI Models' }}
+              </p>
+            </button>
+            <button
+              class="rounded-xl border p-3 text-left transition-colors"
+              :class="[
+                selectedAITool2 === 'ollama' ? 'border-orange-500/30 bg-orange-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]',
+                !toolAvailability.ollama.available || selectedAITool === 'ollama' ? 'opacity-40 cursor-not-allowed' : '',
+              ]"
+              :disabled="!toolAvailability.ollama.available || selectedAITool === 'ollama'"
+              @click="selectedAITool2 = 'ollama'"
+            >
+              <div class="flex items-center gap-2 mb-2">
+                <div class="size-6 shrink-0 grid place-items-center rounded-md border border-orange-500/30 bg-orange-500/15 text-[11px] font-bold text-orange-200">Ol</div>
+                <p class="text-xs font-semibold text-[var(--text)]">Ollama</p>
+                <span v-if="selectedAITool === 'ollama'" class="ml-auto rounded-full border border-white/10 bg-white/5 px-1.5 py-px text-[8px] text-[var(--text-faint)]">in use</span>
+              </div>
+              <p class="text-[10px] leading-relaxed" :class="toolAvailability.ollama.available ? 'text-orange-300' : 'text-amber-300'">
+                {{ toolAvailability.ollama.available ? app.ollama.model : 'Configure Ollama URL in AI Models' }}
+              </p>
+            </button>
+          </div>
+          <!-- Same-model warning -->
+          <p v-if="selectedAITool === selectedAITool2" class="flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/[0.07] px-3 py-2 text-[10px] text-amber-300">
+            <span>⚠</span> Primary and secondary models are the same — select different models for multi-model mode.
+          </p>
+        </template>
+
         <div class="space-y-2">
           <p class="text-xs font-medium text-[var(--text-muted)]">Effort Level</p>
           <div class="grid gap-2 sm:grid-cols-3">
@@ -3434,7 +4459,12 @@ async function clearScanHistory() {
 
         <div class="flex justify-end gap-2 border-t border-[var(--border)] pt-4">
           <button class="rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)]" @click="showToolPicker = false">Cancel</button>
-          <button class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50" :class="securityToolRunButtonClass(selectedAITool)" :disabled="!canRunAIScan" @click="openScopePicker">
+          <button
+            class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            :class="securityToolRunButtonClass(selectedAITool)"
+            :disabled="!canRunAIScan || (scanMode !== 'single' && selectedAITool === selectedAITool2)"
+            @click="openScopePicker"
+          >
             <FileSearch class="size-3.5" />
             Select Scope →
           </button>
@@ -3452,14 +4482,87 @@ async function clearScanHistory() {
             <p class="text-xs font-semibold text-[var(--text)]">Git Branch</p>
             <span class="ml-auto text-[10px] text-[var(--text-faint)]">{{ gitCurrentBranch ? `on ${gitCurrentBranch}` : 'detached HEAD' }}</span>
           </div>
-          <select
-            v-if="gitBranches.length"
-            v-model="selectedBranch"
-            class="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-1.5 text-xs text-[var(--text)] outline-none focus:border-indigo-500/50"
-          >
-            <option v-for="b in gitBranches" :key="b" :value="b">{{ b }}{{ b === gitCurrentBranch ? ' (current)' : '' }}</option>
-          </select>
-          <p v-else class="text-[11px] text-[var(--text-muted)]">No local branches found — using working tree as-is.</p>
+          <GlassSelect v-if="gitBranches.length" v-model="selectedBranch" class="w-full">
+            <optgroup v-if="gitLocalBranches.length" label="Local">
+              <option v-for="b in gitLocalBranches" :key="b" :value="b">{{ b }}{{ b === gitCurrentBranch ? ' (current)' : '' }}</option>
+            </optgroup>
+            <optgroup v-if="gitRemoteBranches.length" label="Remote">
+              <option v-for="b in gitRemoteBranches" :key="b" :value="b">{{ b }}</option>
+            </optgroup>
+          </GlassSelect>
+          <p v-else class="text-[11px] text-[var(--text-muted)]">No branches found — using working tree as-is.</p>
+        </div>
+
+        <!-- VAPT checks — inline classification picker when type not set yet -->
+        <div v-if="!props.project.projectType" class="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3">
+          <div class="flex items-center gap-2 mb-2">
+            <ShieldCheck class="size-3.5 shrink-0 text-amber-400" />
+            <p class="text-xs font-semibold text-[var(--text)]">Set Project Classification</p>
+          </div>
+          <p class="text-[11px] text-[var(--text-muted)] mb-3">Choose a VAPT target type to enable classification-specific security checks. Saved to the project.</p>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button
+              v-for="[key, label] in Object.entries(PROJECT_TYPE_LABELS)"
+              :key="key"
+              class="flex flex-col items-center gap-1.5 rounded-xl border border-[var(--border)] bg-black/20 px-2 py-3 text-center transition-colors hover:border-indigo-500/40 hover:bg-indigo-500/10 cursor-pointer"
+              @click="setProjectClassification(key)"
+            >
+              <component
+                :is="{
+                  web_application: Globe, api: Server, mobile_application: Smartphone,
+                  desktop_application: Monitor, cloud_infrastructure: Cloud,
+                  iot_embedded: Cpu, network_infrastructure: Network,
+                  source_code_library: Code2, other: HelpCircle,
+                }[key]"
+                class="size-4 text-indigo-300/70"
+              />
+              <span class="text-[10px] leading-tight text-[var(--text-muted)]">{{ label }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- VAPT check categories (classification-based) -->
+        <div v-else-if="VAPT_CHECK_CATALOG[props.project.projectType]" class="rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <ShieldCheck class="size-3.5 shrink-0 text-indigo-400" />
+              <p class="text-xs font-semibold text-[var(--text)]">VAPT Checks</p>
+              <span class="rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-medium text-indigo-300">{{ PROJECT_TYPE_LABELS[props.project.projectType] }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors" @click="selectedVaptChecks = VAPT_CHECK_CATALOG[props.project.projectType!]!.flatMap(cat => cat.checks.map(c => c.id))">All</button>
+              <span class="text-[10px] text-[var(--text-faint)]">·</span>
+              <button class="text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors" @click="selectedVaptChecks = []">None</button>
+              <span class="text-[10px] text-[var(--text-faint)]">·</span>
+              <button class="text-[10px] text-[var(--text-faint)] hover:text-amber-300 transition-colors" title="Change classification" @click="setProjectClassification('')">change</button>
+            </div>
+          </div>
+          <div class="space-y-3">
+            <div v-for="cat in VAPT_CHECK_CATALOG[props.project.projectType]" :key="cat.category">
+              <p class="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)] mb-1.5">{{ cat.category }}</p>
+              <div class="grid grid-cols-2 gap-1">
+                <GlassCheckbox
+                  v-for="check in cat.checks"
+                  :key="check.id"
+                  size="sm"
+                  :title="check.desc"
+                  :checked="selectedVaptChecks.includes(check.id)"
+                  class="rounded-lg border border-transparent px-2 py-1.5 transition-colors hover:bg-white/[0.04]"
+                  :class="selectedVaptChecks.includes(check.id) ? 'border-indigo-500/20 bg-indigo-500/10' : ''"
+                  @change="selectedVaptChecks.includes(check.id) ? selectedVaptChecks = selectedVaptChecks.filter(id => id !== check.id) : selectedVaptChecks.push(check.id)"
+                >
+                  <span class="truncate text-[11px]" :class="selectedVaptChecks.includes(check.id) ? 'text-[var(--text)]' : 'text-[var(--text-muted)]'">{{ check.label }}</span>
+                </GlassCheckbox>
+              </div>
+            </div>
+          </div>
+          <p class="text-[10px] text-[var(--text-faint)]">{{ selectedVaptChecks.length }} of {{ VAPT_CHECK_CATALOG[props.project.projectType]?.reduce((n, c) => n + c.checks.length, 0) }} checks selected — injected into AI prompt</p>
+        </div>
+
+        <!-- Warning: no VAPT checks selected -->
+        <div v-if="VAPT_CHECK_CATALOG[props.project.projectType] && selectedVaptChecks.length === 0" class="flex items-start gap-2.5 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] px-4 py-3">
+          <span class="mt-0.5 shrink-0 text-amber-400">⚠</span>
+          <p class="text-[11px] leading-relaxed text-amber-300/90">No checks selected — the scan will run without VAPT guidance and may produce generic results.</p>
         </div>
 
         <!-- Scan all toggle -->
@@ -3493,22 +4596,19 @@ async function clearScanHistory() {
           </div>
 
           <div v-else class="max-h-72 overflow-y-auto rounded-xl border border-[var(--border)] bg-black/10 custom-scroll">
-            <label
+            <GlassCheckbox
               v-for="entry in scopeEntries"
               :key="entry.path"
-              class="flex cursor-pointer items-center gap-2 border-b border-[var(--border)]/50 px-3 py-2 last:border-0 hover:bg-white/[0.03]"
+              size="sm"
+              :checked="entry.selected"
+              class="flex w-full items-center gap-2 border-b border-[var(--border)]/50 py-2 pr-3 last:border-0 hover:bg-white/[0.03]"
               :style="{ paddingLeft: `${12 + entry.depth * 16}px` }"
+              @change="entry.isDir ? toggleScopeParent(entry) : (entry.selected = !entry.selected)"
             >
-              <input
-                type="checkbox"
-                class="size-3.5 rounded accent-indigo-500"
-                :checked="entry.selected"
-                @change="entry.isDir ? toggleScopeParent(entry) : (entry.selected = !entry.selected)"
-              >
               <FolderOpen v-if="entry.isDir" class="size-3.5 shrink-0 text-amber-400/70" />
               <FileText v-else class="size-3.5 shrink-0 text-[var(--text-faint)]" />
               <span class="truncate text-xs" :class="entry.selected ? 'text-[var(--text)]' : 'text-[var(--text-faint)] line-through'">{{ entry.name }}</span>
-            </label>
+            </GlassCheckbox>
             <div v-if="!scopeEntries.length && !scopeLoading" class="px-3 py-6 text-center text-xs text-[var(--text-muted)]">No files found.</div>
           </div>
 
@@ -3538,11 +4638,33 @@ async function clearScanHistory() {
         <p class="text-xs text-[var(--text-muted)]">Review your selections before starting the security scan.</p>
 
         <div class="space-y-2">
-          <!-- AI Model -->
+          <!-- Scan mode -->
           <div class="flex items-center justify-between rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3">
-            <span class="text-xs text-[var(--text-muted)]">AI Model</span>
-            <span class="text-xs font-semibold" :class="securityToolAccentClass(selectedAITool)">{{ selectedAIToolLabel }}</span>
+            <span class="text-xs text-[var(--text-muted)]">Scan Mode</span>
+            <span class="text-xs font-semibold text-[var(--text)]">
+              {{ scanMode === 'multi_aggregate' ? 'Multi Model — Aggregate' : scanMode === 'multi_collaborative' ? 'Multi Model — Collaborative' : 'Single Model' }}
+            </span>
           </div>
+
+          <!-- AI Model(s) -->
+          <template v-if="scanMode === 'single'">
+            <div class="flex items-center justify-between rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3">
+              <span class="text-xs text-[var(--text-muted)]">AI Model</span>
+              <span class="text-xs font-semibold" :class="securityToolAccentClass(selectedAITool)">{{ selectedAIToolLabel }}</span>
+            </div>
+          </template>
+          <template v-else>
+            <div class="rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-[var(--text-muted)]">{{ scanMode === 'multi_collaborative' ? 'Primary (Scanner)' : 'Primary Model' }}</span>
+                <span class="text-xs font-semibold" :class="securityToolAccentClass(selectedAITool)">{{ selectedAIToolLabel }}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-[var(--text-muted)]">{{ scanMode === 'multi_collaborative' ? 'Secondary (Reviewer)' : 'Secondary Model' }}</span>
+                <span class="text-xs font-semibold" :class="securityToolAccentClass(selectedAITool2)">{{ securityToolLabel(selectedAITool2) }}</span>
+              </div>
+            </div>
+          </template>
 
           <!-- Effort level -->
           <div class="flex items-center justify-between rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3">
@@ -3776,6 +4898,34 @@ async function clearScanHistory() {
           </div>
         </div>
 
+        <!-- Additional fix info (collapsible) -->
+        <div v-if="!validateResult">
+          <button
+            class="flex items-center gap-1.5 text-[11px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors cursor-pointer"
+            @click="showValidateExtraInfo = !showValidateExtraInfo"
+          >
+            <component :is="showValidateExtraInfo ? ChevronDown : ChevronRight" class="size-3" />
+            {{ showValidateExtraInfo ? 'Hide fix information' : 'Add fix information' }}
+          </button>
+          <Transition
+            enter-active-class="transition-all duration-150 overflow-hidden"
+            enter-from-class="opacity-0 max-h-0"
+            enter-to-class="opacity-100 max-h-40"
+            leave-active-class="transition-all duration-150 overflow-hidden"
+            leave-from-class="opacity-100 max-h-40"
+            leave-to-class="opacity-0 max-h-0"
+          >
+            <div v-if="showValidateExtraInfo" class="mt-2">
+              <textarea
+                v-model="validateExtraInfo"
+                rows="3"
+                placeholder="Describe what you changed, which files were modified, or any relevant context for the AI to consider during validation…"
+                class="w-full resize-none rounded-lg border border-[var(--border)] bg-black/20 px-3 py-2 text-xs text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] transition-colors focus:border-indigo-500/50 leading-relaxed"
+              />
+            </div>
+          </Transition>
+        </div>
+
         <!-- Error -->
         <div v-if="validateError" class="rounded-lg border border-red-500/20 bg-red-500/[0.07] px-3 py-2.5 text-xs text-red-300">
           {{ validateError }}
@@ -3895,8 +5045,173 @@ async function clearScanHistory() {
               <Plus class="size-3.5" />
               Add to Findings
             </button>
+            <!-- Sign-Off Document -->
+            <button
+              v-if="validateResult && !validateRunning"
+              class="flex items-center gap-1.5 rounded-lg border border-indigo-500/25 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-200 hover:bg-indigo-500/15 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              :disabled="exportingSignOff"
+              @click="exportValidationSignOff('docx')"
+            >
+              <Loader2 v-if="exportingSignOff" class="size-3.5 animate-spin" />
+              <Download v-else class="size-3.5" />
+              Sign-Off Doc
+            </button>
           </div>
         </div>
+      </div>
+    </GlassModal>
+
+    <!-- ── Bulk Validate Fix modal ─────────────────────────────────────────── -->
+    <GlassModal v-model="showBulkValidateModal" title="Bulk Validate Fix" max-width="lg">
+      <div class="space-y-4">
+
+        <!-- Tool selector (only before running starts) -->
+        <div v-if="!bulkValidateRunning && bulkValidateCurrent === 0" class="space-y-2">
+          <p class="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">Choose AI tool</p>
+          <div class="grid grid-cols-4 gap-2">
+            <button class="rounded-xl border p-2.5 text-left transition-colors" :class="validateAITool === 'codex' ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="validateAITool = 'codex'">
+              <div class="flex items-center gap-1.5 mb-1">
+                <div class="size-5 shrink-0 grid place-items-center rounded-md border border-emerald-500/30 bg-emerald-500/15 text-[10px] font-bold text-emerald-200">C</div>
+                <p class="text-[11px] font-semibold text-[var(--text)]">Codex</p>
+              </div>
+              <p class="text-[10px] text-[var(--text-faint)]">CLI · read-only</p>
+            </button>
+            <button class="rounded-xl border p-2.5 text-left transition-colors" :class="validateAITool === 'claude' ? 'border-violet-500/30 bg-violet-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="validateAITool = 'claude'">
+              <div class="flex items-center gap-1.5 mb-1">
+                <div class="size-5 shrink-0 grid place-items-center rounded-md border border-violet-500/30 bg-violet-500/15 text-[10px] font-bold text-violet-200">Cl</div>
+                <p class="text-[11px] font-semibold text-[var(--text)]">Claude</p>
+              </div>
+              <p class="text-[10px] text-[var(--text-faint)]">CLI · read-only</p>
+            </button>
+            <button class="rounded-xl border p-2.5 text-left transition-colors" :class="validateAITool === 'openrouter' ? 'border-sky-500/30 bg-sky-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="validateAITool = 'openrouter'">
+              <div class="flex items-center gap-1.5 mb-1">
+                <div class="size-5 shrink-0 grid place-items-center rounded-md border border-sky-500/30 bg-sky-500/15 text-[10px] font-bold text-sky-200">OR</div>
+                <p class="text-[11px] font-semibold text-[var(--text)]">OpenRouter</p>
+              </div>
+              <p class="text-[10px]" :class="app.openRouter.enabled && app.openRouter.apiKey ? 'text-sky-300' : 'text-amber-300'">
+                {{ app.openRouter.enabled && app.openRouter.apiKey ? app.openRouter.model : 'Not configured' }}
+              </p>
+            </button>
+            <button class="rounded-xl border p-2.5 text-left transition-colors" :class="validateAITool === 'ollama' ? 'border-orange-500/30 bg-orange-500/10' : 'border-[var(--border)] bg-black/10 hover:bg-white/[0.05]'" @click="validateAITool = 'ollama'">
+              <div class="flex items-center gap-1.5 mb-1">
+                <div class="size-5 shrink-0 grid place-items-center rounded-md border border-orange-500/30 bg-orange-500/15 text-[10px] font-bold text-orange-200">Ol</div>
+                <p class="text-[11px] font-semibold text-[var(--text)]">Ollama</p>
+              </div>
+              <p class="text-[10px]" :class="app.ollama.url ? 'text-orange-300' : 'text-amber-300'">
+                {{ app.ollama.url ? app.ollama.model : 'Not configured' }}
+              </p>
+            </button>
+          </div>
+        </div>
+
+        <!-- Progress indicator (while running) -->
+        <div v-if="bulkValidateRunning" class="flex items-center gap-3 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-3 py-3">
+          <Loader2 class="size-4 shrink-0 animate-spin text-violet-400" />
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold text-violet-300">{{ bulkValidateCurrent }} of {{ bulkValidateTotal }} complete</p>
+            <p class="text-[10px] text-[var(--text-muted)]">All findings validating in parallel</p>
+          </div>
+          <span class="shrink-0 text-[10px] font-semibold text-violet-300">{{ Math.round(bulkValidateCurrent / bulkValidateTotal * 100) }}%</span>
+        </div>
+
+        <!-- Summary line (after completion) -->
+        <div
+          v-if="!bulkValidateRunning && bulkValidateCurrent > 0"
+          class="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2"
+        >
+          <CheckCircle2 class="size-3.5 shrink-0 text-emerald-400" />
+          <p class="text-xs text-[var(--text-muted)]">
+            Validation complete —
+            <span class="font-semibold text-emerald-300">{{ bulkValidateResults.filter(e => e.result?.status === 'resolved').length }}</span>
+            of <span class="font-semibold text-[var(--text)]">{{ bulkValidateTotal }}</span> resolved
+          </p>
+        </div>
+
+        <!-- Results list -->
+        <div class="space-y-1.5 max-h-[340px] overflow-y-auto">
+          <div
+            v-for="(entry, i) in bulkValidateResults"
+            :key="entry.id"
+            class="flex items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors"
+            :class="{
+              'border-emerald-500/20 bg-emerald-500/[0.05]': entry.result?.status === 'resolved',
+              'border-red-500/15 bg-red-500/[0.04]': entry.result?.status === 'present' || entry.error,
+              'border-amber-500/15 bg-amber-500/[0.04]': entry.result?.status === 'regressed',
+              'border-violet-500/15 bg-violet-500/[0.04]': entry.result?.status === 'new_issue',
+              'border-violet-500/20 bg-violet-500/[0.03]': bulkValidateRunning && !entry.result && !entry.error,
+              'border-[var(--border)] bg-black/10': !bulkValidateRunning && !entry.result && !entry.error,
+            }"
+          >
+            <!-- Status icon -->
+            <div class="mt-0.5 size-4 shrink-0 grid place-items-center">
+              <Loader2 v-if="bulkValidateRunning && !entry.result && !entry.error" class="size-3.5 animate-spin text-violet-400" />
+              <ShieldCheck v-else-if="entry.result?.status === 'resolved'" class="size-3.5 text-emerald-400" />
+              <ShieldX v-else-if="entry.result?.status === 'present'" class="size-3.5 text-red-400" />
+              <RotateCcw v-else-if="entry.result?.status === 'regressed'" class="size-3.5 text-amber-400" />
+              <TriangleAlert v-else-if="entry.result?.status === 'new_issue'" class="size-3.5 text-violet-400" />
+              <AlertTriangle v-else-if="entry.error" class="size-3.5 text-red-400" />
+              <Clock3 v-else class="size-3.5 text-[var(--text-faint)]" />
+            </div>
+            <!-- Finding info -->
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="rounded-full border px-1.5 py-px text-[9px] font-medium capitalize" :class="severityClasses[entry.severity]">{{ entry.severity }}</span>
+                <p class="text-[11px] font-medium text-[var(--text)] truncate">{{ entry.title }}</p>
+              </div>
+              <p v-if="entry.result" class="mt-0.5 text-[10px] leading-relaxed" :class="{
+                'text-emerald-300': entry.result.status === 'resolved',
+                'text-red-300': entry.result.status === 'present',
+                'text-amber-300': entry.result.status === 'regressed',
+                'text-violet-300': entry.result.status === 'new_issue',
+              }">
+                {{ { resolved: 'Resolved', present: 'Still Present', regressed: 'Regression', new_issue: 'New Issue' }[entry.result.status] }}
+                <span class="text-[var(--text-muted)]"> — {{ entry.result.verdict }}</span>
+              </p>
+              <p v-else-if="entry.error" class="mt-0.5 text-[10px] text-red-300">{{ entry.error }}</p>
+              <p v-else-if="bulkValidateRunning" class="mt-0.5 text-[10px] text-violet-300">Validating…</p>
+              <p v-else class="mt-0.5 text-[10px] text-[var(--text-faint)]">Pending</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="flex items-center justify-between gap-2 border-t border-[var(--border)] pt-3">
+          <button
+            v-if="bulkValidateRunning"
+            class="text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+            @click="cancelBulkValidation"
+          >
+            Cancel
+          </button>
+          <div class="ml-auto flex items-center gap-2">
+            <button
+              class="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+              @click="showBulkValidateModal = false"
+            >
+              Close
+            </button>
+            <!-- Run button (pre-run state) -->
+            <button
+              v-if="!bulkValidateRunning && bulkValidateCurrent === 0"
+              class="flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-medium text-white"
+              :class="securityToolRunButtonClass(validateAITool)"
+              @click="runBulkValidation"
+            >
+              <FlaskConical class="size-3.5" />
+              Validate {{ bulkValidateTotal }} finding{{ bulkValidateTotal !== 1 ? 's' : '' }} with {{ securityToolLabel(validateAITool) }}
+            </button>
+            <!-- Mark resolved (post-run state) -->
+            <button
+              v-if="!bulkValidateRunning && bulkValidateCurrent > 0 && bulkValidateResults.some(e => e.result?.status === 'resolved')"
+              class="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 cursor-pointer transition-colors"
+              @click="bulkMarkAllResolved"
+            >
+              <ShieldCheck class="size-3.5" />
+              Mark {{ bulkValidateResults.filter(e => e.result?.status === 'resolved').length }} as Resolved
+            </button>
+          </div>
+        </div>
+
       </div>
     </GlassModal>
 
@@ -3955,6 +5270,49 @@ async function clearScanHistory() {
             <Github v-else class="size-3.5" />
             {{ ghIssueCreating ? 'Creating…' : 'Create Issue' }}
           </button>
+        </div>
+      </div>
+    </GlassModal>
+
+    <!-- CVE Detail Panel -->
+    <GlassModal v-if="selectedCveItem" v-model="showCvePanel" :title="`CVEs · ${selectedCveItem.name}`">
+      <div class="space-y-3">
+        <div class="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-black/10 px-3 py-2.5">
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold text-[var(--text)]">{{ selectedCveItem.name }}</p>
+            <p class="text-[11px] text-[var(--text-muted)] mt-0.5">{{ selectedCveItem.version }} · {{ selectedCveItem.manifest }}</p>
+          </div>
+          <span v-if="selectedCveItem.latestVersion" class="text-[10px] rounded-full border px-2 py-0.5" :class="selectedCveItem.latestStatus === 'outdated' ? 'border-amber-500/25 bg-amber-500/[0.08] text-amber-300' : 'border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-300'">
+            Latest: {{ selectedCveItem.latestVersion }}
+          </span>
+        </div>
+
+        <div v-if="selectedCveItem.vulns?.length" class="space-y-2">
+          <p class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">Vulnerabilities ({{ selectedCveItem.vulns.length }})</p>
+          <div
+            v-for="vuln in selectedCveItem.vulns"
+            :key="vuln.id"
+            class="flex items-center gap-3 rounded-lg border border-red-500/15 bg-red-500/[0.04] px-3 py-2"
+          >
+            <AlertTriangle class="size-3.5 shrink-0 text-red-400" />
+            <div class="min-w-0 flex-1">
+              <p class="font-mono text-[11px] font-semibold text-red-300">{{ vuln.id }}</p>
+              <p class="text-[10px] text-[var(--text-faint)] mt-0.5">Severity: {{ vuln.severity }}</p>
+            </div>
+            <a
+              :href="`https://osv.dev/vulnerability/${vuln.id}`"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="shrink-0 inline-flex items-center gap-1 rounded border border-[var(--border)] px-2 py-1 text-[9px] text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:border-indigo-500/30 transition-colors cursor-pointer"
+            >
+              <ExternalLink class="size-2.5" />
+              Details
+            </a>
+          </div>
+        </div>
+
+        <div class="flex justify-end pt-1">
+          <GlassButton size="sm" variant="ghost" @click="showCvePanel = false">Close</GlassButton>
         </div>
       </div>
     </GlassModal>

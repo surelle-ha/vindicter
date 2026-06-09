@@ -33,7 +33,9 @@ async function login() {
     if (needsOnboarding) {
       await router.push('/onboarding')
     } else {
-      await router.push(String(route.query.redirect ?? '/news'))
+      const redirect = String(route.query.redirect ?? '/support')
+      const deprecated = ['/news', '/dashboard']
+      await router.push(deprecated.some(p => redirect.startsWith(p)) ? '/support' : redirect)
     }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Unable to login right now.'

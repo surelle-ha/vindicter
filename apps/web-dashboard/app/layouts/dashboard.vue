@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import {
-  Newspaper, Key, User, Building2,
+  User, Building2,
   PanelLeftClose, LogOut, ChevronRight, ChevronDown,
-  LifeBuoy, GraduationCap, Zap, Download, Check,
+  LifeBuoy, Zap, Download, Check,
 } from 'lucide-vue-next'
 
 const route  = useRoute()
@@ -75,17 +75,12 @@ function selectWorkspace(ws: WorkspaceOption) {
 }
 
 const nav = [
-  { label: 'News',    to: '/news',    icon: Newspaper },
-  { label: 'Academy', to: '/academy', icon: GraduationCap },
   { label: 'Support', to: '/support', icon: LifeBuoy },
 ]
 
-const developerNav = [
-  { label: 'API', to: '/api', icon: Key },
-]
 
 function active(to: string) {
-  return route.path === to || (to !== '/news' && route.path.startsWith(to))
+  return route.path === to || route.path.startsWith(to + '/')
 }
 
 const displayName = computed(() => {
@@ -102,9 +97,6 @@ const initials = computed(() =>
 
 const pageTitle = computed(() => {
   const p = route.path
-  if (p === '/news')                                     return 'News'
-  if (p === '/academy' || p.startsWith('/academy/'))    return 'Academy'
-  if (p === '/api')                                      return 'API & Keys'
   if (p === '/support')                                  return 'Support'
   if (p === '/profile')                                  return 'Profile'
   if (p === '/pricing')                                  return 'Pricing'
@@ -199,23 +191,6 @@ const landingUrl = computed(() => {
             <span v-if="!collapsed">{{ item.label }}</span>
           </NuxtLink>
 
-          <!-- Developer section -->
-          <div class="h-px mx-1 my-2" style="background:rgba(255,255,255,0.07);" />
-          <p v-if="!collapsed" class="px-2 mb-1 text-[10px] font-semibold uppercase tracking-[0.12em]" style="color:rgba(99,102,241,0.50);">Developer</p>
-          <NuxtLink
-            v-for="item in developerNav"
-            :key="item.to"
-            :to="item.to"
-            class="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer"
-            :class="[
-              collapsed ? 'justify-center' : '',
-              active(item.to) ? 'bg-indigo-600/15 text-indigo-400' : 'text-white/45 hover:text-white/80 hover:bg-white/[0.05]',
-            ]"
-            :title="collapsed ? item.label : undefined"
-          >
-            <component :is="item.icon" class="size-3.5 shrink-0" />
-            <span v-if="!collapsed">{{ item.label }}</span>
-          </NuxtLink>
         </nav>
 
         <!-- ── Sidebar footer ───────────────────────────────────────────── -->

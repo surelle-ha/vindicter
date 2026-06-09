@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import {
-  Activity, AlertTriangle, CheckCircle2, Github, LogIn, LogOut,
-  RotateCcw, ShieldCheck, ShieldX, Pencil, X, Loader2,
+  AlertTriangle, CheckCircle2, Github, LogIn, LogOut,
+  ShieldCheck, ShieldX, Pencil, X, Loader2,
+  Building2, Calendar, KeyRound, UserCircle2, TriangleAlert,
 } from 'lucide-vue-next'
 import { useAuthStore } from '~/stores/auth'
 
@@ -9,6 +10,18 @@ const user     = useUserStore()
 const security = useSecurityStore()
 const auth     = useAuthStore()
 const router   = useRouter()
+
+const showSignOutModal = ref(false)
+const signingOut = ref(false)
+
+async function confirmSignOut() {
+  signingOut.value = true
+  showSignOutModal.value = false
+  await auth.logoutApi()
+  await auth.logoutGitHub()
+  useAppStore().launched = false
+  signingOut.value = false
+}
 
 // ── API profile edit ────────────────────────────────────────────────────────
 const editing       = ref(false)
@@ -73,14 +86,6 @@ const initials = computed(() =>
   displayName.value.split(' ').map((w: string) => w[0] ?? '').join('').slice(0, 2).toUpperCase()
 )
 
-// ── AI usage ────────────────────────────────────────────────────────────────
-const tokenUsage = computed(() => user.tokenUsage)
-const formattedTotalTokens = computed(() => tokenUsage.value.totalTokens.toLocaleString())
-const lastTokenUse = computed(() => {
-  if (!tokenUsage.value.lastUsedAt) return 'No AI usage recorded yet'
-  return new Date(tokenUsage.value.lastUsedAt).toLocaleString()
-})
-
 // ── Security stats ──────────────────────────────────────────────────────────
 const totalFindings    = computed(() => security.findings.length)
 const openFindings     = computed(() => security.findings.filter(f => f.status === 'open').length)
@@ -105,7 +110,10 @@ const securityHealthColor = computed(() => {
 
 onMounted(async () => {
   await auth.load()
-  await security.load()
+  const projectsStore = useProjectsStore()
+  if (!projectsStore.projects.length) await projectsStore.loadProjects()
+  const active = projectsStore.activeProject
+  if (active?.absolutePath) await security.load(active.absolutePath, active.id)
   if (auth.apiToken) {
     try {
       const { apiFetchMe } = await import('~/composables/useDesktopAuth')
@@ -161,7 +169,6 @@ onMounted(async () => {
             <p class="truncate text-sm text-[var(--text-muted)]">{{ displayEmail }}</p>
             <div class="mt-2 flex flex-wrap items-center gap-2">
               <GlassBadge variant="purple">{{ auth.apiUser?.jobRole || user.jobRole || 'Developer' }}</GlassBadge>
-              <GlassBadge variant="info">{{ tokenUsage.runs }} AI run{{ tokenUsage.runs !== 1 ? 's' : '' }}</GlassBadge>
             </div>
           </div>
         </div>
@@ -239,42 +246,71 @@ onMounted(async () => {
     </Transition>
 
     <div class="grid gap-6 lg:grid-cols-[20rem_1fr]">
-      <aside class="space-y-6">
+      <aside class="space-y-4">
 
-        <!-- AI Usage -->
+        <!-- Account card -->
         <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 space-y-3">
-          <div class="flex items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
-              <Activity class="size-3.5 text-indigo-300" />
-              <p class="text-sm font-semibold text-[var(--text)]">AI Usage</p>
-            </div>
-            <GlassButton variant="ghost" size="sm" @click="user.resetTokenUsage()">
-              <RotateCcw class="size-3.5" />
-              Reset
-            </GlassButton>
+          <div class="flex items-center gap-2">
+            <UserCircle2 class="size-4 text-indigo-300/70" />
+            <p class="text-xs font-semibold text-[var(--text)]">Account</p>
           </div>
-
-          <div class="grid grid-cols-2 gap-2">
-            <div class="rounded-lg border border-[var(--border)] bg-white/[0.03] px-3 py-2">
-              <p class="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">Total</p>
-              <p class="text-lg font-semibold text-[var(--text)]">{{ formattedTotalTokens }}</p>
+          <div class="space-y-2.5">
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-0.5">Email</p>
+              <p class="text-xs text-[var(--text-muted)] break-all">{{ displayEmail || '—' }}</p>
             </div>
-            <div class="rounded-lg border border-[var(--border)] bg-white/[0.03] px-3 py-2">
-              <p class="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">Runs</p>
-              <p class="text-lg font-semibold text-[var(--text)]">{{ tokenUsage.runs }}</p>
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-0.5">Role</p>
+              <p class="text-xs text-[var(--text-muted)]">{{ auth.apiUser?.jobRole || user.jobRole || 'Developer' }}</p>
             </div>
-            <div class="rounded-lg border border-[var(--border)] bg-white/[0.03] px-3 py-2">
-              <p class="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">Input</p>
-              <p class="text-sm font-medium text-indigo-300">{{ tokenUsage.inputTokens.toLocaleString() }}</p>
-            </div>
-            <div class="rounded-lg border border-[var(--border)] bg-white/[0.03] px-3 py-2">
-              <p class="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">Output</p>
-              <p class="text-sm font-medium text-violet-300">{{ tokenUsage.outputTokens.toLocaleString() }}</p>
+            <div v-if="auth.apiUser?.id">
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-0.5">User ID</p>
+              <p class="font-mono text-[10px] text-[var(--text-faint)] truncate">{{ auth.apiUser.id }}</p>
             </div>
           </div>
-
-          <p class="text-xs text-[var(--text-muted)]">{{ lastTokenUse }}</p>
         </div>
+
+        <!-- Workspace card -->
+        <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 space-y-3">
+          <div class="flex items-center gap-2">
+            <Building2 class="size-4 text-violet-300/70" />
+            <p class="text-xs font-semibold text-[var(--text)]">Workspace</p>
+          </div>
+          <div v-if="auth.activeWorkspace" class="space-y-2.5">
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-0.5">Name</p>
+              <p class="text-xs text-[var(--text-muted)]">{{ auth.activeWorkspace.name }}</p>
+            </div>
+            <div v-if="auth.workspaces.length > 1">
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-0.5">All Workspaces</p>
+              <p class="text-xs text-[var(--text-muted)]">{{ auth.workspaces.length }} workspaces</p>
+            </div>
+          </div>
+          <p v-else class="text-[11px] text-[var(--text-faint)]">No workspace selected.</p>
+        </div>
+
+        <!-- Session card -->
+        <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 space-y-3">
+          <div class="flex items-center gap-2">
+            <KeyRound class="size-4 text-amber-300/70" />
+            <p class="text-xs font-semibold text-[var(--text)]">Session</p>
+          </div>
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-[11px] text-[var(--text-muted)]">API</p>
+              <span class="rounded-full border px-2 py-0.5 text-[10px] font-semibold" :class="auth.isApiAuthenticated ? 'border-emerald-500/25 bg-emerald-500/[0.08] text-emerald-300' : 'border-[var(--border)] text-[var(--text-faint)]'">
+                {{ auth.isApiAuthenticated ? 'Active' : 'None' }}
+              </span>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-[11px] text-[var(--text-muted)]">GitHub</p>
+              <span class="rounded-full border px-2 py-0.5 text-[10px] font-semibold" :class="auth.isGitHubConnected ? 'border-emerald-500/25 bg-emerald-500/[0.08] text-emerald-300' : 'border-[var(--border)] text-[var(--text-faint)]'">
+                {{ auth.isGitHubConnected ? 'Connected' : 'None' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
       </aside>
 
       <main class="space-y-6">
@@ -330,5 +366,42 @@ onMounted(async () => {
         </div>
       </main>
     </div>
+
+    <!-- Sign out section -->
+    <div v-if="auth.isApiAuthenticated || auth.isGitHubConnected" class="rounded-xl border border-red-500/15 bg-red-500/[0.03] p-4 flex items-center justify-between gap-4">
+      <div>
+        <p class="text-sm font-semibold text-[var(--text)]">Sign out</p>
+        <p class="text-xs text-[var(--text-muted)] mt-0.5">End your session and return to the sign-in screen.</p>
+      </div>
+      <button
+        class="inline-flex items-center gap-2 rounded-lg border border-red-500/25 px-3 py-2 text-xs font-medium text-red-300 hover:bg-red-500/[0.08] transition-colors cursor-pointer"
+        @click="showSignOutModal = true"
+      >
+        <LogOut class="size-3.5" />
+        Sign out
+      </button>
+    </div>
   </div>
+
+  <!-- Sign out confirmation modal -->
+  <GlassModal v-model="showSignOutModal" title="Sign out">
+    <div class="space-y-4">
+      <div class="flex items-start gap-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] p-3">
+        <TriangleAlert class="mt-0.5 size-4 shrink-0 text-amber-300" />
+        <p class="text-xs text-amber-200">Are you sure you want to sign out? You will need to sign in again to access your workspace.</p>
+      </div>
+      <div class="flex gap-2 justify-end">
+        <GlassButton variant="ghost" size="sm" :disabled="signingOut" @click="showSignOutModal = false">Cancel</GlassButton>
+        <button
+          class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 transition-colors cursor-pointer disabled:opacity-50"
+          :disabled="signingOut"
+          @click="confirmSignOut"
+        >
+          <Loader2 v-if="signingOut" class="size-3.5 animate-spin" />
+          <LogOut v-else class="size-3.5" />
+          {{ signingOut ? 'Signing out…' : 'Sign out' }}
+        </button>
+      </div>
+    </div>
+  </GlassModal>
 </template>

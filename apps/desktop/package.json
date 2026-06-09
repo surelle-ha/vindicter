@@ -7,13 +7,16 @@
     "build": "nuxt build",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "download-sidecars": "node scripts/download-trivy.mjs",
     "tauri:dev": "tauri dev --config tauri/tauri.conf.json",
-    "tauri:build": "tauri build --config tauri/tauri.conf.json"
+    "pretauri:dev": "node scripts/download-trivy.mjs",
+    "tauri:build": "tauri build --config tauri/tauri.conf.json",
+    "pretauri:build": "node scripts/download-trivy.mjs"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/cli": "^2",
-    "nuxt": "^4",
+    "nuxt": "^4.4.8",
     "tailwindcss": "latest",
     "typescript": "latest",
     "vue": "latest",

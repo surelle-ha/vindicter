@@ -33,28 +33,36 @@ export async function runClaudeExec(opts: ClaudeExecOptions): Promise<ClaudeExec
   return new Promise((resolve, reject) => {
     const stdoutLines: string[] = []
     const stderrLines: string[] = []
+    let settled = false
+
+    function safeResolve(result: ClaudeExecResult) {
+      if (!settled) { settled = true; resolve(result) }
+    }
+    function safeReject(err: Error) {
+      if (!settled) { settled = true; reject(err) }
+    }
 
     runClaude({
       prompt: opts.prompt,
       projectPath: opts.projectPath,
       model: opts.model,
       onLine(line) {
-        // --verbose stream-json events from Claude CLI
         try {
           const parsed = JSON.parse(line) as Record<string, unknown>
           const type = parsed?.type as string | undefined
 
-          // Final result block — authoritative full output
+          // Final result block — resolve immediately without waiting for close event.
+          // This prevents hangs when the Tauri close-event IPC callback is dropped.
           if (type === 'result') {
             const text = parsed.result ?? (parsed as any)?.content
             if (typeof text === 'string' && text.trim()) {
-              stdoutLines.length = 0 // discard partial; use the complete result
+              stdoutLines.length = 0
               stdoutLines.push(text)
             }
+            safeResolve({ stdout: stdoutLines.join(''), stderr: stderrLines.join('') })
             return
           }
 
-          // Assistant turn text content blocks
           if (type === 'assistant') {
             const content = (parsed as any)?.message?.content
             if (Array.isArray(content)) {
@@ -67,7 +75,6 @@ export async function runClaudeExec(opts: ClaudeExecOptions): Promise<ClaudeExec
             return
           }
 
-          // Legacy / alternative shapes
           if (type === 'text' && typeof parsed.text === 'string') {
             stdoutLines.push(parsed.text as string)
           }
@@ -80,22 +87,18 @@ export async function runClaudeExec(opts: ClaudeExecOptions): Promise<ClaudeExec
           }
         }
         catch {
-          // Non-JSON line — treat as raw text output
           if (line.trim()) stdoutLines.push(line)
         }
       },
       onClose(stderr) {
         if (stderr.trim()) stderrLines.push(stderr)
-        resolve({
-          stdout: stdoutLines.join(''),
-          stderr: stderrLines.join(''),
-        })
+        safeResolve({ stdout: stdoutLines.join(''), stderr: stderrLines.join('') })
       },
       onError(err) {
-        reject(new Error(friendlyClaudeExecError(err)))
+        safeReject(new Error(friendlyClaudeExecError(err)))
       },
     }).catch((err: any) => {
-      reject(new Error(friendlyClaudeExecError(err?.message ?? String(err))))
+      safeReject(new Error(friendlyClaudeExecError(err?.message ?? String(err))))
     })
   })
 }

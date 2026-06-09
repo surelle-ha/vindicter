@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, Res, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import type { FastifyReply } from 'fastify'
 import { NewsletterService } from './newsletter.service'
@@ -52,36 +52,9 @@ export class NewsletterController {
 </html>`)
   }
 
-  @Get('updates/published')
-  getPublished(@Query('limit') limit?: string) {
-    return this.service.findPublishedUpdates(limit ? Number(limit) : undefined)
-  }
-
   // ── Admin endpoints ────────────────────────────────────────────────────────
   @Get('signups')
   @UseGuards(JwtAuthGuard, AccessGuard)
   @RequireAccess('newsletter', 'read')
   findAllSignups() { return this.service.findAllSignups() }
-
-  @Get('updates')
-  @UseGuards(JwtAuthGuard, AccessGuard)
-  @RequireAccess('newsletter', 'read')
-  findAllUpdates() { return this.service.findAllUpdates() }
-
-  @Post('updates')
-  @UseGuards(JwtAuthGuard, AccessGuard)
-  @RequireAccess('newsletter', 'create')
-  createUpdate(@Body() body: any) { return this.service.createUpdate(body) }
-
-  @Put('updates/:id')
-  @UseGuards(JwtAuthGuard, AccessGuard)
-  @RequireAccess('newsletter', 'update')
-  updateOne(@Param('id') id: string, @Body() body: any) {
-    return this.service.updateOne(id, body)
-  }
-
-  @Delete('updates/:id')
-  @UseGuards(JwtAuthGuard, AccessGuard)
-  @RequireAccess('newsletter', 'delete')
-  removeUpdate(@Param('id') id: string) { return this.service.removeUpdate(id) }
 }

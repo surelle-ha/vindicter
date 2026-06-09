@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
   Megaphone, SquarePen, History, UsersRound,
-  Users, MessageCircle, Star, Rss, Globe, Cpu, Building2,
+  Users, MessageCircle, Star, Globe, Building2,
   PanelLeftClose, LogOut, ChevronRight, ChevronDown, User,
 } from 'lucide-vue-next'
 
@@ -57,9 +57,7 @@ const adminNav = [
   { label: 'Workspaces',    to: '/admin/workspaces',  icon: Building2 },
   { label: 'Tickets',       to: '/admin/tickets',     icon: MessageCircle },
   { label: 'Beta Requests', to: '/admin/beta',         icon: Star },
-  { label: 'News Feeds',    to: '/admin/news',         icon: Rss },
   { label: 'CORS',          to: '/admin/cors',         icon: Globe },
-  { label: 'DefendCore',    to: '/admin/defendcore',   icon: Cpu },
 ]
 
 function active(to: string) {
@@ -85,9 +83,7 @@ const pageTitle = computed(() => {
   if (p.startsWith('/admin/users'))      return 'User Management'
   if (p.startsWith('/admin/tickets'))    return 'Support Tickets'
   if (p.startsWith('/admin/beta'))       return 'Beta Requests'
-  if (p.startsWith('/admin/news'))       return 'News Management'
   if (p.startsWith('/admin/cors'))        return 'CORS Origins'
-  if (p.startsWith('/admin/defendcore')) return 'DefendCore'
   return 'Admin'
 })
 

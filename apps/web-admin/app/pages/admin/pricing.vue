@@ -160,7 +160,7 @@ onMounted(fetchPlans)
           <p class="text-[10px] font-semibold uppercase tracking-[0.22em]" style="color:rgba(248,113,113,0.50);">Admin</p>
         </div>
         <h1 class="text-[26px] font-display font-black uppercase tracking-wide" style="color:rgba(255,255,255,0.90);">Pricing Management</h1>
-        <p class="mt-1 text-[13px]" style="color:rgba(255,255,255,0.40);">Manage DefendCore token-based subscription plans.</p>
+        <p class="mt-1 text-[13px]" style="color:rgba(255,255,255,0.40);">Manage workspace subscription plans and limits.</p>
       </div>
       <div class="flex gap-2 shrink-0">
         <button class="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] transition-colors hover:bg-white/[0.06] cursor-pointer"
@@ -186,12 +186,11 @@ onMounted(fetchPlans)
     <!-- Error -->
     <div v-if="err" class="mb-4 rounded-xl px-4 py-3 text-[12px]" style="background:rgba(242,63,66,0.08);border:1px solid rgba(242,63,66,0.18);color:rgba(242,63,66,0.80);">{{ err }}</div>
 
-    <!-- Note about DefendCore -->
+    <!-- Note about plans -->
     <div class="mb-5 rounded-xl px-4 py-3 flex items-start gap-3" style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.14);">
       <Zap class="h-4 w-4 shrink-0 mt-0.5" style="color:rgba(251,191,36,0.65);" />
       <p class="text-[12px] leading-relaxed" style="color:rgba(255,255,255,0.45);">
-        Plans define the token allowances for DefendCore usage. Token limits represent monthly AI token consumption.
-        Pricing is informational until DefendCore billing is live.
+        Plans define seat and project limits per workspace. Pricing is informational until billing is live.
       </p>
     </div>
 

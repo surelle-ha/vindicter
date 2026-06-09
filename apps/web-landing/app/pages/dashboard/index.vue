@@ -34,28 +34,6 @@ function fmt(iso: string) {
     <!-- Cards row -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-8">
 
-      <!-- DefendCore card -->
-      <div class="rounded-2xl p-5" style="background:rgba(79,70,229,0.10);border:1px solid rgba(79,70,229,0.20);">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="flex h-9 w-9 items-center justify-center rounded-xl" style="background:rgba(79,70,229,0.15);border:1px solid rgba(79,70,229,0.25);">
-            <svg class="h-4 w-4" style="color:rgb(129,140,248);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-            </svg>
-          </div>
-          <div>
-            <p class="text-[13px] font-bold" style="color:rgba(255,255,255,0.85);">DefendCore</p>
-            <p class="text-[10px]" style="color:rgba(139,92,246,0.60);">AI Security Model</p>
-          </div>
-        </div>
-        <div class="rounded-xl px-3 py-2 text-[11px] flex items-center gap-2" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);">
-          <span class="h-1.5 w-1.5 rounded-full animate-pulse" style="background:rgba(245,158,11,0.80);" />
-          <span style="color:rgba(255,255,255,0.45);">Subscription management coming soon</span>
-        </div>
-        <NuxtLink to="/dashboard/subscription" class="mt-3 flex items-center gap-1 text-[11px] transition-colors" style="color:rgba(129,140,248,0.70);">
-          Learn more →
-        </NuxtLink>
-      </div>
-
       <!-- Updates card -->
       <div class="rounded-2xl p-5" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);">
         <div class="flex items-center gap-3 mb-4">

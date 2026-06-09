@@ -32,7 +32,6 @@ export declare class AuthController {
         createdAt?: Date | undefined;
         updatedAt?: Date | undefined;
         userRoles?: import("../roles/entities/user-role.entity").UserRole[] | undefined;
-        apiTokens?: import("../api-tokens/entities/api-token.entity").ApiToken[] | undefined;
     }>;
     updateProfile(user: any, dto: UpdateProfileDto): Promise<import("../users/entities/user.entity").User | null>;
 }

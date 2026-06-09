@@ -4,12 +4,10 @@ import {
   Bot,
   Check,
   ChevronDown,
-  FileText,
-  Files,
   Github,
+  Globe,
   House,
   KeyRound,
-  LogOut,
   Moon,
   PackageSearch,
   PanelLeftClose,
@@ -44,14 +42,14 @@ const navItems = [
 // `link` = navigate to absolute path; null = navigate via ?tab= query param
 const workspaceTabs = computed(() => {
   const tabs = [
-    { id: 'overview',       label: 'Overview',      icon: ShieldCheck,   link: null as string | null },
-    { id: 'scanner',        label: 'Scanner',       icon: Radar,          link: null as string | null },
-    { id: 'findings',       label: 'Findings',      icon: AlertTriangle,  link: null as string | null },
-    { id: 'dependencies',   label: 'Dependencies',  icon: PackageSearch,  link: null as string | null },
-    { id: 'secrets',        label: 'Secrets',       icon: KeyRound,       link: null as string | null },
-    { id: 'whitelist',      label: 'Whitelist',     icon: ShieldMinus,    link: null as string | null },
-    { id: 'reports',        label: 'Reports',       icon: FileText,       link: null as string | null },
-    { id: 'settings',       label: 'Settings',      icon: Settings,       link: null as string | null },
+    { id: 'overview',      label: 'Overview',     icon: ShieldCheck,  link: null as string | null },
+    { id: 'scanner',       label: 'Scanner',      icon: Radar,        link: null as string | null },
+    { id: 'findings',      label: 'Findings',     icon: AlertTriangle, link: null as string | null },
+    { id: 'whitelist',     label: 'Whitelist',    icon: ShieldMinus,  link: null as string | null },
+    { id: 'dependencies',  label: 'Dependencies', icon: PackageSearch, link: null as string | null },
+    { id: 'secrets',       label: 'Secrets',      icon: KeyRound,     link: null as string | null },
+    { id: 'environment',   label: 'Environment',  icon: Globe,        link: null as string | null },
+    { id: 'settings',      label: 'Settings',     icon: Settings,     link: null as string | null },
   ]
   if (auth.isGitHubConnected) {
     tabs.push({ id: 'github_issues', label: 'Issues', icon: Github, link: null })
@@ -89,13 +87,6 @@ const projectToolItems = computed(() => {
       ],
     })
   }
-  items.push({
-    icon: Files,
-    label: 'Documents',
-    to: '/documents',
-    exact: true,
-    disabled: false,
-  })
   return items
 })
 
@@ -143,11 +134,6 @@ watch(() => route.fullPath, () => {
   projectSelectorOpen.value = false
 })
 
-async function handleLogout() {
-  await auth.logoutApi()
-  await auth.logoutGitHub()
-  await router.push('/login')
-}
 </script>
 
 <template>
@@ -192,7 +178,7 @@ async function handleLogout() {
         <span v-if="!collapsed">{{ item.label }}</span>
       </NuxtLink>
 
-      <!-- MCP (shown below Academy when enabled in settings) -->
+      <!-- MCP (shown when enabled in settings) -->
       <NuxtLink
         v-if="app.mcpInSidebar"
         to="/mcp"
@@ -212,7 +198,7 @@ async function handleLogout() {
       <!-- Core section -->
       <div class="pt-3">
         <p v-if="!collapsed" class="px-2 mb-1 text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-[0.12em]">
-          Project Specific
+          Workspace
         </p>
         <div v-else class="h-px bg-[var(--border)] mx-1 mb-2" />
 
@@ -229,10 +215,10 @@ async function handleLogout() {
                   ? 'bg-indigo-600/15 text-indigo-400'
                   : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-white/[0.05]',
               ]"
-              :title="collapsed ? 'Workspace' : undefined"
+              :title="collapsed ? 'Codebase' : undefined"
             >
               <ShieldCheck class="size-3.5 shrink-0 text-violet-400/70" />
-              <span v-if="!collapsed" class="truncate flex-1">Workspace</span>
+              <span v-if="!collapsed" class="truncate flex-1">Codebase</span>
             </NuxtLink>
             <!-- Expand toggle (only in expanded sidebar, only when project active) -->
             <button
@@ -335,8 +321,6 @@ async function handleLogout() {
 
     </nav>
 
-    <!-- Developer section removed: Academy Builder moved to web-dashboard admin -->
-
     <!-- Project selector -->
     <div v-if="projects.hasProjects" class="border-t border-[var(--border)] p-2">
       <template v-if="!collapsed">
@@ -433,16 +417,5 @@ async function handleLogout() {
       <span v-if="!collapsed" class="text-xs">Settings</span>
     </NuxtLink>
 
-    <!-- Sign out (when any auth is active) -->
-    <button
-      v-if="auth.isApiAuthenticated || auth.isGitHubConnected"
-      class="h-9 flex items-center gap-2 px-3 border-t border-[var(--border)] text-[var(--text-faint)] hover:text-red-400 hover:bg-red-500/[0.04] transition-colors cursor-pointer"
-      :class="collapsed ? 'justify-center' : ''"
-      title="Sign out"
-      @click="handleLogout"
-    >
-      <LogOut class="size-3.5 shrink-0" />
-      <span v-if="!collapsed" class="text-xs">Sign out</span>
-    </button>
   </aside>
 </template>

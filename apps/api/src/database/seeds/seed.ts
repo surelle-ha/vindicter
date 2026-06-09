@@ -56,11 +56,6 @@ const DEFAULT_ACCESSES: { resource: string; action: string; description: string 
   { resource: 'marketing',   action: 'update',  description: 'Update internal marketing records' },
   { resource: 'marketing',   action: 'delete',  description: 'Delete internal marketing records' },
   { resource: 'marketing',   action: 'send',    description: 'Send internal marketing email' },
-  // defendcore
-  { resource: 'defendcore',  action: 'read',    description: 'Read DefendCore config and documents' },
-  { resource: 'defendcore',  action: 'create',  description: 'Add DefendCore knowledge documents' },
-  { resource: 'defendcore',  action: 'update',  description: 'Update DefendCore configuration' },
-  { resource: 'defendcore',  action: 'delete',  description: 'Delete DefendCore knowledge documents' },
   // cors
   { resource: 'cors',        action: 'read',    description: 'View CORS allowlist' },
   { resource: 'cors',        action: 'create',  description: 'Add CORS origins' },

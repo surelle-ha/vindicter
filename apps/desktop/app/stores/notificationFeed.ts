@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { sendDesktopNotification } from '~/composables/useDesktopNotification'
 
 export type FeedCategory = 'scan_complete' | 'scan_error' | 'rss_article' | 'finding_new' | 'finding_stale' | 'info'
 
@@ -48,6 +49,7 @@ export const useNotificationFeedStore = defineStore('notificationFeed', {
       this.items.unshift({ ...item, id, read: false, createdAt: Date.now() })
       if (this.items.length > MAX_ITEMS) this.items = this.items.slice(0, MAX_ITEMS)
       this._persist()
+      void sendDesktopNotification(item.title, item.body || undefined)
     },
 
     markRead(id: string) {

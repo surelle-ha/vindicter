@@ -13,5 +13,5 @@ const redirectMap: Record<string, string> = {
   'admin/beta':          '/admin/beta',
 }
 
-await navigateTo(redirectMap[path] ?? '/news', { redirectCode: 301 })
+await navigateTo(redirectMap[path] ?? '/support', { redirectCode: 301 })
 </script>

@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
-    "nuxt": "^4",
+    "nuxt": "^4.4.8",
     "tailwindcss": "latest",
     "typescript": "latest",
     "vue": "latest"

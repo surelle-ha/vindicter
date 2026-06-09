@@ -5,19 +5,13 @@ import { Access } from '../modules/roles/entities/access.entity'
 import { RoleAccess } from '../modules/roles/entities/role-access.entity'
 import { UserRole } from '../modules/roles/entities/user-role.entity'
 import { NewsletterSignup } from '../modules/newsletter/entities/newsletter-signup.entity'
-import { NewsletterUpdate } from '../modules/newsletter/entities/newsletter-update.entity'
 import { SpecialBetaApplication } from '../modules/beta/entities/special-beta-application.entity'
 import { SupportTicket } from '../modules/support/entities/support-ticket.entity'
-import { ApiToken } from '../modules/api-tokens/entities/api-token.entity'
-import { RssFeed } from '../modules/news/entities/rss-feed.entity'
-import { RssArticle } from '../modules/news/entities/rss-article.entity'
 import { MarketingSegment } from '../modules/marketing/entities/marketing-segment.entity'
 import { MarketingContact } from '../modules/marketing/entities/marketing-contact.entity'
 import { MarketingCampaign } from '../modules/marketing/entities/marketing-campaign.entity'
 import { MarketingTemplate } from '../modules/marketing/entities/marketing-template.entity'
 import { MarketingSendEvent } from '../modules/marketing/entities/marketing-send-event.entity'
-import { AcademyProgress } from '../modules/academy/entities/academy-progress.entity'
-import { AcademyChatSession } from '../modules/academy/entities/academy-chat-session.entity'
 import { CorsOrigin } from '../modules/cors/entities/cors-origin.entity'
 import { PricingPlan } from '../modules/pricing/entities/pricing-plan.entity'
 import { Workspace } from '../modules/workspaces/entities/workspace.entity'
@@ -39,12 +33,10 @@ export const databaseConfig = (): TypeOrmModuleOptions => {
     url,
     entities: [
       User, Role, Access, RoleAccess, UserRole,
-      NewsletterSignup, NewsletterUpdate,
-      SpecialBetaApplication, SupportTicket, ApiToken,
-      RssFeed, RssArticle,
+      NewsletterSignup,
+      SpecialBetaApplication, SupportTicket,
       MarketingSegment, MarketingContact, MarketingCampaign,
       MarketingTemplate, MarketingSendEvent,
-      AcademyProgress, AcademyChatSession,
       CorsOrigin,
       PricingPlan, Workspace, WorkspaceMember, WorkspaceInvitation, Subscription,
     ],

@@ -101,14 +101,14 @@ async function updateStatus(value: SecurityFindingStatus) {
             <p class="mt-2 break-words text-sm leading-relaxed text-[var(--text-muted)]">{{ finding.detail }}</p>
           </div>
 
-          <select
+          <GlassSelect
             v-if="remediationFinding"
-            class="h-9 rounded-lg border border-[var(--border)] bg-black/20 px-2 text-xs text-[var(--text)] outline-none"
+            class="w-36"
             :value="remediationFinding.status"
             @change="updateStatus(($event.target as HTMLSelectElement).value as SecurityFindingStatus)"
           >
             <option v-for="status in statusOptions" :key="status" :value="status">{{ status.replace('_', ' ') }}</option>
-          </select>
+          </GlassSelect>
         </div>
       </div>
 

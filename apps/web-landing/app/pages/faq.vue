@@ -10,7 +10,7 @@ useLandingSeo({
 const faqs = [
   {
     question: 'What is Vindicter?',
-    answer: 'Vindicter is an AI-powered security platform for teams — automating vulnerability scanning, finding tracking, dependency inventory, secret detection, and security learning.',
+    answer: 'Vindicter is an AI-powered security platform for teams — automating vulnerability scanning, finding tracking, dependency inventory, and secret detection.',
   },
   {
     question: 'Is Vindicter free during beta?',

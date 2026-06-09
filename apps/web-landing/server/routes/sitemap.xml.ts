@@ -2,7 +2,6 @@ const SITE = 'https://vindicter.xyz'
 
 const STATIC_ROUTES = [
   { path: '/',              priority: '1.0', changefreq: 'weekly'  },
-  { path: '/defendcore',    priority: '0.9', changefreq: 'monthly' },
   { path: '/standard-beta', priority: '0.8', changefreq: 'monthly' },
   { path: '/special-beta',  priority: '0.7', changefreq: 'monthly' },
   { path: '/download',      priority: '0.8', changefreq: 'weekly'  },

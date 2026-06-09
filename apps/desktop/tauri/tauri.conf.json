@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "identifier": "com.vindicta.app",
   "productName": "Vindicter",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "build": {
     "beforeDevCommand": "pnpm --filter @vindicter/desktop dev",
     "beforeBuildCommand": "pnpm --filter @vindicter/desktop generate",
@@ -40,7 +40,8 @@
       "icons/icon.png",
       "icons/icon.ico"
     ],
-    "resources": ["course-bin/*.va"]
+    "resources": ["course-bin/*.va"],
+    "externalBin": ["binaries/trivy"]
   },
   "plugins": {
     "updater": {

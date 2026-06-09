@@ -120,6 +120,13 @@
           "args": ["audit", "--json", "--file", { "validator": "[^\\u0000-\\u001f\\u007f]+" }],
           "sidecar": false
         },
+        { "name": "trivy-sidecar-version", "cmd": "binaries/trivy", "args": ["--version"], "sidecar": true },
+        {
+          "name": "trivy-sidecar-fs-scan",
+          "cmd": "binaries/trivy",
+          "sidecar": true,
+          "args": ["fs", "--format", "json", "--quiet", "--no-progress", { "validator": "[^\\u0000-\\u001f\\u007f]+" }]
+        },
         { "name": "trivy-version", "cmd": "trivy", "args": ["--version"], "sidecar": false },
         {
           "name": "trivy-fs-scan",
@@ -134,6 +141,25 @@
           "args": ["--config=auto", "--json", "--quiet", { "validator": "[^\\u0000-\\u001f\\u007f]+" }],
           "sidecar": false
         },
+        { "name": "cmd-trivy-version", "cmd": "cmd", "args": ["/c", "trivy", "--version"], "sidecar": false },
+        {
+          "name": "cmd-trivy-fs-scan",
+          "cmd": "cmd",
+          "args": ["/c", "trivy", "fs", "--format", "json", "--quiet", "--no-progress", { "validator": "[^\\u0000-\\u001f\\u007f]+" }],
+          "sidecar": false
+        },
+        { "name": "cmd-semgrep-version", "cmd": "cmd", "args": ["/c", "semgrep", "--version"], "sidecar": false },
+        {
+          "name": "cmd-semgrep-scan",
+          "cmd": "cmd",
+          "args": ["/c", "semgrep", "--config=auto", "--json", "--quiet", { "validator": "[^\\u0000-\\u001f\\u007f]+" }],
+          "sidecar": false
+        },
+        { "name": "cargo-audit-check", "cmd": "cargo", "args": ["audit", "--help"], "sidecar": false },
+        { "name": "cargo-install-audit", "cmd": "cargo", "args": ["install", "cargo-audit"], "sidecar": false },
+        { "name": "winget-install-trivy", "cmd": "winget", "args": ["install", "--id", "AquaSecurity.Trivy", "-e", "--accept-package-agreements", "--accept-source-agreements"], "sidecar": false },
+        { "name": "pip-install-semgrep", "cmd": "pip", "args": ["install", "semgrep"], "sidecar": false },
+        { "name": "pip3-install-semgrep", "cmd": "pip3", "args": ["install", "semgrep"], "sidecar": false },
         {
           "name": "wsl-exec",
           "cmd": "wsl",

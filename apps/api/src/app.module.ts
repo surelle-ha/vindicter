@@ -10,10 +10,7 @@ import { RolesModule } from './modules/roles/roles.module'
 import { NewsletterModule } from './modules/newsletter/newsletter.module'
 import { BetaModule } from './modules/beta/beta.module'
 import { SupportModule } from './modules/support/support.module'
-import { ApiTokensModule } from './modules/api-tokens/api-tokens.module'
-import { NewsModule } from './modules/news/news.module'
 import { MarketingModule } from './modules/marketing/marketing.module'
-import { AcademyModule } from './modules/academy/academy.module'
 import { CorsModule } from './modules/cors/cors.module'
 import { PricingModule } from './modules/pricing/pricing.module'
 import { WorkspacesModule } from './modules/workspaces/workspaces.module'
@@ -35,10 +32,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
     NewsletterModule,
     BetaModule,
     SupportModule,
-    ApiTokensModule,
-    NewsModule,
     MarketingModule,
-    AcademyModule,
     CorsModule,
     PricingModule,
     WorkspacesModule,

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { EditorSlug, AIToolSlug } from '~/types/vindicta'
+import type { EditorSlug, AIToolSlug, ProjectType } from '~/types/vindicta'
 
 export const useWizardStore = defineStore('wizard', {
   state: () => ({
@@ -10,6 +10,7 @@ export const useWizardStore = defineStore('wizard', {
     projectName: '',
     projectDescription: '',
     projectCode: '',
+    projectType: null as ProjectType | null,
     selectedEditor: null as EditorSlug | null,
     selectedAITools: ['codex'] as AIToolSlug[],
     importMode: 'local' as 'local' | 'clone' | 'new' | 'github',
@@ -47,6 +48,7 @@ export const useWizardStore = defineStore('wizard', {
       this.projectName = ''
       this.projectDescription = ''
       this.projectCode = ''
+      this.projectType = null
       this.selectedEditor = null
       this.selectedAITools = ['codex']
       this.importMode = 'local'

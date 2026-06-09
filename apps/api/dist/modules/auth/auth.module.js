@@ -31,7 +31,7 @@ exports.AuthModule = AuthModule = __decorate([
             jwt_1.JwtModule.registerAsync({
                 useFactory: () => ({
                     secret: process.env.JWT_SECRET ?? 'fallback-secret',
-                    signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? '7d' },
+                    signOptions: { expiresIn: (process.env.JWT_EXPIRES_IN ?? '7d') },
                 }),
             }),
             typeorm_1.TypeOrmModule.forFeature([user_entity_1.User, role_entity_1.Role, user_role_entity_1.UserRole, workspace_entity_1.Workspace, workspace_member_entity_1.WorkspaceMember, subscription_entity_1.Subscription, pricing_plan_entity_1.PricingPlan]),

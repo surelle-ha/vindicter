@@ -1,7 +1,7 @@
 <script setup lang="ts">
 useLandingSeo({
   title: 'Documentation — Vindicter',
-  description: 'Read Vindicter setup, scanning, findings, dependency inventory, secret detection, Academy, and configuration documentation.',
+  description: 'Read Vindicter setup, scanning, findings, dependency inventory, secret detection, and configuration documentation.',
   path: '/docs',
 })
 
@@ -11,7 +11,6 @@ const sections = [
   { title: 'Findings & Triaging',  desc: 'Manage severity, status, evidence, and remediation',   icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
   { title: 'Dependency Inventory', desc: 'Scan Node, Rust, Python, Go, .NET, and more',          icon: 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4' },
   { title: 'Secret Detection',     desc: 'Local pattern checks for tokens, keys, and secrets',   icon: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z' },
-  { title: 'Vindicter Academy',     desc: 'Bootcamp structure, Professor AI, and TTS narration',  icon: 'M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z' },
   { title: 'Configuration',        desc: 'vindicter.json schema, settings, and local storage',    icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
   { title: 'AI Providers',         desc: 'Connect Claude, OpenRouter, Ollama, and Core AI',      icon: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z' },
 ]
@@ -41,7 +40,7 @@ const sections = [
         </h1>
 
         <p class="text-[14px] leading-relaxed text-white/45 mb-10 max-w-sm">
-          The Vindicter documentation site is currently being written. It will cover installation, configuration, scanning, the Academy, and all AI provider integrations.
+          The Vindicter documentation site is currently being written. It will cover installation, configuration, scanning, and all AI provider integrations.
         </p>
 
         <!-- Planned sections preview -->

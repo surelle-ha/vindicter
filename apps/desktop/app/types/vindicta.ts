@@ -167,6 +167,29 @@ export interface SecurityData {
   whitelist: WhitelistedFinding[]
 }
 
+export type ProjectType =
+  | 'web_application'
+  | 'api'
+  | 'mobile_application'
+  | 'desktop_application'
+  | 'cloud_infrastructure'
+  | 'iot_embedded'
+  | 'network_infrastructure'
+  | 'source_code_library'
+  | 'other'
+
+export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
+  web_application:       'Web Application',
+  api:                   'API / Backend Service',
+  mobile_application:    'Mobile Application',
+  desktop_application:   'Desktop Application',
+  cloud_infrastructure:  'Cloud Infrastructure',
+  iot_embedded:          'IoT / Embedded System',
+  network_infrastructure:'Network Infrastructure',
+  source_code_library:   'Source Code / Library',
+  other:                 'Other',
+}
+
 export interface ProjectMeta {
   id: string
   name: string
@@ -182,12 +205,24 @@ export interface ProjectMeta {
   createdAt: string
   updatedAt: string
   ownedBy: string
+  projectType?: ProjectType
   // Pentest feature flags (optional; undefined = never configured)
   pentestEnabled?: boolean
   pentestPromptDismissed?: boolean
   pentestTargetUrl?: string
   pentestTermsAccepted?: boolean
   pentestEnabledAt?: string | null
+  // Environment configs (optional)
+  environments?: EnvironmentEntry[]
+}
+
+export interface EnvironmentEntry {
+  id: string
+  name: string
+  url: string
+  sshHost: string
+  sshUser: string
+  sshKeyPath: string
 }
 
 export const DEFAULT_KANBAN_COLUMNS: KanbanColumn[] = [

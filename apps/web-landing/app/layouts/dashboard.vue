@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-  LayoutDashboard, ShieldCheck, Newspaper,
+  LayoutDashboard, Newspaper,
   PanelLeftClose, LogOut, Loader2, ChevronRight,
   User, Users, MessageCircle, Star, ChevronDown,
 } from 'lucide-vue-next'
@@ -46,9 +46,8 @@ async function handleSignOut() {
 }
 
 const nav = [
-  { label: 'Overview',   to: '/dashboard',              icon: LayoutDashboard },
-  { label: 'DefendCore', to: '/dashboard/subscription', icon: ShieldCheck },
-  { label: 'Updates',    to: '/dashboard/updates',      icon: Newspaper },
+  { label: 'Overview', to: '/dashboard',        icon: LayoutDashboard },
+  { label: 'Updates',  to: '/dashboard/updates', icon: Newspaper },
 ]
 
 const adminNav = [
@@ -77,7 +76,6 @@ const initials = computed(() =>
 const pageTitle = computed(() => {
   const p = route.path
   if (p === '/dashboard') return 'Overview'
-  if (p.startsWith('/dashboard/subscription')) return 'DefendCore'
   if (p.startsWith('/dashboard/updates')) return 'Updates'
   if (p.startsWith('/dashboard/profile')) return 'Profile'
   if (p.startsWith('/dashboard/admin/users')) return 'User Management'

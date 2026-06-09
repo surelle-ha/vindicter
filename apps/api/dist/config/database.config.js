@@ -7,21 +7,13 @@ const access_entity_1 = require("../modules/roles/entities/access.entity");
 const role_access_entity_1 = require("../modules/roles/entities/role-access.entity");
 const user_role_entity_1 = require("../modules/roles/entities/user-role.entity");
 const newsletter_signup_entity_1 = require("../modules/newsletter/entities/newsletter-signup.entity");
-const newsletter_update_entity_1 = require("../modules/newsletter/entities/newsletter-update.entity");
 const special_beta_application_entity_1 = require("../modules/beta/entities/special-beta-application.entity");
 const support_ticket_entity_1 = require("../modules/support/entities/support-ticket.entity");
-const api_token_entity_1 = require("../modules/api-tokens/entities/api-token.entity");
-const rss_feed_entity_1 = require("../modules/news/entities/rss-feed.entity");
-const rss_article_entity_1 = require("../modules/news/entities/rss-article.entity");
 const marketing_segment_entity_1 = require("../modules/marketing/entities/marketing-segment.entity");
 const marketing_contact_entity_1 = require("../modules/marketing/entities/marketing-contact.entity");
 const marketing_campaign_entity_1 = require("../modules/marketing/entities/marketing-campaign.entity");
 const marketing_template_entity_1 = require("../modules/marketing/entities/marketing-template.entity");
 const marketing_send_event_entity_1 = require("../modules/marketing/entities/marketing-send-event.entity");
-const academy_progress_entity_1 = require("../modules/academy/entities/academy-progress.entity");
-const academy_chat_session_entity_1 = require("../modules/academy/entities/academy-chat-session.entity");
-const defendcore_config_entity_1 = require("../modules/defendcore/entities/defendcore-config.entity");
-const knowledge_document_entity_1 = require("../modules/defendcore/entities/knowledge-document.entity");
 const cors_origin_entity_1 = require("../modules/cors/entities/cors-origin.entity");
 const pricing_plan_entity_1 = require("../modules/pricing/entities/pricing-plan.entity");
 const workspace_entity_1 = require("../modules/workspaces/entities/workspace.entity");
@@ -39,13 +31,11 @@ const databaseConfig = () => {
         url,
         entities: [
             user_entity_1.User, role_entity_1.Role, access_entity_1.Access, role_access_entity_1.RoleAccess, user_role_entity_1.UserRole,
-            newsletter_signup_entity_1.NewsletterSignup, newsletter_update_entity_1.NewsletterUpdate,
-            special_beta_application_entity_1.SpecialBetaApplication, support_ticket_entity_1.SupportTicket, api_token_entity_1.ApiToken,
-            rss_feed_entity_1.RssFeed, rss_article_entity_1.RssArticle,
+            newsletter_signup_entity_1.NewsletterSignup,
+            special_beta_application_entity_1.SpecialBetaApplication, support_ticket_entity_1.SupportTicket,
             marketing_segment_entity_1.MarketingSegment, marketing_contact_entity_1.MarketingContact, marketing_campaign_entity_1.MarketingCampaign,
             marketing_template_entity_1.MarketingTemplate, marketing_send_event_entity_1.MarketingSendEvent,
-            academy_progress_entity_1.AcademyProgress, academy_chat_session_entity_1.AcademyChatSession,
-            defendcore_config_entity_1.DefendCoreConfig, knowledge_document_entity_1.KnowledgeDocument, cors_origin_entity_1.CorsOrigin,
+            cors_origin_entity_1.CorsOrigin,
             pricing_plan_entity_1.PricingPlan, workspace_entity_1.Workspace, workspace_member_entity_1.WorkspaceMember, workspace_invitation_entity_1.WorkspaceInvitation, subscription_entity_1.Subscription,
         ],
         migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],

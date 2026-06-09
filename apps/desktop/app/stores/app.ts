@@ -92,14 +92,6 @@ const DEFAULT_OLLAMA: OllamaSettings = {
 
 export const DEFAULT_WSL_PROFILES: WslProfile[] = [
   {
-    id: 'academy',
-    name: 'Academy',
-    purpose: 'Isolated learning labs and course exercises',
-    distro: '',
-    homePath: '~/vindicta/academy',
-    enabled: true,
-  },
-  {
     id: 'pentest',
     name: 'Pentesting',
     purpose: 'Recon, scanning, and exploit tooling workspace',

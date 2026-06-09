@@ -1,7 +1,6 @@
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm'
 import { Exclude } from 'class-transformer'
 import { UserRole } from '../../roles/entities/user-role.entity'
-import { ApiToken } from '../../api-tokens/entities/api-token.entity'
 
 @Entity('users')
 export class User {
@@ -41,9 +40,6 @@ export class User {
 
   @OneToMany(() => UserRole, (ur) => ur.user, { cascade: true })
   userRoles: UserRole[]
-
-  @OneToMany(() => ApiToken, (t) => t.user, { cascade: true })
-  apiTokens: ApiToken[]
 
   get fullName(): string | null {
     const parts = [this.firstName, this.lastName].filter(Boolean)

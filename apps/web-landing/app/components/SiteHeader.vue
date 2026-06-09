@@ -26,7 +26,6 @@ onMounted(() => {
 
     <div class="flex items-center gap-4 text-[13px] text-white/50 sm:gap-6">
       <NuxtLink to="/#features" class="hidden transition-colors hover:text-white sm:inline">Features</NuxtLink>
-      <NuxtLink to="/#academy" class="hidden transition-colors hover:text-white sm:inline">Academy</NuxtLink>
       <a
         :href="dashboardUrl"
         class="inline-flex items-center rounded-lg border border-white/10 px-4 py-1.5 text-[12px] font-semibold text-white/70 transition hover:border-accent/40 hover:bg-white/[0.04] hover:text-white"

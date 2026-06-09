@@ -58,9 +58,7 @@ const lastUpdated = 'May 28, 2026'
             <ul>
               <li>Project directories and metadata you register</li>
               <li>Scan results and vulnerability findings</li>
-              <li>Academy progress, lesson state, and chat history</li>
               <li>App preferences and settings</li>
-              <li>Generated TTS audio files (local cache)</li>
             </ul>
             <p>You can inspect, edit, or delete this data at any time. Uninstalling Vindicter removes all app-managed storage.</p>
           </section>
@@ -73,7 +71,7 @@ const lastUpdated = 'May 28, 2026'
                 <strong>Beta sign-up</strong> — when you register for the open beta, we collect your name and email address to send you a download link. This data is stored in our database and is not shared with third parties or used for marketing.
               </li>
               <li>
-                <strong>AI provider calls (Academy / Scan)</strong> — if you configure an AI model (Claude, OpenRouter, or Ollama) for scanning or the Academy Professor, the app invokes those CLIs or APIs directly from your machine using credentials you supply. Vindicter does not proxy, store, or log those requests. The AI provider's own privacy policy applies to any data you send.
+                <strong>AI provider calls (Scan)</strong> — if you configure an AI model (Claude, OpenRouter, or Ollama) for scanning, the app invokes those CLIs or APIs directly from your machine using credentials you supply. Vindicter does not proxy, store, or log those requests. The AI provider's own privacy policy applies to any data you send.
               </li>
             </ul>
           </section>

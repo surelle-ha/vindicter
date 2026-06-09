@@ -21,6 +21,7 @@ onMounted(() => {
     <NotificationToast />
     <NotificationDrawer />
     <FloatingAIActivity />
+    <ScanProgressFooter />
     <FeaturesModal />
     <AppUpdateBanner />
   </div>

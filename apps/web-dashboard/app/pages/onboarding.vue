@@ -38,7 +38,7 @@ async function finish() {
       experienceLevel:   experience.value,
       onboardingComplete: true,
     })
-    await router.push('/news')
+    await router.push('/support')
   } catch (e: any) {
     err.value = e?.message ?? 'Something went wrong. Please try again.'
   } finally {

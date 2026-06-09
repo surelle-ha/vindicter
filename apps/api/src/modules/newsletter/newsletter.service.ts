@@ -1,9 +1,8 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { nanoid } from 'nanoid'
 import { NewsletterSignup } from './entities/newsletter-signup.entity'
-import { NewsletterUpdate } from './entities/newsletter-update.entity'
 import { SmtpService } from '../marketing/smtp.service'
 
 const MANIFEST_URL = 'https://pub-1dcbd264e42f475e9f95858cc16ab6b7.r2.dev/releases/latest/update.json'
@@ -13,8 +12,7 @@ export class NewsletterService {
   private readonly logger = new Logger(NewsletterService.name)
 
   constructor(
-    @InjectRepository(NewsletterSignup) private signupRepo:  Repository<NewsletterSignup>,
-    @InjectRepository(NewsletterUpdate) private updateRepo: Repository<NewsletterUpdate>,
+    @InjectRepository(NewsletterSignup) private signupRepo: Repository<NewsletterSignup>,
     private smtp: SmtpService,
   ) {}
 
@@ -34,7 +32,7 @@ export class NewsletterService {
       this.logger.error(`Failed to send download email to ${email}: ${err?.message}`)
     )
 
-    return { email: email.toLowerCase(), downloadToken: token }
+    return { success: true }
   }
 
   private async sendDownloadEmail(email: string, token: string) {
@@ -99,7 +97,7 @@ export class NewsletterService {
   async findSignupByToken(token: string) {
     const signup = await this.signupRepo.findOneBy({ downloadToken: token })
     if (!signup) throw new NotFoundException('Token not found')
-    return { email: signup.email, downloadToken: signup.downloadToken }
+    return { valid: true }
   }
 
   async getDownloadUrlForToken(token: string): Promise<string> {
@@ -118,38 +116,4 @@ export class NewsletterService {
     return this.signupRepo.find({ order: { createdAt: 'DESC' } })
   }
 
-  // ── Updates ────────────────────────────────────────────────────────────────
-  findPublishedUpdates(limit?: number) {
-    const query = this.updateRepo
-      .createQueryBuilder('u')
-      .where('u.status = :status', { status: 'published' })
-      .orderBy('u.published_at', 'DESC')
-    if (limit) query.take(limit)
-    return query.getMany()
-  }
-
-  findAllUpdates() {
-    return this.updateRepo.find({ order: { createdAt: 'DESC' } })
-  }
-
-  async createUpdate(data: Partial<NewsletterUpdate>) {
-    const update = this.updateRepo.create(data)
-    return this.updateRepo.save(update)
-  }
-
-  async updateOne(id: string, data: Partial<NewsletterUpdate>) {
-    const update = await this.updateRepo.findOneBy({ id })
-    if (!update) throw new NotFoundException('Update not found')
-    Object.assign(update, data)
-    if (data.status === 'published' && !update.publishedAt) {
-      update.publishedAt = new Date()
-    }
-    return this.updateRepo.save(update)
-  }
-
-  async removeUpdate(id: string) {
-    const update = await this.updateRepo.findOneBy({ id })
-    if (!update) throw new NotFoundException('Update not found')
-    await this.updateRepo.remove(update)
-  }
 }

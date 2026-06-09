@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
+import type { StringValue } from 'ms'
 import { PassportModule } from '@nestjs/passport'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { User } from '../users/entities/user.entity'
@@ -19,7 +20,7 @@ import { JwtStrategy } from './strategies/jwt.strategy'
     JwtModule.registerAsync({
       useFactory: () => ({
         secret: process.env.JWT_SECRET ?? 'fallback-secret',
-        signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? '7d' },
+        signOptions: { expiresIn: (process.env.JWT_EXPIRES_IN ?? '7d') as StringValue },
       }),
     }),
     TypeOrmModule.forFeature([User, Role, UserRole, Workspace, WorkspaceMember, Subscription, PricingPlan]),

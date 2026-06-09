@@ -19,13 +19,11 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const nanoid_1 = require("nanoid");
 const newsletter_signup_entity_1 = require("./entities/newsletter-signup.entity");
-const newsletter_update_entity_1 = require("./entities/newsletter-update.entity");
 const smtp_service_1 = require("../marketing/smtp.service");
 const MANIFEST_URL = 'https://pub-1dcbd264e42f475e9f95858cc16ab6b7.r2.dev/releases/latest/update.json';
 let NewsletterService = NewsletterService_1 = class NewsletterService {
-    constructor(signupRepo, updateRepo, smtp) {
+    constructor(signupRepo, smtp) {
         this.signupRepo = signupRepo;
-        this.updateRepo = updateRepo;
         this.smtp = smtp;
         this.logger = new common_1.Logger(NewsletterService_1.name);
     }
@@ -41,7 +39,7 @@ let NewsletterService = NewsletterService_1 = class NewsletterService {
             await this.signupRepo.save(signup);
         }
         this.sendDownloadEmail(email.toLowerCase(), token).catch(err => this.logger.error(`Failed to send download email to ${email}: ${err?.message}`));
-        return { email: email.toLowerCase(), downloadToken: token };
+        return { success: true };
     }
     async sendDownloadEmail(email, token) {
         if (!this.smtp.isConfigured())
@@ -104,7 +102,7 @@ let NewsletterService = NewsletterService_1 = class NewsletterService {
         const signup = await this.signupRepo.findOneBy({ downloadToken: token });
         if (!signup)
             throw new common_1.NotFoundException('Token not found');
-        return { email: signup.email, downloadToken: signup.downloadToken };
+        return { valid: true };
     }
     async getDownloadUrlForToken(token) {
         const signup = await this.signupRepo.findOneBy({ downloadToken: token });
@@ -122,46 +120,12 @@ let NewsletterService = NewsletterService_1 = class NewsletterService {
     findAllSignups() {
         return this.signupRepo.find({ order: { createdAt: 'DESC' } });
     }
-    findPublishedUpdates(limit) {
-        const query = this.updateRepo
-            .createQueryBuilder('u')
-            .where('u.status = :status', { status: 'published' })
-            .orderBy('u.published_at', 'DESC');
-        if (limit)
-            query.take(limit);
-        return query.getMany();
-    }
-    findAllUpdates() {
-        return this.updateRepo.find({ order: { createdAt: 'DESC' } });
-    }
-    async createUpdate(data) {
-        const update = this.updateRepo.create(data);
-        return this.updateRepo.save(update);
-    }
-    async updateOne(id, data) {
-        const update = await this.updateRepo.findOneBy({ id });
-        if (!update)
-            throw new common_1.NotFoundException('Update not found');
-        Object.assign(update, data);
-        if (data.status === 'published' && !update.publishedAt) {
-            update.publishedAt = new Date();
-        }
-        return this.updateRepo.save(update);
-    }
-    async removeUpdate(id) {
-        const update = await this.updateRepo.findOneBy({ id });
-        if (!update)
-            throw new common_1.NotFoundException('Update not found');
-        await this.updateRepo.remove(update);
-    }
 };
 exports.NewsletterService = NewsletterService;
 exports.NewsletterService = NewsletterService = NewsletterService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(newsletter_signup_entity_1.NewsletterSignup)),
-    __param(1, (0, typeorm_1.InjectRepository)(newsletter_update_entity_1.NewsletterUpdate)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository,
         smtp_service_1.SmtpService])
 ], NewsletterService);
 //# sourceMappingURL=newsletter.service.js.map

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { AlertTriangle, FileText, FolderSearch, Github, KeyRound, PackageSearch, PanelBottomOpen, Radar, Settings, ShieldCheck, ShieldMinus, Trash2 } from 'lucide-vue-next'
+import { AlertTriangle, FolderSearch, Github, Globe, KeyRound, PackageSearch, PanelBottomOpen, Radar, Settings, ShieldCheck, ShieldMinus, Trash2 } from 'lucide-vue-next'
 import type { Component } from 'vue'
 
-type SecurityWorkspaceTab = 'overview' | 'scanner' | 'findings' | 'whitelist' | 'dependencies' | 'secrets' | 'reports' | 'settings' | 'github_issues' | 'history'
+type SecurityWorkspaceTab = 'overview' | 'scanner' | 'findings' | 'whitelist' | 'dependencies' | 'secrets' | 'environment' | 'settings' | 'github_issues' | 'history'
 
 const route = useRoute()
 const router = useRouter()
@@ -60,10 +60,10 @@ const staticTabs: { id: SecurityWorkspaceTab; label: string; icon: Component }[]
   { id: 'overview', label: 'Overview', icon: ShieldCheck },
   { id: 'scanner', label: 'Scanner', icon: Radar },
   { id: 'findings', label: 'Findings', icon: AlertTriangle },
+  { id: 'whitelist', label: 'Whitelist', icon: ShieldMinus },
   { id: 'dependencies', label: 'Dependencies', icon: PackageSearch },
   { id: 'secrets', label: 'Secrets', icon: KeyRound },
-  { id: 'whitelist', label: 'Whitelist', icon: ShieldMinus },
-  { id: 'reports', label: 'Reports', icon: FileText },
+  { id: 'environment', label: 'Environment', icon: Globe },
   { id: 'settings', label: 'Settings', icon: Settings },
 ]
 
@@ -90,7 +90,7 @@ onMounted(async () => {
 })
 
 function isSecurityTab(value: unknown): value is SecurityWorkspaceTab {
-  const allIds: SecurityWorkspaceTab[] = ['overview', 'scanner', 'findings', 'whitelist', 'dependencies', 'secrets', 'reports', 'history', 'settings', 'github_issues']
+  const allIds: SecurityWorkspaceTab[] = ['overview', 'scanner', 'findings', 'whitelist', 'dependencies', 'secrets', 'environment', 'history', 'settings', 'github_issues']
   return allIds.includes(value as SecurityWorkspaceTab)
 }
 

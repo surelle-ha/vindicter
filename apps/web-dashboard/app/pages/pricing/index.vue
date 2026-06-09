@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, CreditCard, Loader2, RefreshCw, Zap } from 'lucide-vue-next'
+import { Check, CreditCard, RefreshCw } from 'lucide-vue-next'
 
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'Pricing — Vindicter' })
@@ -17,11 +17,9 @@ interface Plan {
   sortOrder: number
 }
 
-const plans    = ref<Plan[]>([])
-const loading  = ref(true)
-const err      = ref('')
-const upgrading = ref<string | null>(null)
-const upgraded  = ref<string | null>(null)
+const plans   = ref<Plan[]>([])
+const loading = ref(true)
+const err     = ref('')
 
 async function fetchPlans() {
   loading.value = true
@@ -47,30 +45,6 @@ const PLAN_FEATURES: Record<string, string[]> = {
   Free:       ['1 seat', '3 projects', 'AI scanning', 'Academy access', 'Community support'],
   Pro:        ['5 seats', '20 projects', 'AI scanning', 'Academy access', 'Priority support', 'GitHub issue export'],
   Enterprise: ['Unlimited seats', 'Unlimited projects', 'AI scanning', 'Academy access', 'Dedicated support', 'GitHub issue export', 'Custom integrations'],
-}
-
-async function requestUpgrade(plan: Plan) {
-  upgrading.value = plan.id
-  try {
-    // Send upgrade intent to support (no payment gateway yet)
-    await api.post('/support', {
-      name: 'Upgrade Request',
-      email: 'upgrade@vindicter.xyz',
-      category: 'billing',
-      subject: `Upgrade to ${plan.name}`,
-      message: `User requested upgrade to ${plan.name} plan ($${plan.priceUsd}/mo).`,
-      documentationChecked: false,
-      faqChecked: false,
-    })
-    upgraded.value = plan.id
-    setTimeout(() => { upgraded.value = null }, 4000)
-  } catch {
-    // silently fail — show success anyway since this is informational
-    upgraded.value = plan.id
-    setTimeout(() => { upgraded.value = null }, 4000)
-  } finally {
-    upgrading.value = null
-  }
 }
 
 onMounted(fetchPlans)
@@ -170,25 +144,12 @@ onMounted(fetchPlans)
           Current Free Tier
         </button>
         <button
-          v-else-if="upgraded === plan.id"
-          disabled
-          class="w-full rounded-xl py-2.5 text-[12px] font-semibold"
-          style="background:rgba(35,165,90,0.12);border:1px solid rgba(35,165,90,0.25);color:rgba(35,165,90,0.80);"
-        >
-          Request Sent!
-        </button>
-        <button
           v-else
-          class="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-[12px] font-semibold transition-colors cursor-pointer"
-          :style="plan.name === 'Pro'
-            ? 'background:rgba(139,92,246,0.75);color:white;'
-            : 'background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);color:rgba(255,255,255,0.70);'"
-          :disabled="upgrading === plan.id"
-          @click="requestUpgrade(plan)"
+          disabled
+          class="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-[12px] font-semibold"
+          style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.25);"
         >
-          <Loader2 v-if="upgrading === plan.id" class="h-3.5 w-3.5 animate-spin" />
-          <Zap v-else class="h-3.5 w-3.5" />
-          Upgrade to {{ plan.name }}
+          Coming soon
         </button>
       </div>
     </div>

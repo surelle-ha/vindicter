@@ -235,6 +235,7 @@ async function handleFinish() {
     activeAITool: null,
     ownedBy: 'local',
     code: wizard.projectCode || deriveProjectCode(wizard.projectName),
+    projectType: wizard.projectType ?? undefined,
   })
 
   await projects.addProject(data.meta)
@@ -376,10 +377,13 @@ async function handleFinish() {
           <p class="mt-3 text-xs leading-relaxed text-[var(--text-muted)]">
             Keep a quick scan fresh, review new evidence, and export a report before release decisions.
           </p>
-          <button class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-200 transition-colors hover:bg-amber-500/15">
+          <NuxtLink
+            :to="activeProject ? `/projects/${activeProject.id}` : '/'"
+            class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-200 transition-colors hover:bg-amber-500/15"
+          >
             View Workspace
             <ArrowRight class="size-3.5" />
-          </button>
+          </NuxtLink>
         </section>
 
         <section class="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">

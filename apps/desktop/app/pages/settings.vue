@@ -4,7 +4,6 @@ import { Sun, Moon, Database, ChevronDown, ChevronUp, FolderOpen, Stethoscope, C
 const app = useAppStore()
 const user = useUserStore()
 const projects = useProjectsStore()
-const academy = useAcademyStore()
 const router = useRouter()
 const route = useRoute()
 const { notify } = useNotifications()
@@ -132,8 +131,6 @@ const cleanProfilesDistro = ref('')
 const confirmCleanProfiles = ref(false)
 const wslAutoStart = ref(app.wslAutoStart)
 
-// Academy WSL Daemon
-const { state: daemonState, start: daemonStart, stop: daemonStop } = useAcademyDaemon()
 
 watch(wslAutoStart, (value) => app.setWslAutoStart(value))
 
@@ -366,6 +363,12 @@ const codexInstallLog = ref('')
 const claudeInstalling = ref(false)
 const claudeInstallLog = ref('')
 const ollamaInstalling = ref(false)
+const trivyInstalling = ref(false)
+const trivyInstallLog = ref('')
+const semgrepInstalling = ref(false)
+const semgrepInstallLog = ref('')
+const cargoAuditInstalling = ref(false)
+const cargoAuditInstallLog = ref('')
 
 const doctorSummary = computed(() => {
   const errors = doctorChecks.value.filter(c => c.status === 'error').length
@@ -383,6 +386,12 @@ const ollamaCheck = computed(() => doctorChecks.value.find(c => c.id === 'ollama
 const shouldShowCodexInstaller = computed(() => !codexCheck.value || codexCheck.value.status !== 'ok')
 const shouldShowClaudeInstaller = computed(() => !claudeCheck.value || claudeCheck.value.status !== 'ok')
 const shouldShowOllamaInstaller = computed(() => !ollamaCheck.value || ollamaCheck.value.status !== 'ok')
+const trivyCheck      = computed(() => doctorChecks.value.find(c => c.id === 'trivy'))
+const semgrepCheck    = computed(() => doctorChecks.value.find(c => c.id === 'semgrep'))
+const cargoAuditCheck = computed(() => doctorChecks.value.find(c => c.id === 'cargo-audit'))
+const shouldShowTrivyInstaller      = computed(() => !trivyCheck.value      || trivyCheck.value.status      !== 'ok')
+const shouldShowSemgrepInstaller    = computed(() => !semgrepCheck.value    || semgrepCheck.value.status    !== 'ok')
+const shouldShowCargoAuditInstaller = computed(() => !cargoAuditCheck.value || cargoAuditCheck.value.status !== 'ok')
 
 function firstLine(value: string | undefined) {
   return (value ?? '').split('\n').map(line => line.trim()).find(Boolean) ?? ''
@@ -665,6 +674,133 @@ async function checkOllamaHealth(): Promise<DoctorCheck> {
   }
 }
 
+async function checkTrivyHealth(): Promise<DoctorCheck> {
+  const { Command } = await import('@tauri-apps/plugin-shell')
+  // Resolution order: bundled sidecar → system PATH → cmd /c (winget PATH)
+  const attempts = [
+    () => Command.sidecar('binaries/trivy', ['--version']).execute(),
+    () => Command.create('trivy-version', ['--version']).execute(),
+    () => Command.create('cmd-trivy-version', ['/c', 'trivy', '--version']).execute(),
+  ]
+  for (const attempt of attempts) {
+    try {
+      const result = await attempt()
+      if (result.code === 0 || result.stdout) {
+        const v = firstLine(result.stdout || result.stderr)
+        const src = attempts.indexOf(attempt) === 0 ? ' (bundled)' : ''
+        return { id: 'trivy', label: 'Trivy', detail: `${v || 'Trivy'}${src} — scans npm, cargo, pip, go, maven, NuGet, IaC, and more.`, status: 'ok', fixable: false }
+      }
+    }
+    catch { /* try next */ }
+  }
+  return { id: 'trivy', label: 'Trivy', detail: 'Trivy not found. Run "pnpm download-sidecars" to bundle it, or install via winget.', status: 'error', fixable: false }
+}
+
+async function checkSemgrepHealth(): Promise<DoctorCheck> {
+  const { Command } = await import('@tauri-apps/plugin-shell')
+  try {
+    const result = await Command.create('semgrep-version', ['--version']).execute()
+    const v = firstLine(result.stdout || result.stderr)
+    return { id: 'semgrep', label: 'Semgrep', detail: `Semgrep ${v || ''} available — static analysis for JS/TS, Python, Go, Java, Ruby, and more.`.trim(), status: 'ok', fixable: false }
+  }
+  catch {
+    return { id: 'semgrep', label: 'Semgrep', detail: 'Semgrep is not installed. Install via pip to enable static code analysis.', status: 'error', fixable: false }
+  }
+}
+
+async function checkCargoAuditHealth(): Promise<DoctorCheck> {
+  const { Command } = await import('@tauri-apps/plugin-shell')
+  try {
+    await Command.create('cargo-version', ['--version']).execute()
+  }
+  catch {
+    return { id: 'cargo-audit', label: 'cargo-audit', detail: 'Rust / cargo is not installed. Install Rust from rustup.rs to enable cargo-audit for Rust dependency scanning.', status: 'warning', fixable: false }
+  }
+  try {
+    await Command.create('cargo-audit-check', ['audit', '--help']).execute()
+    return { id: 'cargo-audit', label: 'cargo-audit', detail: 'cargo-audit is installed and ready for Rust dependency vulnerability scanning.', status: 'ok', fixable: false }
+  }
+  catch {
+    return { id: 'cargo-audit', label: 'cargo-audit', detail: 'cargo is available but cargo-audit is not installed. Run cargo install cargo-audit to enable Rust vulnerability scanning.', status: 'error', fixable: false }
+  }
+}
+
+async function installTrivy() {
+  trivyInstalling.value = true
+  trivyInstallLog.value = ''
+  const { Command } = await import('@tauri-apps/plugin-shell')
+  try {
+    const result = await Command.create('winget-install-trivy', [
+      'install', '--id', 'AquaSecurity.Trivy', '-e',
+      '--accept-package-agreements', '--accept-source-agreements',
+    ]).execute()
+    trivyInstallLog.value = [result.stdout, result.stderr].filter(Boolean).join('\n').trim()
+    if (result.code === 0) {
+      notify('Trivy installed. Checking...', 'success')
+      await runDoctor()
+    }
+    else {
+      notify('Trivy install may have failed. Check the installer log.', 'error')
+    }
+  }
+  catch {
+    trivyInstallLog.value = 'winget could not be found. Install Trivy manually from github.com/aquasecurity/trivy/releases'
+    notify('winget not available. Download Trivy manually.', 'error')
+  }
+  finally {
+    trivyInstalling.value = false
+  }
+}
+
+async function installSemgrep() {
+  semgrepInstalling.value = true
+  semgrepInstallLog.value = ''
+  const { Command } = await import('@tauri-apps/plugin-shell')
+  const candidates = ['pip3-install-semgrep', 'pip-install-semgrep']
+  let lastLog = ''
+  for (const name of candidates) {
+    try {
+      const result = await Command.create(name, ['install', 'semgrep']).execute()
+      lastLog = [result.stdout, result.stderr].filter(Boolean).join('\n').trim()
+      semgrepInstallLog.value = lastLog
+      if (result.code === 0) {
+        notify('Semgrep installed. Checking...', 'success')
+        await runDoctor()
+        semgrepInstalling.value = false
+        return
+      }
+    }
+    catch { /* try next */ }
+  }
+  semgrepInstallLog.value = lastLog || 'pip/pip3 not found. Install Python first, then run: pip install semgrep'
+  notify('Semgrep install failed. Ensure Python/pip is installed.', 'error')
+  semgrepInstalling.value = false
+}
+
+async function installCargoAudit() {
+  cargoAuditInstalling.value = true
+  cargoAuditInstallLog.value = ''
+  const { Command } = await import('@tauri-apps/plugin-shell')
+  try {
+    const result = await Command.create('cargo-install-audit', ['install', 'cargo-audit']).execute()
+    cargoAuditInstallLog.value = [result.stdout, result.stderr].filter(Boolean).join('\n').trim()
+    if (result.code === 0) {
+      notify('cargo-audit installed. Checking...', 'success')
+      await runDoctor()
+    }
+    else {
+      notify('cargo-audit install failed. Check the log.', 'error')
+    }
+  }
+  catch {
+    cargoAuditInstallLog.value = 'cargo not found. Install Rust from rustup.rs first.'
+    notify('cargo not available. Install Rust first.', 'error')
+  }
+  finally {
+    cargoAuditInstalling.value = false
+  }
+}
+
 async function checkKokoroHealth(): Promise<DoctorCheck> {
   try {
     if (typeof caches === 'undefined') {
@@ -710,6 +846,9 @@ async function runDoctor() {
     checks.push(await checkOpenRouterHealth())
     checks.push(await checkOllamaHealth())
     checks.push(await checkKokoroHealth())
+    checks.push(await checkTrivyHealth())
+    checks.push(await checkSemgrepHealth())
+    checks.push(await checkCargoAuditHealth())
   }
   finally {
     doctorChecks.value = checks
@@ -773,7 +912,7 @@ const rawData = computed(() => JSON.stringify({
 }, null, 2))
 
 // Danger zone confirms
-const confirmReset = ref<null | 'profile' | 'projects' | 'academy' | 'all'>(null)
+const confirmReset = ref<null | 'profile' | 'projects' | 'all'>(null)
 
 async function resetProfile() {
   await user.reset()
@@ -787,12 +926,6 @@ async function clearProjects() {
   confirmReset.value = null
 }
 
-async function resetAcademyProgress() {
-  await academy.loadFromDisk()
-  await academy.resetProgress(false)
-  confirmReset.value = null
-  notify('Academy progress and enrollment were reset.', 'success')
-}
 
 async function resetAll() {
   await user.reset()
@@ -1083,7 +1216,7 @@ onMounted(() => {
             <div class="flex items-center justify-between gap-3">
               <div>
                 <p class="text-xs font-semibold text-[var(--text)]">Background backend</p>
-                <p class="mt-0.5 text-[11px] leading-relaxed text-[var(--text-muted)]">Keep enabled WSL profiles warm so Academy and Pentest can connect without opening a separate terminal first.</p>
+                <p class="mt-0.5 text-[11px] leading-relaxed text-[var(--text-muted)]">Keep enabled WSL profiles warm so Pentest tools can connect without opening a separate terminal first.</p>
               </div>
               <label class="relative inline-flex items-center cursor-pointer shrink-0">
                 <input v-model="wslAutoStart" type="checkbox" class="sr-only peer">
@@ -1103,30 +1236,6 @@ onMounted(() => {
               </GlassButton>
             </div>
 
-            <!-- Academy WSL Daemon -->
-            <div class="mt-2 rounded-xl border border-[var(--border)] bg-black/10 p-3 space-y-2">
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <p class="text-xs font-semibold text-[var(--text)]">Academy WSL Bridge</p>
-                  <p class="text-[10px] text-[var(--text-faint)]">Expose the academy sandbox over local port {{ daemonState.port }} so the web dashboard can relay terminal sessions.</p>
-                </div>
-                <div class="flex items-center gap-1.5 shrink-0">
-                  <span class="size-1.5 rounded-full" :class="daemonState.running ? 'bg-emerald-400' : 'bg-white/20'" />
-                  <span class="text-[10px] text-[var(--text-faint)]">{{ daemonState.running ? `Port ${daemonState.port}` : 'Stopped' }}</span>
-                </div>
-              </div>
-              <div class="flex gap-2">
-                <GlassButton v-if="!daemonState.running" variant="ghost" size="sm" :disabled="daemonState.starting" @click="daemonStart(wslInfo?.defaultDistro ?? '')">
-                  <Loader2 v-if="daemonState.starting" class="size-3.5 animate-spin" />
-                  <Plug v-else class="size-3.5" />
-                  Start bridge
-                </GlassButton>
-                <GlassButton v-else variant="ghost" size="sm" @click="daemonStop">
-                  <Square class="size-3.5" />
-                  Stop bridge
-                </GlassButton>
-              </div>
-            </div>
           </div>
 
           <div class="grid gap-2">
@@ -1148,7 +1257,7 @@ onMounted(() => {
             <div class="flex items-center justify-between gap-3">
               <div>
                 <p class="text-xs font-semibold text-[var(--text)]">Profiles</p>
-                <p class="mt-0.5 text-[11px] text-[var(--text-faint)]">Assign WSL distributions for Academy and Pentest workflows.</p>
+                <p class="mt-0.5 text-[11px] text-[var(--text-faint)]">Assign WSL distributions for Pentest workflows.</p>
               </div>
               <GlassButton variant="ghost" size="sm" @click="app.ensureDefaultWslProfiles(wslInfo.defaultDistro || wslInfo.distributions[0]?.name || '')">
                 Reset profiles
@@ -1172,14 +1281,14 @@ onMounted(() => {
                   <div class="w-9 h-5 bg-white/10 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white/40 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600 peer-checked:after:bg-white" />
                 </label>
               </div>
-              <select
-                class="h-9 rounded-lg border border-[var(--border)] bg-black/20 px-2 text-xs text-[var(--text)] outline-none"
+              <GlassSelect
+                class="w-full"
                 :value="profile.distro"
                 @change="saveWslProfileDistro(index, ($event.target as HTMLSelectElement).value)"
               >
                 <option value="">Default distribution</option>
                 <option v-for="distro in wslInfo.distributions" :key="distro.name" :value="distro.name">{{ distro.name }}</option>
-              </select>
+              </GlassSelect>
             </div>
           </div>
 
@@ -1187,13 +1296,13 @@ onMounted(() => {
           <div class="space-y-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] p-3">
             <div>
               <p class="text-xs font-semibold text-amber-200">Clean Vindicter Profiles</p>
-              <p class="mt-0.5 text-[11px] leading-relaxed text-[var(--text-muted)]">Removes only the <span class="font-mono">pentest</span> and <span class="font-mono">academy</span> user accounts and their home directories from the selected distribution. The distribution itself is kept.</p>
+              <p class="mt-0.5 text-[11px] leading-relaxed text-[var(--text-muted)]">Removes only the <span class="font-mono">pentest</span> user account and home directory from the selected distribution. The distribution itself is kept.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-              <select v-model="cleanProfilesDistro" class="h-9 min-w-40 flex-1 rounded-lg border border-amber-500/20 bg-black/20 px-2 text-xs text-[var(--text)] outline-none">
+              <GlassSelect v-model="cleanProfilesDistro" class="min-w-40 flex-1">
                 <option value="">Choose distribution</option>
                 <option v-for="distro in wslInfo.distributions" :key="distro.name" :value="distro.name">{{ distro.name }}</option>
-              </select>
+              </GlassSelect>
               <GlassCheckbox v-model="confirmCleanProfiles" size="sm" class="text-[11px] text-[var(--text-muted)]">
                 Confirm
               </GlassCheckbox>
@@ -1217,10 +1326,10 @@ onMounted(() => {
               <p class="mt-0.5 text-[11px] leading-relaxed text-[var(--text-muted)]">Permanently deletes the full Linux filesystem of the selected distribution. This cannot be undone.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-              <select v-model="purgeDistro" class="h-9 min-w-40 flex-1 rounded-lg border border-red-500/20 bg-black/20 px-2 text-xs text-[var(--text)] outline-none">
+              <GlassSelect v-model="purgeDistro" class="min-w-40 flex-1">
                 <option value="">Choose distribution</option>
                 <option v-for="distro in wslInfo.distributions" :key="distro.name" :value="distro.name">{{ distro.name }}</option>
-              </select>
+              </GlassSelect>
               <GlassCheckbox v-model="confirmWslPurge" size="sm" class="text-[11px] text-[var(--text-muted)]">
                 Yes, delete everything
               </GlassCheckbox>
@@ -1240,7 +1349,7 @@ onMounted(() => {
 
         <div v-else class="rounded-lg border border-amber-500/20 bg-amber-500/[0.06] p-3">
           <p class="text-xs text-[var(--text-muted)]">
-            Install WSL with <code class="rounded bg-white/[0.07] px-1 py-0.5 font-mono text-[11px]">wsl --install</code>, then come back here to assign Academy and Pentest profiles.
+            Install WSL with <code class="rounded bg-white/[0.07] px-1 py-0.5 font-mono text-[11px]">wsl --install</code>, then come back here to assign Pentest profiles.
           </p>
         </div>
       </div>
@@ -1290,7 +1399,7 @@ onMounted(() => {
             <Heart class="size-4 text-indigo-300" />
           </div>
           <div class="min-w-0">
-            <p class="text-sm font-semibold text-[var(--text)]">Made by Harold Eustaquio</p>
+            <p class="text-sm font-semibold text-[var(--text)]">Vindicter Security Platform</p>
             <p class="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
               Vindicter is an AI-powered security platform for scanning projects, tracking remediation, and keeping your team's security posture sharp.
             </p>
@@ -1382,6 +1491,36 @@ onMounted(() => {
               <Download v-else class="size-3" />
               Download Ollama
             </button>
+            <button
+              v-if="check.id === 'trivy' && shouldShowTrivyInstaller"
+              class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-sky-500/20 bg-sky-500/10 px-2.5 py-1.5 text-[10px] font-medium text-sky-300 hover:bg-sky-500/20 transition-colors disabled:opacity-60"
+              :disabled="trivyInstalling"
+              @click="installTrivy"
+            >
+              <Loader2 v-if="trivyInstalling" class="size-3 animate-spin" />
+              <Download v-else class="size-3" />
+              {{ trivyInstalling ? 'Installing…' : 'Install via winget' }}
+            </button>
+            <button
+              v-if="check.id === 'semgrep' && shouldShowSemgrepInstaller"
+              class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-2.5 py-1.5 text-[10px] font-medium text-indigo-300 hover:bg-indigo-500/20 transition-colors disabled:opacity-60"
+              :disabled="semgrepInstalling"
+              @click="installSemgrep"
+            >
+              <Loader2 v-if="semgrepInstalling" class="size-3 animate-spin" />
+              <Download v-else class="size-3" />
+              {{ semgrepInstalling ? 'Installing…' : 'Install via pip' }}
+            </button>
+            <button
+              v-if="check.id === 'cargo-audit' && shouldShowCargoAuditInstaller"
+              class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-orange-500/20 bg-orange-500/10 px-2.5 py-1.5 text-[10px] font-medium text-orange-300 hover:bg-orange-500/20 transition-colors disabled:opacity-60"
+              :disabled="cargoAuditInstalling"
+              @click="installCargoAudit"
+            >
+              <Loader2 v-if="cargoAuditInstalling" class="size-3 animate-spin" />
+              <Download v-else class="size-3" />
+              {{ cargoAuditInstalling ? 'Installing…' : 'cargo install cargo-audit' }}
+            </button>
             <span v-if="check.fixable" class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 shrink-0">fixable</span>
           </div>
         </div>
@@ -1399,6 +1538,27 @@ onMounted(() => {
             <p class="text-xs font-medium text-[var(--text-muted)]">Claude Code installer output</p>
           </div>
           <pre class="max-h-40 overflow-auto whitespace-pre-wrap text-[10px] leading-relaxed text-[var(--text-muted)] scrollbar-glass">{{ claudeInstallLog }}</pre>
+        </div>
+        <div v-if="trivyInstallLog" class="rounded-lg border border-[var(--border)] bg-black/20 p-3">
+          <div class="flex items-center gap-2 mb-2">
+            <Terminal class="size-3.5 text-[var(--text-muted)]" />
+            <p class="text-xs font-medium text-[var(--text-muted)]">Trivy installer output</p>
+          </div>
+          <pre class="max-h-40 overflow-auto whitespace-pre-wrap text-[10px] leading-relaxed text-[var(--text-muted)] scrollbar-glass">{{ trivyInstallLog }}</pre>
+        </div>
+        <div v-if="semgrepInstallLog" class="rounded-lg border border-[var(--border)] bg-black/20 p-3">
+          <div class="flex items-center gap-2 mb-2">
+            <Terminal class="size-3.5 text-[var(--text-muted)]" />
+            <p class="text-xs font-medium text-[var(--text-muted)]">Semgrep installer output</p>
+          </div>
+          <pre class="max-h-40 overflow-auto whitespace-pre-wrap text-[10px] leading-relaxed text-[var(--text-muted)] scrollbar-glass">{{ semgrepInstallLog }}</pre>
+        </div>
+        <div v-if="cargoAuditInstallLog" class="rounded-lg border border-[var(--border)] bg-black/20 p-3">
+          <div class="flex items-center gap-2 mb-2">
+            <Terminal class="size-3.5 text-[var(--text-muted)]" />
+            <p class="text-xs font-medium text-[var(--text-muted)]">cargo-audit installer output</p>
+          </div>
+          <pre class="max-h-40 overflow-auto whitespace-pre-wrap text-[10px] leading-relaxed text-[var(--text-muted)] scrollbar-glass">{{ cargoAuditInstallLog }}</pre>
         </div>
       </div>
     </div>
@@ -1462,21 +1622,6 @@ onMounted(() => {
           </GlassButton>
           <div v-else class="flex gap-2">
             <GlassButton size="sm" class="bg-red-600/20 text-red-400 border-red-500/30 hover:bg-red-600/30" @click="clearProjects">Confirm</GlassButton>
-            <GlassButton variant="ghost" size="sm" @click="confirmReset = null">Cancel</GlassButton>
-          </div>
-        </div>
-
-        <!-- Reset academy -->
-        <div class="flex items-center justify-between py-2 border-t border-white/[0.05]">
-          <div>
-            <p class="text-sm text-[var(--text)]">Reset Academy progress</p>
-            <p class="text-xs text-[var(--text-muted)]">Clears enrollment, completed lessons, professor chats, and certificate</p>
-          </div>
-          <GlassButton v-if="confirmReset !== 'academy'" variant="ghost" size="sm" class="text-red-400 hover:text-red-300" @click="confirmReset = 'academy'">
-            Reset
-          </GlassButton>
-          <div v-else class="flex gap-2">
-            <GlassButton size="sm" class="bg-red-600/20 text-red-400 border-red-500/30 hover:bg-red-600/30" @click="resetAcademyProgress">Confirm</GlassButton>
             <GlassButton variant="ghost" size="sm" @click="confirmReset = null">Cancel</GlassButton>
           </div>
         </div>

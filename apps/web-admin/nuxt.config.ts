@@ -7,6 +7,12 @@ const DESC     = 'Internal admin and marketing panel for Vindicter.'
 export default defineNuxtConfig({
   compatibilityDate: '2025-05-12',
   ssr: false,
+
+  // Fixes Nuxt 4.4.5 bug: "No entry found in rollupOptions.input" when ssr:false
+  experimental: {
+    viteEnvironmentApi: true,
+  },
+
   modules: [],
   runtimeConfig: {
     public: {

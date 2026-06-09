@@ -41,17 +41,14 @@ pnpm landing:dev
 ```
 apps/desktop/
   app/
-    pages/          # Route-level screens (academy, ai-models, security, profile, settings…)
+    pages/          # Route-level screens (ai-models, security, profile, settings…)
     components/
-      academy/      # Academy learning UI (AIProfessorChat, AcademyWhiteboard, AcademyAudioPlayer…)
       security/     # SecurityWorkspace and its sub-tabs
       ui/           # Shared: GlassButton, GlassInput, GlassModal, GlassCheckbox…
-    composables/    # useClaudeShell, useCodexShell, useOpenRouterAI, useOllamaAI, useAcademyTTS…
-    stores/         # app.ts (settings), auth.ts (GitHub OAuth), academy.ts, security.ts…
-    data/           # curriculum.ts (Academy lesson/week definitions)
+    composables/    # useClaudeShell, useCodexShell, useOpenRouterAI, useOllamaAI…
+    stores/         # app.ts (settings), auth.ts (GitHub OAuth), security.ts…
     types/          # vindicta.ts (ProjectMeta, SecurityFinding, SecurityScan…)
     utils/          # docx.ts, markdown.ts, date.ts…
-    workers/        # kokoro.worker.ts (ONNX TTS, runs in Web Worker)
   tauri/
     capabilities/   # Shell command allowlist
     tauri.conf.json # Window, bundle, and CSP config
@@ -63,8 +60,7 @@ apps/desktop/
 - Use CSS variables: `var(--bg-surface)`, `var(--bg-card)`, `var(--text)`, `var(--text-muted)`, `var(--text-faint)`, `var(--border)` — never hard-code dark/light colors
 - Glass cards: `rounded-xl border border-[var(--border)] bg-[var(--bg-card)]`
 - Accent colors by feature area:
-  - Indigo (`indigo-500`): Academy/chat/professor
-  - Teal (`teal-500`): Whiteboard, TTS, audio
+  - Indigo (`indigo-500`): General UI / interactive elements
   - Violet (`violet-500`): Claude / AI models
   - Emerald (`emerald-500`): Codex / success states
   - Sky (`sky-500`): OpenRouter
@@ -101,13 +97,6 @@ Then in components:
 - Import the composable function
 - Call it inside `try/catch`
 - Show streaming/loading state during the call
-
-## Academy Data Model
-
-- Lessons are defined in `apps/desktop/app/data/curriculum.ts`
-- Chat sessions persist per `lessonId` in the Academy Pinia store (`chatSessions`)
-- `AcademyChatMessage` has `id`, `role`, `text`, `model`, `createdAt`, `quiz`
-- `ChatMessage` (local to AIProfessorChat) extends with `mermaidCode?: string` for whiteboard
 
 ## Security Findings Data Model
 

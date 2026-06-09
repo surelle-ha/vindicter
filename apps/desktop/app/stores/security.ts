@@ -298,6 +298,14 @@ export const useSecurityStore = defineStore('security', {
           }
         }
       }
+      // Write findings to vindicta.json so they survive Tauri store resets
+      if (this.projectPath) {
+        try {
+          const { useVindicterJson } = await import('~/composables/useVindictaJson')
+          await useVindicterJson().patchSecurity(this.projectPath, snapshot)
+        }
+        catch { /* non-critical — project JSON may not exist yet */ }
+      }
     },
 
     persist(): Promise<void> {

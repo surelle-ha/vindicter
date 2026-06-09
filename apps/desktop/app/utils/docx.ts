@@ -864,6 +864,225 @@ export function createVindicterRawReportDocx(report: VindicterSecurityDocxReport
   ))
 }
 
+// ── Security Sign-Off Document ────────────────────────────────────────────────
+
+export interface VindicterSignOffDocxReport {
+  projectName: string
+  projectCode: string
+  findingTitle: string
+  findingSeverity: string
+  findingCategory: string
+  findingArea: string
+  findingDetail: string
+  validationStatus: string
+  verdict: string
+  evidence: string
+  recommendation: string
+  aiTool: string
+  validatedAt: string
+  generatedAt: string
+}
+
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  resolved:  { label: 'RESOLVED — Fix Confirmed',    color: '059669' },
+  present:   { label: 'STILL PRESENT',               color: 'DC2626' },
+  regressed: { label: 'REGRESSION DETECTED',         color: 'D97706' },
+  new_issue: { label: 'NEW ISSUE FOUND',             color: '7C3AED' },
+}
+
+function buildSignOffDocumentXml(report: VindicterSignOffDocxReport) {
+  const validatedDate = new Date(report.validatedAt).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })
+  const genDate       = new Date(report.generatedAt).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })
+  const statusMeta    = STATUS_LABELS[report.validationStatus] ?? { label: report.validationStatus.toUpperCase(), color: '64748B' }
+  const sevPal        = sevPalette(report.findingSeverity)
+
+  const cover = [
+    sPara(sRun('VINDICTA', { b: true, color: '059669', sz: 52, font: 'Calibri' }), '<w:spacing w:before="0" w:after="60"/>'),
+    sPara(sRun('Security Sign-Off Document', { color: '475569', sz: 26 }), '<w:spacing w:before="0" w:after="60"/>'),
+    dividerLine('10B981'),
+    spacer(),
+    sPara(
+      sRun('■ CONFIDENTIAL', { b: true, color: 'DC2626', sz: 18 }) +
+      sRun('   —   for internal use only', { color: '94A3B8', sz: 16 }),
+      '<w:spacing w:before="60" w:after="160"/>',
+    ),
+    metaLine([{ label: 'Project', value: report.projectName || 'Unknown' }]),
+    metaLine([{ label: 'Project Code', value: report.projectCode || 'N/A' }]),
+    metaLine([{ label: 'Validated', value: validatedDate }]),
+    metaLine([{ label: 'Generated', value: genDate }]),
+    spacer(),
+    dividerLine('E2E8F0'),
+  ].join('')
+
+  const findingSection = [
+    sectionHeading('01', 'Finding Under Review'),
+    `<w:p>
+      <w:pPr>
+        <w:shd w:fill="${sevPal.bg}" w:color="auto" w:val="clear"/>
+        <w:pBdr><w:left w:val="single" w:sz="24" w:space="4" w:color="${sevPal.border}"/></w:pBdr>
+        <w:ind w:left="200"/>
+        <w:spacing w:before="120" w:after="60"/>
+      </w:pPr>
+      ${sRun('[' + sevPal.label + ']', { b: true, color: sevPal.text, sz: 18 })}
+      ${sRun('  ' + report.findingTitle, { b: true, color: '0F172A', sz: 20 })}
+    </w:p>`,
+    metaLine([
+      { label: 'Category', value: report.findingCategory || 'Security review' },
+      { label: 'Area', value: report.findingArea || 'Project' },
+    ]),
+    fieldLabel('Description'),
+    fieldText(report.findingDetail),
+    spacer(),
+  ].join('')
+
+  const validationSection = [
+    sectionHeading('02', 'Validation Result'),
+    `<w:p>
+      <w:pPr><w:spacing w:before="80" w:after="80"/></w:pPr>
+      ${sRun(statusMeta.label, { b: true, color: statusMeta.color, sz: 22 })}
+    </w:p>`,
+    fieldLabel('Verdict'),
+    fieldText(report.verdict),
+    ...(report.evidence ? [fieldLabel('Evidence'), evidenceBlock(report.evidence)] : []),
+    ...(report.recommendation ? [fieldLabel('Recommendation'), fieldText(report.recommendation)] : []),
+    spacer(),
+  ].join('')
+
+  const signOffSection = [
+    sectionHeading('03', 'Sign-Off'),
+    sParaText(
+      'This document confirms that the above security finding was reviewed and validated by an AI security agent. A human engineer must review this outcome before it is considered authoritative.',
+      '<w:spacing w:after="120"/>',
+      { color: '475569', sz: 18 },
+    ),
+    spacer(),
+    metaLine([{ label: 'Validated by AI Tool', value: report.aiTool }]),
+    metaLine([{ label: 'Validation Date', value: validatedDate }]),
+    metaLine([{ label: 'Outcome', value: statusMeta.label }]),
+    spacer(),
+    dividerLine('E2E8F0'),
+    spacer(),
+    sPara(sRun('Authorized by:', { color: '64748B', sz: 18 }), '<w:spacing w:before="160" w:after="240"/>'),
+    sPara(sRun('_'.repeat(52), { color: 'CBD5E1', sz: 18 }), '<w:spacing w:before="0" w:after="60"/>'),
+    sPara(sRun('Name / Role / Date', { color: 'CBD5E1', sz: 16 }), '<w:spacing w:before="0" w:after="240"/>'),
+    sPara(sRun('Reviewed by:', { color: '64748B', sz: 18 }), '<w:spacing w:before="80" w:after="240"/>'),
+    sPara(sRun('_'.repeat(52), { color: 'CBD5E1', sz: 18 }), '<w:spacing w:before="0" w:after="60"/>'),
+    sPara(sRun('Name / Role / Date', { color: 'CBD5E1', sz: 16 }), '<w:spacing w:before="0" w:after="80"/>'),
+  ].join('')
+
+  const body = [cover, findingSection, validationSection, signOffSection].join('')
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  mc:Ignorable="w14 wp14">
+  <w:body>
+    ${body}
+    <w:sectPr>
+      <w:headerReference w:type="default" r:id="rId2"/>
+      <w:footerReference w:type="default" r:id="rId3"/>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="864" w:right="720" w:bottom="864" w:left="720" w:header="360" w:footer="360" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`
+}
+
+function buildSignOffHeaderXml(projectName: string) {
+  const name = xml(projectName || 'Sign-Off')
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr>
+      <w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="E2E8F0"/></w:pBdr>
+      <w:spacing w:before="0" w:after="80"/>
+      <w:jc w:val="both"/>
+    </w:pPr>
+    <w:r><w:rPr><w:b/><w:color w:val="059669"/><w:sz w:val="18"/><w:szCs w:val="18"/><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/></w:rPr><w:t>VINDICTA</w:t></w:r>
+    <w:r><w:rPr><w:color w:val="94A3B8"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t xml:space="preserve">  ·  Security Sign-Off  ·  ${name}</w:t></w:r>
+    <w:r><w:rPr><w:color w:val="auto"/><w:sz w:val="18"/></w:rPr><w:tab/></w:r>
+    <w:r><w:rPr><w:b/><w:color w:val="DC2626"/><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:t>CONFIDENTIAL</w:t></w:r>
+  </w:p>
+</w:hdr>`
+}
+
+export function createVindicterSignOffDocx(report: VindicterSignOffDocxReport) {
+  return createZip(sharedDocZipFiles(
+    report.projectName,
+    buildSignOffDocumentXml(report),
+    buildSecurityStylesXml(),
+    buildSignOffHeaderXml(report.projectName),
+    buildFooterXml(),
+    report.generatedAt,
+    `Vindicter Security Sign-Off — ${report.projectName}`,
+  ))
+}
+
+export function buildSignOffMarkdown(report: VindicterSignOffDocxReport): string {
+  const validatedDate = new Date(report.validatedAt).toLocaleDateString(undefined, { dateStyle: 'long' })
+  const statusMeta    = STATUS_LABELS[report.validationStatus] ?? { label: report.validationStatus.toUpperCase(), color: '' }
+  const sevEmoji      = ({ critical: '🔴', high: '🟠', medium: '🟡', low: '🔵' } as Record<string, string>)[report.findingSeverity.toLowerCase()] ?? '⚪'
+  const lines: string[] = [
+    `# Vindicter Security Sign-Off Document`,
+    ``,
+    `> **CONFIDENTIAL — for internal use only**`,
+    ``,
+    `| | |`,
+    `|---|---|`,
+    `| **Project** | ${report.projectName || 'Unknown'} |`,
+    `| **Project Code** | ${report.projectCode || 'N/A'} |`,
+    `| **Validated** | ${validatedDate} |`,
+    ``,
+    `---`,
+    ``,
+    `## 01  Finding Under Review`,
+    ``,
+    `### ${sevEmoji} [${report.findingSeverity.toUpperCase()}] ${report.findingTitle}`,
+    ``,
+    `**Category:** ${report.findingCategory || 'Security review'}  **Area:** ${report.findingArea || 'Project'}`,
+    ``,
+    `**Description:**`,
+    ``,
+    report.findingDetail || '_No description provided._',
+    ``,
+    `---`,
+    ``,
+    `## 02  Validation Result`,
+    ``,
+    `**Status:** ${statusMeta.label}`,
+    ``,
+    `**Verdict:** ${report.verdict}`,
+    ``,
+    ...(report.evidence ? [`**Evidence:**`, ``, '```', report.evidence, '```', ``] : []),
+    ...(report.recommendation ? [`**Recommendation:** ${report.recommendation}`, ``] : []),
+    `---`,
+    ``,
+    `## 03  Sign-Off`,
+    ``,
+    `| | |`,
+    `|---|---|`,
+    `| **Validated by AI Tool** | ${report.aiTool} |`,
+    `| **Validation Date** | ${validatedDate} |`,
+    `| **Outcome** | ${statusMeta.label} |`,
+    ``,
+    `---`,
+    ``,
+    `**Authorized by:** ___________________________________________`,
+    ``,
+    `Name / Role / Date`,
+    ``,
+    `**Reviewed by:** ___________________________________________`,
+    ``,
+    `Name / Role / Date`,
+    ``,
+    `---`,
+    ``,
+    `_Generated by Vindicter_`,
+  ]
+  return lines.join('\n')
+}
+
 // ── Fix Prompts Markdown ──────────────────────────────────────────────────────
 
 export function buildFixPromptsMarkdown(report: VindicterSecurityDocxReport): string {

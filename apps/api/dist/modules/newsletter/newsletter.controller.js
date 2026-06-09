@@ -63,16 +63,7 @@ let NewsletterController = class NewsletterController {
 </body>
 </html>`);
     }
-    getPublished(limit) {
-        return this.service.findPublishedUpdates(limit ? Number(limit) : undefined);
-    }
     findAllSignups() { return this.service.findAllSignups(); }
-    findAllUpdates() { return this.service.findAllUpdates(); }
-    createUpdate(body) { return this.service.createUpdate(body); }
-    updateOne(id, body) {
-        return this.service.updateOne(id, body);
-    }
-    removeUpdate(id) { return this.service.removeUpdate(id); }
 };
 exports.NewsletterController = NewsletterController;
 __decorate([
@@ -99,13 +90,6 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], NewsletterController.prototype, "downloadByToken", null);
 __decorate([
-    (0, common_1.Get)('updates/published'),
-    __param(0, (0, common_1.Query)('limit')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", void 0)
-], NewsletterController.prototype, "getPublished", null);
-__decorate([
     (0, common_1.Get)('signups'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, access_guard_1.AccessGuard),
     (0, require_access_decorator_1.RequireAccess)('newsletter', 'read'),
@@ -113,42 +97,6 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], NewsletterController.prototype, "findAllSignups", null);
-__decorate([
-    (0, common_1.Get)('updates'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, access_guard_1.AccessGuard),
-    (0, require_access_decorator_1.RequireAccess)('newsletter', 'read'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", void 0)
-], NewsletterController.prototype, "findAllUpdates", null);
-__decorate([
-    (0, common_1.Post)('updates'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, access_guard_1.AccessGuard),
-    (0, require_access_decorator_1.RequireAccess)('newsletter', 'create'),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
-], NewsletterController.prototype, "createUpdate", null);
-__decorate([
-    (0, common_1.Put)('updates/:id'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, access_guard_1.AccessGuard),
-    (0, require_access_decorator_1.RequireAccess)('newsletter', 'update'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
-    __metadata("design:returntype", void 0)
-], NewsletterController.prototype, "updateOne", null);
-__decorate([
-    (0, common_1.Delete)('updates/:id'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, access_guard_1.AccessGuard),
-    (0, require_access_decorator_1.RequireAccess)('newsletter', 'delete'),
-    __param(0, (0, common_1.Param)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", void 0)
-], NewsletterController.prototype, "removeUpdate", null);
 exports.NewsletterController = NewsletterController = __decorate([
     (0, common_1.Controller)('newsletter'),
     __metadata("design:paramtypes", [newsletter_service_1.NewsletterService])

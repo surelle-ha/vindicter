@@ -1,6 +1,12 @@
 {
   "name": "vindicter-workspace",
   "private": true,
+  "pnpm": {
+    "overrides": {
+      "devalue": ">=5.8.1",
+      "fast-uri": ">=3.1.2"
+    }
+  },
   "scripts": {
     "desktop:dev": "pnpm --filter @vindicter/desktop tauri:dev",
     "desktop:build": "pnpm --filter @vindicter/desktop tauri:build",
